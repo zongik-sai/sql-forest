@@ -42,6 +42,7 @@ docs/12_SETUP_GUIDE.md의 순서를 따릅니다. 요약:
 3. Supabase Auth → Providers → Google에 client ID/secret 입력(secret은 Supabase에만).
 4. Supabase Auth → URL Configuration: Site URL = `https://OWNER.github.io/REPO/`, Redirect URLs = `https://OWNER.github.io/REPO/`, `http://localhost:5173/` (정확히, 끝의 `/` 포함. hash 경로를 등록하지 않음).
 5. 로컬: `.env.example`을 `.env.local`로 복사하고 `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`(publishable/anon 키)만 입력. **service_role/secret 키는 절대 넣지 않습니다.**
+   입력 후 `npm run check:supabase`로 점검합니다(읽기 전용): 키 종류(공개 키인지), Google provider 사용 여부, migration 적용 여부, 비로그인 접근 차단을 확인합니다. Redirect URL은 자동 확인이 안 되므로 직접 확인하세요.
 6. 학교 Google Workspace 계정이 외부 앱을 막는 경우, Workspace 관리자가 관리 콘솔 → 보안 → API 제어 → 앱 액세스 제어에서 이 OAuth 클라이언트를 "신뢰함"으로 허용해야 합니다.
 
 로그인 흐름: 앱 루트로 돌아온 `?code=`를 Router보다 먼저 한 번만 교환(PKCE, `detectSessionInUrl: false`) → `history.replaceState`로 query 제거 → sessionStorage에 저장해 둔 **내부 hash 경로만** 복귀(외부 URL 거부, 없으면 `#/garden`).

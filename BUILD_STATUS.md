@@ -31,6 +31,8 @@
 - 앱 개선: 첫 앱 내 이동이 '새로고침 진입'으로 오인되던 경쟁 상태를 layout effect로 수정, 상단바 safe-area 대응, SQL 엔진(WASM) 로드 실패 시 원인 안내. sql.js asm.js 대체 빌드는 Chrome Worker에서 호출 스택 초과가 나서 채택하지 않음.
 - 재검증: Vitest 329, Playwright 30(dev 25 + Pages 5) 통과.
 
+- 2026-10-01 19:00 — 로그인 설정 단계 준비: `npm run check:supabase`(scripts/check-supabase.mjs, 읽기 전용 점검) 추가, 가짜 응답으로 통과/미적용/Google 꺼짐/비밀 키 실수 구분 테스트 5개. 단계별 설정 가이드 문서(SQL 숲 로그인 설정 가이드) 작성. 실제 Supabase·Google 설정과 로그인 확인은 선생님 계정 작업 대기.
+
 ## 미검증·한계(정직한 보고)
 - 실제 Google OAuth·Supabase 프로젝트 연동(로그인·취소·만료·다기기)은 자격정보가 없어 실행하지 않았다. mock 성공을 실제 검증으로 보고하지 않는다.
 - 집중모드는 합성 이벤트(visibilitychange/blur/focus)로 자동 검증했다. Chrome/Edge 실제 Alt+Tab·최소화·분할 화면·두 번째 모니터, 키보드만 사용, 태블릿 레이아웃, 가림 스크린샷 대비는 수동 확인 필요.
