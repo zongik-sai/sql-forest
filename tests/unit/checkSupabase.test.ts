@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { checkSupabase, classifyKey } from '../../scripts/check-supabase.mjs';
 
 const jwt = (role: string) => `x.${Buffer.from(JSON.stringify({ role })).toString('base64url')}.y`;
-type Route = (url: string, init?: RequestInit) => { status: number; body: unknown };
+type Route = (url: string, init?: RequestInit) => { status: number; body: unknown; type?: string };
 const fakeFetch = (route: Route) => (async (url: string, init?: RequestInit) => {
-  const { status, body } = route(url, init);
-  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
+  const { status, body, type = 'application/json' } = route(url, init);
+  const text = typeof body === 'string' ? body : JSON.stringify(body);
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? type : null) },
+    text: async () => text,
+    json: async () => JSON.parse(text),
+  } as unknown as Response;
 }) as unknown as typeof fetch;
 
 const URL_ = 'https://abcd1234.supabase.co';
@@ -38,6 +45,27 @@ describe('Supabase 설정 점검 스크립트', () => {
     }) });
     expect(r.ok).toBe(false);
     expect(r.checks.filter((c) => c.status === 'fail').map((c) => c.name)).toEqual(['Google 로그인', 'migration(테이블)', 'migration(XP 함수)']);
+  });
+  it('방화벽·프록시의 403(텍스트 응답)을 "비로그인 차단됨"으로 착각하지 않는다', async () => {
+    const r = await checkSupabase({ url: URL_, key: KEY, fetch: fakeFetch(() => ({ status: 403, type: 'text/plain', body: 'Host not in allowlist: abcd1234.supabase.co' })) });
+    expect(r.ok).toBe(false);
+    expect(r.checks.filter((c) => c.status === 'pass').map((c) => c.name)).toEqual(['프로젝트 URL', '공개 키 종류']);
+    expect(r.checks.find((c) => c.name === 'migration(테이블)')?.detail).toContain('방화벽');
+  });
+  it('다른 프로젝트의 키(Invalid API key)는 migration 통과로 보지 않는다', async () => {
+    const r = await checkSupabase({ url: URL_, key: KEY, fetch: fakeFetch(() => ({ status: 401, body: { message: 'Invalid API key', hint: 'Double check your Supabase `anon` or `service_role` API key.' } })) });
+    expect(r.ok).toBe(false);
+    expect(r.checks.filter((c) => c.status === 'fail').map((c) => c.name)).toEqual(['Google 로그인', 'migration(테이블)', 'migration(XP 함수)']);
+    expect(r.checks.find((c) => c.name === 'migration(테이블)')?.detail).toContain('이 프로젝트 것이 아니에요');
+  });
+  it('42501이 아닌 401 JSON은 통과시키지 않는다', async () => {
+    const r = await checkSupabase({ url: URL_, key: KEY, fetch: fakeFetch((u) => {
+      if (u.endsWith('/auth/v1/settings')) return { status: 200, body: { external: { google: true } } };
+      return { status: 401, body: { code: 'PGRST301', message: 'JWT expired' } };
+    }) });
+    expect(r.ok).toBe(false);
+    expect(r.checks.find((c) => c.name === 'migration(테이블)')?.status).toBe('fail');
+    expect(r.checks.find((c) => c.name === 'migration(XP 함수)')?.status).toBe('fail');
   });
   it('비밀 키를 넣으면 네트워크 요청 없이 즉시 실패', async () => {
     let called = false;
