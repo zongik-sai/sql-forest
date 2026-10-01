@@ -31,6 +31,9 @@ Playwright 브라우저가 없다면 처음 한 번 `npx playwright install chro
 상단에 "개발 데모" 표시가 있고, 운영(production) 빌드에서 `VITE_ENABLE_DEMO=true`를 쓰면 빌드가 실패합니다.
 `npm run build:demo`는 데모가 켜진 별도 빌드로, 학교 내부 시연용이며 공개 배포용이 아닙니다.
 
+### 1-1) 비공개 미리보기 페이지(Node 없이 보기)
+`npm run build:preview`는 데모를 상대 경로·메모리 라우터로 빌드하고 `dist-artifact/artifact.html`과 `assets/`(JS·Worker·WASM)를 만듭니다. 주소 hash를 쓸 수 없는 미리보기 화면용이며, 새로고침하면 첫 화면으로 돌아가고(진도는 브라우저에 남음) 보고서 다운로드 버튼은 미리보기 화면의 보안 정책상 동작하지 않을 수 있습니다.
+
 ### 2) 실제 서비스(Google 로그인)
 docs/12_SETUP_GUIDE.md의 순서를 따릅니다. 요약:
 

@@ -10,6 +10,7 @@ import react from '@vitejs/plugin-react';
  */
 function resolveBase(raw: string | undefined): string {
   if (!raw || raw === '/') return '/';
+  if (raw === './') return './'; // 상대 경로(미리보기 등 하위 경로를 미리 알 수 없을 때)
   let b = raw.trim();
   if (!b.startsWith('/')) b = '/' + b;
   if (!b.endsWith('/')) b = b + '/';

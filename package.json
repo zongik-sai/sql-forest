@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "test:db": "vitest run tests/db",
     "validate:content": "vitest run tests/unit/content.test.ts tests/unit/solutions.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:preview": "tsc -b && vite build --mode artifact --outDir dist-artifact && node scripts/make-artifact.mjs dist-artifact"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

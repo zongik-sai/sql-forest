@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { HashRouter, Link, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { HashRouter, Link, MemoryRouter, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Garden } from '../components/Garden';
 import { useAuth } from '../features/auth/AuthContext';
 import { FocusGate, FocusProvider, markInAppNavigation, useFocusGate } from '../features/focus/FocusContext';
@@ -190,7 +190,8 @@ function Home() {
 function NavTracker() {
   const loc = useLocation();
   const [first, setFirst] = useState(loc.pathname);
-  useEffect(() => {
+  // layout effect: 자식(FocusProvider)의 일반 effect보다 먼저 실행되어 첫 앱 내 이동도 정확히 기록된다
+  useLayoutEffect(() => {
     if (loc.pathname !== first) {
       markInAppNavigation();
       setFirst(loc.pathname);
@@ -217,9 +218,12 @@ function PlaygroundRoute() {
   return <Playground />;
 }
 
+/** 기본은 HashRouter(GitHub Pages). 비공개 미리보기처럼 주소 hash를 쓸 수 없는 곳은 VITE_ROUTER=memory */
+const Router = import.meta.env.VITE_ROUTER === 'memory' ? MemoryRouter : HashRouter;
+
 export function App() {
   return (
-    <HashRouter>
+    <Router>
       <NavTracker />
       <Routes>
         <Route element={<PublicShell />}>
@@ -246,6 +250,6 @@ export function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </HashRouter>
+    </Router>
   );
 }

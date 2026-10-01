@@ -11,10 +11,19 @@ import type { WorkerRequest, WorkerResponse } from './protocol';
 declare const self: DedicatedWorkerGlobalScope;
 
 let sqlPromise: Promise<SqlJsStatic> | null = null;
+
+/**
+ * SQLite(WASM) 초기화. 브라우저 보안 정책 등으로 WebAssembly를 쓸 수 없으면 원인을 알려 준다.
+ * (sql.js의 asm.js 빌드는 Chrome Worker에서 호출 스택 초과가 나 대체 수단으로 쓰지 않는다.)
+ */
 function getSql(): Promise<SqlJsStatic> {
-  sqlPromise ??= initSqlJs({ locateFile: () => wasmUrl });
+  sqlPromise ??= initSqlJs({ locateFile: () => wasmUrl }).catch((e: unknown) => {
+    sqlPromise = null;
+    throw new Error(`이 브라우저 환경에서 SQL 엔진(WebAssembly)을 불러오지 못했어요. 최신 Chrome·Edge에서 다시 열어 주세요. (${(e as Error)?.message ?? e})`);
+  });
   return sqlPromise;
 }
+
 const handle = createHandler(getSql);
 
 self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
