@@ -35,7 +35,7 @@ const SCHOOL_ALT = `
 INSERT INTO departments VALUES(10,'AI컴퓨터'),(20,'AI로봇'),(30,'AI콘텐츠디자인'),(40,'전기에너지'),(50,'스마트팩토리');
 INSERT INTO students VALUES(1,'하늘',20,1),(2,'노을',10,3),(3,'보라',10,3),(4,'새봄',30,2),(5,'이슬',40,3),(6,'초롱',20,3),(7,'단비',10,1),(8,'여름',40,2);
 INSERT INTO courses VALUES(101,'SQL캠프'),(102,'IoT캠프'),(103,'AI캠프'),(104,'로봇캠프');
-INSERT INTO enrollment VALUES(2,101,75),(2,103,NULL),(3,101,75),(3,102,95),(4,101,60),(5,102,NULL),(6,101,88),(6,103,70),(8,103,70);
+INSERT INTO enrollment VALUES(2,101,75),(2,103,NULL),(3,101,75),(3,102,95),(4,101,60),(5,102,NULL),(6,101,88),(6,103,70),(8,103,79);
 `;
 
 /** U02 정규화: 복합키 (student_id, course_id), 부분종속(student_name, course_name), 이행종속(dept_id→dept_name) */

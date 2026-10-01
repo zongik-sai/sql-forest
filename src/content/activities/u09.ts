@@ -86,7 +86,7 @@ export const U09 = [
     },
     hints: [
       '학생마다 따로 누적하려면 PARTITION BY student_id가 필요해요.',
-      '같은 날짜도 한 행씩 더하려면 정렬에 event_id를 추가하거나 ROWS 프레임을 쓰세요.',
+      '같은 날짜도 event_id 순으로 한 행씩 더하려면 ORDER BY에 event_id를 추가하세요(ROWS를 함께 쓰면 뜻이 더 분명해요).',
       'SUM(points) OVER (PARTITION BY student_id ORDER BY event_date, event_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)',
     ],
     solution: { sql: 'SELECT student_id, event_id, points, SUM(points) OVER (PARTITION BY student_id ORDER BY event_date, event_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS 누적 FROM point_events ORDER BY student_id, event_id;', reasoning: '학생마다 날짜·이벤트 순으로 한 행씩 더해요. 가온은 10 → 15 → 35예요.', commonMistakes: ['PARTITION BY를 빼서 모든 학생을 이어서 더하는 것', 'ORDER BY event_date만 써서 같은 날짜가 한꺼번에 더해지는 것'] },
@@ -99,7 +99,7 @@ export const U09 = [
       ordered: true,
       explore: [
         { label: 'LAG/LEAD 보기', sql: 'SELECT student_id, event_id, points,\n  LAG(points) OVER (PARTITION BY student_id ORDER BY event_id) AS 이전,\n  LEAD(points) OVER (PARTITION BY student_id ORDER BY event_id) AS 다음\nFROM point_events ORDER BY student_id, event_id;' },
-        { label: 'RANGE 기본 프레임 비교', sql: 'SELECT student_id, event_date, points,\n  SUM(points) OVER (PARTITION BY student_id ORDER BY event_date) AS range_누적,\n  SUM(points) OVER (PARTITION BY student_id ORDER BY event_date ROWS UNBOUNDED PRECEDING) AS rows_누적\nFROM point_events ORDER BY student_id, event_id;' },
+        { label: 'RANGE 기본 프레임 비교', sql: 'SELECT student_id, event_date, points,\n  SUM(points) OVER (PARTITION BY student_id ORDER BY event_date) AS range_누적,\n  SUM(points) OVER (PARTITION BY student_id ORDER BY event_date, event_id ROWS UNBOUNDED PRECEDING) AS rows_누적\nFROM point_events ORDER BY student_id, event_id;' },
       ],
     },
   }),
@@ -128,7 +128,7 @@ export const U09 = [
     ],
     solution: { reasoning: 'RANK <= 3은 동점 포함 4행, ROW_NUMBER <= 3과 LIMIT 3은 정확히 3행이에요.', commonMistakes: ['Top N이 항상 N행이라고 생각하는 것'] },
     conceptTags: ['Top N', 'RANK/DENSE_RANK/ROW_NUMBER', '인라인 뷰'],
-    dialectNotes: ['Oracle은 ROWNUM 또는 FETCH FIRST 3 ROWS WITH TIES, SQL Server는 TOP (3) WITH TIES를 써요. SQLite는 LIMIT를 써요.', 'NULL의 정렬 위치는 DBMS마다 달라요. SQLite에서 DESC 정렬 시 NULL은 맨 뒤, Oracle에서는 맨 앞이에요.'],
+    dialectNotes: ['Oracle의 ROWNUM은 동점을 포함하지 않고 ORDER BY보다 먼저 붙어서, 정렬한 인라인 뷰 바깥에서 써야 해요. 동점 포함은 Oracle FETCH FIRST 3 ROWS WITH TIES, SQL Server TOP (3) WITH TIES예요. SQLite는 LIMIT를 써요(동점 미포함).', 'NULL의 정렬 위치는 DBMS마다 달라요. SQLite에서 DESC 정렬 시 NULL은 맨 뒤, Oracle에서는 맨 앞이에요.'],
     successMessage: 'Top N에서 동점 포함 여부를 비교했어요.',
     config: {
       kind: 'predict-result',

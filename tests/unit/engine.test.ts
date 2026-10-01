@@ -127,6 +127,14 @@ describe('결과 기반 채점', () => {
     const g = gradeSql(SQL, { ...base, solutionSql: 'SELECT s.student_id FROM students s WHERE NOT EXISTS (SELECT 1 FROM enrollment e WHERE e.student_id=s.student_id)', studentSql: 'SELECT student_id FROM students WHERE student_id IN (4,5)' });
     expect(g.status === 'graded' && !g.pass && g.failedOnAltSeed).toBe(true);
   });
+  it('동점 포함 Top N: LIMIT 답은 동점이 있는 검증 seed에서 걸러진다(U12-A04)', async () => {
+    const { ACTIVITY_BY_ID } = await import('../../src/content');
+    const c = ACTIVITY_BY_ID['U12-A04'].config;
+    if (c.kind !== 'sql-editor') throw new Error('kind');
+    const limitAnswer = 'SELECT s.student_name, AVG(e.score), RANK() OVER (ORDER BY AVG(e.score) DESC) FROM enrollment e JOIN students s ON s.student_id = e.student_id WHERE e.score IS NOT NULL GROUP BY s.student_id ORDER BY 3, 1 LIMIT 2';
+    const g = gradeSql(SQL, { ...base, ordered: true, solutionSql: c.solutionSql, studentSql: limitAnswer });
+    expect(g.status === 'graded' && !g.pass && g.failedOnAltSeed).toBe(true);
+  });
   it('부동소수 허용오차', () => {
     const g = gradeSql(SQL, { ...base, solutionSql: 'SELECT AVG(score) FROM enrollment', studentSql: 'SELECT SUM(score)*1.0/COUNT(score) FROM enrollment' });
     expect(g.status === 'graded' && g.pass).toBe(true);

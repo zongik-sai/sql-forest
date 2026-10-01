@@ -124,6 +124,8 @@ export class RemoteProgress {
   private snapshotPending: LearnerState | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private sessionId: string | null = null;
+  /** 서버가 마지막으로 알려준 활동별 revision(대기 중 초안의 오래된 값 대신 사용) */
+  private revs = new Map<string, number>();
 
   constructor(private sb: SupabaseClient) {
     if (typeof window !== 'undefined') window.addEventListener('online', () => this.schedule(0));
@@ -187,7 +189,7 @@ export class RemoteProgress {
         const { data, error } = await this.sb.rpc('save_activity_progress', {
           p_activity_id: id, p_content_version: a.contentVersion, p_state: state, p_draft_sql: a.draftSql,
           p_attempts: a.attempts, p_hint_level: a.hintLevel, p_completion_kind: a.completionKind,
-          p_active_seconds: a.activeSeconds, p_expected_revision: a.serverRevision,
+          p_active_seconds: a.activeSeconds, p_expected_revision: Math.max(this.revs.get(id) ?? 0, a.serverRevision),
         });
         if (error) throw error;
         const res = data as { status: 'ok' | 'conflict'; revision: number; draft_sql?: string; state?: Record<string, unknown>; updated_at?: string };
@@ -195,6 +197,7 @@ export class RemoteProgress {
         if (res.status === 'conflict') {
           this.conflicts = [...this.conflicts.filter((c) => c.activityId !== id), { activityId: id, server: { revision: res.revision, draftSql: res.draft_sql ?? '', state: res.state ?? {}, updatedAt: res.updated_at ?? '' } }];
         } else {
+          this.revs.set(id, res.revision);
           this.onRevision?.(id, res.revision);
         }
       }
@@ -214,7 +217,8 @@ export class RemoteProgress {
     }
   }
 
-  resolveConflict(activityId: string) {
+  resolveConflict(activityId: string, serverRevision?: number) {
+    if (serverRevision !== undefined) this.revs.set(activityId, serverRevision);
     this.conflicts = this.conflicts.filter((c) => c.activityId !== activityId);
     this.listeners.forEach((l) => l());
   }

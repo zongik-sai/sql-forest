@@ -29,7 +29,7 @@ export const U11 = [
     ],
     solution: { sql: "UPDATE camp_signup SET status = '확정' WHERE status = '신청';", reasoning: "WHERE로 '신청' 행만 골라 2행을 '확정'으로 바꿔요. '취소' 행은 그대로예요.", commonMistakes: ["WHERE를 빼서 '취소' 행까지 '확정'이 되는 것"] },
     conceptTags: ['INSERT/UPDATE/DELETE/MERGE', 'DML'],
-    dialectNotes: ['MERGE INTO … USING … WHEN MATCHED THEN UPDATE … WHEN NOT MATCHED THEN INSERT는 Oracle·SQL Server 문법이에요. SQLite는 INSERT … ON CONFLICT DO UPDATE로 비슷한 일을 해요.'],
+    dialectNotes: ['MERGE INTO … USING … WHEN MATCHED THEN UPDATE … WHEN NOT MATCHED THEN INSERT는 표준 SQL이며 Oracle·SQL Server 등은 지원하지만 SQLite에는 없어요. SQLite는 INSERT … ON CONFLICT DO UPDATE로 비슷한 일을 해요.'],
     successMessage: "UPDATE로 '신청' 행만 '확정'으로 바꿨어요.",
     config: {
       kind: 'sql-editor',
@@ -50,6 +50,7 @@ export const U11 = [
       { term: 'TCL', meaning: 'COMMIT, ROLLBACK, SAVEPOINT처럼 트랜잭션을 제어하는 명령' },
       { term: 'SAVEPOINT', meaning: '트랜잭션 안의 중간 저장점' },
       { term: 'ROLLBACK TO', meaning: '지정한 저장점 이후의 변경만 취소' },
+      { term: 'ACID', meaning: '트랜잭션의 4가지 성질: 원자성(모두 반영 또는 모두 취소), 일관성(규칙 유지), 고립성(서로 간섭 없음), 지속성(확정 후 유지)' },
     ],
     mode: 'executable', datasetId: 'sandbox',
     prompt: '라온의 AI캠프 신청(INSERT)은 남기고, 가온을 취소한 UPDATE만 되돌린 뒤 트랜잭션을 확정하세요. 실수하면 "처음 상태로"를 누르세요.',

@@ -22,3 +22,9 @@
 - GitHub Pages publishing source: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site — Actions 기반 출판.
 - Supabase redirect URLs: https://supabase.com/docs/guides/auth/redirect-urls — 로그인 복귀 allowlist.
 HashRouter+루트 PKCE callback 조합은 Pages 경로 특성을 고려한 본 패키지의 구현 설계이며 실제 Google 로그인으로 별도 검증해야 한다. 레벨·XP는 수업 설계이며 공식 SQLD 등급이 아니다.
+
+## 구현 시 확인 기록(2026-10-01, Claude)
+- K-DATA 상세 출제기준(https://www.dataq.or.kr/www/sub/a_04.do): 자동 조회가 robots.txt로 차단되어 다시 읽지 못함 → **미검증 상태 유지**. 사람이 직접 열어 대조해야 함.
+- Vite 정적 배포 문서(https://vite.dev/guide/static-deploy.html): GitHub Pages Actions 예시의 액션 버전 확인 — checkout v7, setup-node v7, configure-pages v6, upload-pages-artifact v5, deploy-pages v5(커밋 SHA 고정). `.github/workflows/deploy-pages.yml`에 반영.
+- SQLite 엔진: sql.js 1.14.2에 포함된 SQLite **3.49.1**에서 윈도우 함수·RIGHT/FULL JOIN·재귀 CTE 실행을 테스트로 확인. REGEXP 함수는 없음(정규표현식 활동은 브라우저 정규식 시뮬레이션으로 표시).
+- Supabase: `@supabase/supabase-js` 2.117 사용(PKCE, `exchangeCodeForSession`). RLS·RPC는 PGlite(PostgreSQL 17 WASM)와 Supabase 호환 auth 스텁으로 검증했고, **실제 Supabase 프로젝트·Google OAuth는 자격정보가 없어 미검증**.

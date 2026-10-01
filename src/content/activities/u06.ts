@@ -118,6 +118,7 @@ export const U06 = [
     ],
     solution: { sql: 'SELECT dept_id, COUNT(*) AS student_count, AVG(grade) AS avg_grade FROM students GROUP BY dept_id ORDER BY dept_id;', reasoning: '학과로 묶어 행 수와 학년 평균을 구하고 dept_id 순으로 정렬해요.', commonMistakes: ['ORDER BY를 빼서 순서가 보장되지 않는 것', 'SELECT에 student_name처럼 그룹에 없는 열을 넣는 것'] },
     conceptTags: ['GROUP BY', 'ORDER BY', '집계 함수'],
+    dialectNotes: ['SQLite는 GROUP BY에 없는 열(student_name 등)을 SELECT에 써도 오류 없이 임의의 값을 보여 주지만, Oracle·SQL Server에서는 오류예요.', 'SQL Server의 AVG(정수 열)는 결과가 정수로 잘려요. 소수가 필요하면 AVG(grade * 1.0)처럼 써요.'],
     successMessage: '학과별 학생 수와 평균 학년을 계산했어요.',
     config: {
       kind: 'sql-editor',

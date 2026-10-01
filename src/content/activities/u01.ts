@@ -86,6 +86,7 @@ export const U01 = [
       { term: '개념 모델', meaning: '업무에 필요한 핵심 엔터티와 관계를 큰 그림으로 표현' },
       { term: '논리 모델', meaning: '속성, 식별자, 관계를 정확히 정하고 정규화하는 단계' },
       { term: '물리 모델', meaning: '특정 DBMS에 맞춰 테이블, 데이터 타입, 인덱스를 정하는 단계' },
+      { term: '모델링의 특징', meaning: '추상화(공통 특징을 뽑아 일반화) · 단순화(약속된 표기법으로 쉽게 표현) · 명확화(한 가지 뜻으로만 해석되게 정확히 표현)' },
     ],
     mode: 'simulation', datasetId: 'school',
     prompt: '각 작업 카드를 알맞은 모델링 단계에 연결하세요.',
@@ -127,7 +128,7 @@ export const U01 = [
       prompt: '지금 SQL을 그대로 실행하면 어떻게 될까요?',
       options: ['그대로 저장된다', '제약조건 오류로 저장되지 않는다', '학년만 자동으로 3으로 바뀐다'],
       correctIndex: 1,
-      reveal: 'grade 4는 CHECK(1~3)에, 학과 이름 글자는 학과 번호(FK)에 맞지 않아 거부돼요.',
+      reveal: 'grade 4는 CHECK(1~3)에, 학과 이름 글자는 정수형 학과 번호(타입·FK)에 맞지 않아 거부돼요.',
     },
     hints: [
       'grade의 도메인은 1~3, dept_id의 도메인은 departments 표에 있는 번호예요.',

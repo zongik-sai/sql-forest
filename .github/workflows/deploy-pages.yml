@@ -1,0 +1,77 @@
+# GitHub Pages 배포 (docs/12_SETUP_GUIDE.md)
+# - main 브랜치 push 또는 수동 실행(workflow_dispatch)에서만 배포한다.
+# - PR은 검증(타입·테스트·빌드)만 하고 배포하지 않는다. pull_request_target은 사용하지 않는다.
+# - 공개 Supabase 값은 저장소 Settings > Secrets and variables > Actions > Variables에 넣는다.
+#   (VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY) service_role/secret 키는 넣지 않는다.
+# - 저장소 Settings > Pages > Source = GitHub Actions
+# 액션 버전은 vite.dev/guide/static-deploy 예시(2026-10-01 확인)와 같은 커밋 SHA로 고정했다.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install (lockfile 고정)
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Core tests (콘텐츠·정답 SQL·채점·XP·집중모드·RLS/RPC)
+        run: npm test
+      - name: Configure Pages
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - name: Build
+        env:
+          # 프로젝트 사이트면 /REPO/, 사용자 사이트·커스텀 도메인이면 / (configure-pages가 결정)
+          BASE_PATH: ${{ steps.pages.outputs.base_path && format('{0}/', steps.pages.outputs.base_path) || format('/{0}/', github.event.repository.name) }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_ENABLE_DEMO: 'false'
+        run: npm run build
+      - name: Verify build paths (base·Worker·WASM)
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path && format('{0}/', steps.pages.outputs.base_path) || format('/{0}/', github.event.repository.name) }}
+        run: node scripts/verify-dist.mjs dist
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ./dist
+
+  deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

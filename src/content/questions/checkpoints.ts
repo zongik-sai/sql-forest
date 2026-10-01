@@ -10,7 +10,7 @@ const pairs: [Question, Question][] = [
   /* ---------------- U01 ---------------- */
   defineCheckpointPair(
     { id: 'U01-Q01', unitId: 'U01', set: 'checkpoint', area: 'modeling', conceptTags: ['모델링', '추상화·단순화·명확화'],
-      prompt: '모델링의 특징 중 "복잡한 현실에서 필요한 것만 남겨 쉽게 표현하는 것"은?',
+      prompt: '모델링의 특징 중 "복잡한 현실을 약속된 규약에 따라 제한된 표기법·언어로 표현해 쉽게 이해하게 하는 것"은?',
       body: choice(['추상화', '단순화', '명확화', '정규화'], 1),
       explanation: '단순화는 복잡한 현실을 약속된 표기로 쉽게 표현하는 것이에요. 추상화는 공통 특징을 뽑아 일반화, 명확화는 애매함 없이 한 뜻으로 표현하는 것이에요.',
       review: '모델링의 세 특징: 추상화(공통 특징을 뽑아 일반화), 단순화(쉽게 표현), 명확화(한 가지 뜻으로 정확히). 각 단어의 뜻을 다시 떠올려 보세요.' },
@@ -355,7 +355,7 @@ const pairs: [Question, Question][] = [
     { prompt: 'Oracle 계층형 질의에서 부모-자식 연결 방향을 지정하는 절은?',
       body: choice(['START WITH', 'CONNECT BY PRIOR', 'LEVEL', 'WITH RECURSIVE'], 1),
       explanation: 'CONNECT BY PRIOR club_id = parent_id처럼 부모에서 자식 방향을 정해요.',
-      review: 'PRIOR가 붙은 쪽이 이전(부모) 행의 값이에요.' },
+      review: 'PRIOR가 붙은 쪽은 직전에 방문한 행의 값이에요. PRIOR 자식키 = 부모키 형태면 위에서 아래로(순방향) 내려가요.' },
   ),
   defineCheckpointPair(
     { id: 'U10-Q03', unitId: 'U10', set: 'checkpoint', area: 'advanced', conceptTags: ['정규표현식'],

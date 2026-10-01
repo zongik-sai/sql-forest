@@ -214,7 +214,7 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
     } else {
       void commit((s) => ({ ...s, activities: { ...s.activities, [activityId]: { ...cur, serverRevision: c.server.revision } } }), { activityId, immediate: true });
     }
-    remote.resolveConflict(activityId);
+    remote.resolveConflict(activityId, c.server.revision);
   }, [remote, commit]);
 
   const resetMyData = useCallback(async () => {

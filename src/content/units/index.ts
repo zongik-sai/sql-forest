@@ -37,7 +37,7 @@ export const UNITS: Unit[] = [
     badgeId: 'badge:unit-U09', badgeName: '순위 설계자', intro: '행을 줄이지 않고 순위와 누적합을 붙이는 윈도우 함수를 다뤄요.' }),
   unit({ id: 'U10', order: 10, title: '심화 SQL 첫 경험', minutes: 30, checkpointMinutes: 6,
     concepts: ['ROLLUP/CUBE/GROUPING SETS/GROUPING', '계층형 질의·셀프조인', 'PIVOT/UNPIVOT', '정규표현식'],
-    badgeId: 'badge:unit-U10', badgeName: '변환 탐험가', intro: '시험에 나오는 DBMS 전용 문법을 SQLite 대안과 나란히 비교해요.' }),
+    badgeId: 'badge:unit-U10', badgeName: '변환 탐험가', intro: 'SQLite에는 없는 시험 문법(소계·계층·피벗·정규표현식)을 같은 결과의 SQLite 대안과 나란히 비교해요.' }),
   unit({ id: 'U11', order: 11, title: '데이터 변경·트랜잭션', minutes: 30, checkpointMinutes: 5,
     concepts: ['INSERT/UPDATE/DELETE/MERGE', 'COMMIT/ROLLBACK/SAVEPOINT', 'ACID', 'DDL·제약조건', 'DCL', 'DELETE/TRUNCATE/DROP'],
     badgeId: 'badge:unit-U11', badgeName: '데이터 관리자', intro: '안전한 샌드박스에서 데이터를 바꾸고 되돌려 봐요.' }),

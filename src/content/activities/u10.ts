@@ -36,7 +36,7 @@ export const U10 = [
     ],
     solution: { sql: `-- Oracle/SQL Server: SELECT dept_name, month, SUM(participants) FROM camp_monthly GROUP BY ROLLUP(dept_name, month);\n${wrap(ROLLUP_SQL)};`, reasoning: 'ROLLUP(dept_name, month)은 (학과,월), (학과), () 세 묶음을 만들어요. CUBE는 월별 소계까지 더해 행이 더 많아요.', commonMistakes: ['CUBE를 골라 월별 소계까지 나오는 것'] },
     conceptTags: ['ROLLUP/CUBE/GROUPING SETS/GROUPING'],
-    dialectNotes: ['ROLLUP/CUBE/GROUPING SETS/GROUPING은 Oracle·SQL Server 문법이에요. SQLite에서는 실행되지 않아 같은 결과의 UNION ALL 쿼리로 바꿔 실행했어요.', 'SQL Server는 GROUP BY dept_name, month WITH ROLLUP 형태도 지원해요.'],
+    dialectNotes: ['ROLLUP/CUBE/GROUPING SETS/GROUPING은 표준 SQL이며 Oracle·SQL Server 등은 지원하지만 SQLite에는 없어요. 그래서 같은 결과의 UNION ALL 쿼리로 바꿔 실행했어요.', 'SQL Server는 GROUP BY dept_name, month WITH ROLLUP 형태도 지원해요.'],
     successMessage: 'ROLLUP으로 학과별 소계와 총계를 만들었어요.',
     config: {
       kind: 'row-filter',
@@ -85,9 +85,9 @@ export const U10 = [
       nodesSql: 'SELECT club_id, parent_id, club_name FROM clubs_tree ORDER BY club_id',
       answerSql: 'WITH RECURSIVE sub(club_id) AS (SELECT club_id FROM clubs_tree WHERE parent_id = 2 UNION ALL SELECT c.club_id FROM clubs_tree c JOIN sub ON c.parent_id = sub.club_id) SELECT club_id FROM sub',
       question: '학술부(2) 아래의 모든 동아리',
-      dialectSql: "-- Oracle (SQLite에서 실행 안 됨)\nSELECT LEVEL, club_name\nFROM clubs_tree\nSTART WITH club_id = 2\nCONNECT BY PRIOR club_id = parent_id;",
+      dialectSql: "-- Oracle (SQLite에서 실행 안 됨)\n-- START WITH 행(학술부)도 LEVEL 1로 결과에 포함돼요\nSELECT LEVEL, club_name\nFROM clubs_tree\nSTART WITH club_id = 2\nCONNECT BY PRIOR club_id = parent_id;",
       runnable: [
-        { label: 'WITH RECURSIVE로 하위 트리(LEVEL 포함)', sql: 'WITH RECURSIVE sub(club_id, club_name, lvl) AS (\n  SELECT club_id, club_name, 1 FROM clubs_tree WHERE club_id = 2\n  UNION ALL\n  SELECT c.club_id, c.club_name, sub.lvl + 1\n  FROM clubs_tree c JOIN sub ON c.parent_id = sub.club_id\n)\nSELECT lvl, club_name FROM sub;' },
+        { label: 'WITH RECURSIVE로 하위 트리(LEVEL 포함)', sql: '-- 시작 행(학술부)도 lvl 1로 포함돼요\nWITH RECURSIVE sub(club_id, club_name, lvl) AS (\n  SELECT club_id, club_name, 1 FROM clubs_tree WHERE club_id = 2\n  UNION ALL\n  SELECT c.club_id, c.club_name, sub.lvl + 1\n  FROM clubs_tree c JOIN sub ON c.parent_id = sub.club_id\n)\nSELECT lvl, club_name FROM sub;' },
         { label: '셀프조인으로 부모 이름 붙이기', sql: 'SELECT c.club_name AS 동아리, p.club_name AS 부모\nFROM clubs_tree c LEFT JOIN clubs_tree p ON c.parent_id = p.club_id\nORDER BY c.club_id;' },
       ],
     },
@@ -111,7 +111,7 @@ export const U10 = [
     ],
     solution: { sql: "SELECT dept_name,\n  SUM(CASE WHEN month = '3월' THEN participants END) AS \"3월\",\n  SUM(CASE WHEN month = '4월' THEN participants END) AS \"4월\"\nFROM camp_monthly GROUP BY dept_name ORDER BY dept_name;", reasoning: '월 값이 열 제목이 되고 각 칸에 그 학과·월의 인원이 들어가요. 기록이 없으면 NULL이에요.', commonMistakes: ['기록 없는 칸에 0을 적는 것(NULL과 0은 달라요)'] },
     conceptTags: ['PIVOT/UNPIVOT', '조건부 집계'],
-    dialectNotes: ["Oracle·SQL Server의 PIVOT (SUM(participants) FOR month IN ('3월', '4월'))은 SQLite에서 실행되지 않아요. 조건부 집계로 같은 표를 만들어 비교해요."],
+    dialectNotes: ["Oracle은 PIVOT (SUM(participants) FOR month IN ('3월', '4월')), SQL Server는 FOR month IN ([3월], [4월])처럼 대괄호를 써요. 둘 다 SQLite에서는 실행되지 않아 조건부 집계로 같은 표를 만들어 비교해요."],
     successMessage: '세로 데이터를 월별 열로 펼쳤어요.',
     config: {
       kind: 'pivot',

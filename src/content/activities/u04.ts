@@ -11,6 +11,8 @@ export const U04 = [
     glossary: [
       { term: 'WHERE', meaning: '조건이 참인 행만 남기는 절' },
       { term: '비교 연산자', meaning: '= (같다), <> (다르다), >, >=, <, <=' },
+      { term: 'BETWEEN a AND b', meaning: 'a 이상 b 이하(양 끝 포함). 예: grade BETWEEN 2 AND 3' },
+      { term: 'IN (목록)', meaning: '목록 중 하나와 같으면 참. 예: dept_id IN (10, 20) = dept_id = 10 OR dept_id = 20' },
     ],
     mode: 'executable', datasetId: 'school',
     prompt: '연산자와 값을 바꿔 "2학년 이상" 학생만 남기세요.',
@@ -144,7 +146,7 @@ export const U04 = [
     solution: {
       sql: 'SELECT s.student_id FROM students s WHERE NOT EXISTS (SELECT 1 FROM enrollment e WHERE e.student_id = s.student_id) ORDER BY s.student_id;',
       reasoning: '학생마다 그 학생의 수강 행이 있는지 확인해 없으면 남겨요. 결과는 4, 5예요. enrollment.student_id는 NOT NULL이라 그 열 자체에는 NULL이 없어요. 위의 0행은 비교 목록에 직접 넣은 NULL 때문이에요.',
-      commonMistakes: ['NOT IN 목록에 NULL이 있으면 결과가 0행이 되는 것', '= NULL로 NULL을 찾으려는 것'],
+      commonMistakes: ['NOT IN 목록에 NULL이 섞이면 0행이 된다는 것을 놓치는 것', '= NULL로 NULL을 찾으려는 것'],
     },
     conceptTags: ['NULL', '3값 논리', 'IS NULL', 'NOT EXISTS'],
     successMessage: 'NOT EXISTS로 수강 기록 없는 학생을 찾았어요.',

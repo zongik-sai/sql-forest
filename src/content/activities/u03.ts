@@ -117,6 +117,7 @@ export const U03 = [
     ],
     solution: { reasoning: 'FROM(1) → WHERE(2) → GROUP BY(3) → HAVING(4) → SELECT(5) → ORDER BY(6) 순서예요.', commonMistakes: ['SELECT를 1번으로 두는 것', 'HAVING을 GROUP BY보다 먼저 두는 것'] },
     conceptTags: ['논리적 처리 순서'],
+    dialectNotes: ['SQLite는 예외적으로 WHERE·GROUP BY에서도 SELECT 별칭을 허용하지만, 시험 기준(Oracle·SQL Server)에서는 오류예요. 이 앱에서 실행된다고 규칙이 바뀌는 것은 아니에요.'],
     successMessage: 'SQL의 논리적 처리 순서를 정렬했어요.',
     config: {
       kind: 'classify', layout: 'order',
