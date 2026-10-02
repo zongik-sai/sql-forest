@@ -11,8 +11,8 @@
 | S04 학습 흐름 UI | done | src/features/learning/**, src/features/progress/pages.tsx, src/app/** | E2E: 데모 시작→진단 건너뛰기→U01 4활동 실제 조작→체크포인트 오답·개념 복습·변형 재도전→U02 해제, 정답 보기 후 안내 학습 완료, 잠긴 단원 차단, 활동 13종 각 1개 이상 조작, 도전 모드 | 없음 |
 | S05 원장·XP·정원·배지 | done | src/features/progress/{rewards,ledger,model}.ts, src/features/growth/levels.ts, src/components/Garden.tsx | XP 경계(0/99/100/9899/9900), Lv0~99 모든 레벨의 단계 이름·정원 형태 변화, U01 650XP/Lv6 → 7,800/Lv78 → 9,000/Lv90 → 9,900/Lv99, 2/3 해제·마무리 보류, 힌트 무감점, 중복 지급 방지(재제출·재로딩·동시·모드 변경), E2E로 최종 진단→Lv99 보고서·CSV | 없음 |
 | S06 집중모드·초안 복구·접근성 | done | src/features/focus/** | 상태기계·타이머 단위 테스트, E2E: 탭 숨김/창 blur → 불투명 가림·inert·단축키 차단·자동 재개 없음·초안 보존, 수동 휴식, 실행 중 SQL 중단+late result 무시, 2초 시간초과 복원, 숨김 시간 미포함, 새로고침 후 클릭으로 재개 | 실제 OS 창 전환(Alt+Tab·최소화·분할화면) 수동 확인 필요 |
-| S07 Supabase·OAuth·동기화 | done(코드) / 설정 대기(실서비스) | supabase/migrations/20261001000000_sql_forest_v2.sql, src/features/auth/** | PGlite(PostgreSQL 17)+Supabase 호환 auth 스텁에서 RLS(타인 조회·수정·삭제 불가, user_id 변경 불가, anon 차단), xp_events 직접 쓰기 거부, award_xp 멱등·선행조건·9,900, 배지·숙련, revision CAS, 세션 시간 상한, 데이터 삭제, 카탈로그=TS 일치, migration 재적용. 가짜 서버로 오프라인 대기·재전송·충돌 처리 테스트 | 실제 Supabase 프로젝트·Google OAuth 클라이언트 생성, 실제 로그인/취소/재로그인/세션 만료/다른 기기 이어하기 검증 |
-| S08 GitHub Pages 준비 | done(코드) / 설정 대기(배포) | .github/workflows/deploy-pages.yml, vite.config.ts, scripts/verify-dist.mjs, README.md | `/sql-forest/` 운영 빌드 경로 검증 스크립트 통과, Pages E2E(데모 버튼 없음, 하위 경로 Worker·WASM 실행, hash 직접 링크 새로고침, `?code=`/`?error=` 처리 후 query 제거·외부 복귀 경로 거부), 운영 빌드에서 데모 플래그 거부 확인 | 저장소 생성·push·Pages Source=Actions·Variables 등록(사용자 배포 지시 후) |
+| S07 Supabase·OAuth·동기화 | done(코드·실서비스 설정) / 실제 로그인 확인 대기 | supabase/migrations/20261001000000_sql_forest_v2.sql, src/features/auth/** | PGlite(PostgreSQL 17)+Supabase 호환 auth 스텁에서 RLS(타인 조회·수정·삭제 불가, user_id 변경 불가, anon 차단), xp_events 직접 쓰기 거부, award_xp 멱등·선행조건·9,900, 배지·숙련, revision CAS, 세션 시간 상한, 데이터 삭제, 카탈로그=TS 일치, migration 재적용. 가짜 서버로 오프라인 대기·재전송·충돌 처리 테스트 | 실제 로그인/취소/재로그인/세션 만료/다른 기기 이어하기 검증(배포 주소에서) |
+| S08 GitHub Pages 준비 | done(코드) / 설정 대기(배포) | .github/workflows/deploy-pages.yml, vite.config.ts, scripts/verify-dist.mjs, README.md | `/sql-forest/` 운영 빌드 경로 검증 스크립트 통과, Pages E2E(데모 버튼 없음, 하위 경로 Worker·WASM 실행, hash 직접 링크 새로고침, `?code=`/`?error=` 처리 후 query 제거·외부 복귀 경로 거부), 운영 빌드에서 데모 플래그 거부 확인 | 저장소 생성·Pages Source=Actions·Variables 등록 완료, push 후 Actions 배포 확인 |
 | S09 전체 QA·보고 | done | BUILD_STATUS.md, README.md | typecheck·lint·Vitest·Playwright(dev+pages)·build 전체 재실행(아래 결과) | 위 '설정 대기' 항목 |
 
 ## 설계 결정 기록
@@ -33,14 +33,23 @@
 
 - 2026-10-01 19:00 — 로그인 설정 단계 준비: `npm run check:supabase`(scripts/check-supabase.mjs, 읽기 전용 점검) 추가, 가짜 응답으로 통과/미적용/Google 꺼짐/비밀 키 실수 구분 테스트 5개. 단계별 설정 가이드 문서(SQL 숲 로그인 설정 가이드) 작성. 실제 Supabase·Google 설정과 로그인 확인은 선생님 계정 작업 대기.
 
+- 2026-10-02 — 실서비스 설정(선생님 공개 배포 승인 후). 비밀번호·Client Secret·약관 동의·GitHub 앱 권한은 선생님이 직접 처리했고, 비밀 값은 Claude가 보거나 저장하지 않음.
+  - Supabase 프로젝트 `sql-forest`(Northeast Asia/Seoul) 생성, "새 테이블 자동 노출" 끔. migration을 원본 파일과 SHA-256 일치 확인 후 SQL Editor에서 실행. 실제 DB 조회: reward_catalog 109행·합계 9,900XP, 사용자 테이블 10개 RLS 켜짐, 정책 28개, anon의 award_xp 실행·카탈로그 조회·delete_my_progress 실행 불가, authenticated의 xp_events 직접 INSERT 불가, private 함수 직접 실행 불가.
+  - 실제 REST 응답(브라우저): 비로그인 reward_catalog·award_xp 모두 42501, 잘못된 키 "Invalid API key", publishable 키 정상.
+  - Auth: Site URL `https://zongik-sai.github.io/sql-forest/`, Redirect URLs = 그 주소 + `http://localhost:5173/`. Google provider 켜짐(Client ID 입력, Secret은 선생님이 붙여넣기, 저장 확인).
+  - Google Cloud 프로젝트 SQLD: Google 인증 플랫폼 앱 "SQL 숲 키우기", 대상=내부(seoulai.sen.hs.kr 계정만), 웹 클라이언트(JS 원본 `https://zongik-sai.github.io`, 리디렉션 URI = Supabase callback).
+  - GitHub 공개 저장소 `zongik-sai/sql-forest`, Pages Source=GitHub Actions, Actions Variables(VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY) 등록. 공개 전 추적 파일에서 비밀 키·개인정보 검색: 없음.
+  - 발견·수정: `check:supabase`가 프록시/방화벽의 403(text/plain)을 "비로그인 차단됨"으로 통과시키던 거짓 양성 → Supabase JSON + 42501/28000일 때만 통과, 비JSON·Invalid API key는 원인과 함께 실패. 회귀 테스트 3개 추가(Vitest 337).
+
 ## 미검증·한계(정직한 보고)
-- 실제 Google OAuth·Supabase 프로젝트 연동(로그인·취소·만료·다기기)은 자격정보가 없어 실행하지 않았다. mock 성공을 실제 검증으로 보고하지 않는다.
+- Supabase·Google 설정은 실제로 완료했지만, 실제 Google 로그인 왕복(로그인·취소·만료·다기기)은 배포 주소에서 선생님 계정으로 확인해야 한다. mock 성공을 실제 검증으로 보고하지 않는다.
+- Google 대상이 '내부'라서 seoulai.sen.hs.kr 계정만 로그인할 수 있다. 학생 계정이 다른 도메인이면 대상을 '외부'로 바꿔야 한다.
 - 집중모드는 합성 이벤트(visibilitychange/blur/focus)로 자동 검증했다. Chrome/Edge 실제 Alt+Tab·최소화·분할 화면·두 번째 모니터, 키보드만 사용, 태블릿 레이아웃, 가림 스크린샷 대비는 수동 확인 필요.
 - PGlite는 단일 연결이라 진짜 동시 RPC 경합은 재현하지 못했다(설계: PK + ON CONFLICT DO NOTHING + 사용자별 advisory lock).
 - 공식 SQLD 상세 출제기준과의 대조는 미검증(13_SOURCES).
 - 학습용 앱이라 정답 데이터가 클라이언트 번들에 포함되며 시험 보안을 제공하지 않는다.
 
 ## 다음 작업
-1. Supabase 프로젝트 생성·migration 적용·Google provider 설정(README 2절)
-2. GitHub 저장소에 push → Pages Source=Actions, Variables 등록 → 배포
-3. 실제 로그인·다기기·OS 창 전환 수동 점검
+1. main push → Actions 배포 성공 확인 → https://zongik-sai.github.io/sql-forest/ 접속·SQL 실행 확인
+2. 배포 주소에서 실제 Google 로그인·취소·로그아웃·다른 기기 이어하기 확인
+3. 실제 OS 창 전환(Alt+Tab·최소화) 집중모드 수동 점검
