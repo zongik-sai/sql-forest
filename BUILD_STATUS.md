@@ -12,7 +12,7 @@
 | S05 원장·XP·정원·배지 | done | src/features/progress/{rewards,ledger,model}.ts, src/features/growth/levels.ts, src/components/Garden.tsx | XP 경계(0/99/100/9899/9900), Lv0~99 모든 레벨의 단계 이름·정원 형태 변화, U01 650XP/Lv6 → 7,800/Lv78 → 9,000/Lv90 → 9,900/Lv99, 2/3 해제·마무리 보류, 힌트 무감점, 중복 지급 방지(재제출·재로딩·동시·모드 변경), E2E로 최종 진단→Lv99 보고서·CSV | 없음 |
 | S06 집중모드·초안 복구·접근성 | done | src/features/focus/** | 상태기계·타이머 단위 테스트, E2E: 탭 숨김/창 blur → 불투명 가림·inert·단축키 차단·자동 재개 없음·초안 보존, 수동 휴식, 실행 중 SQL 중단+late result 무시, 2초 시간초과 복원, 숨김 시간 미포함, 새로고침 후 클릭으로 재개 | 실제 OS 창 전환(Alt+Tab·최소화·분할화면) 수동 확인 필요 |
 | S07 Supabase·OAuth·동기화 | done(코드·실서비스 설정) / 실제 로그인 확인 대기 | supabase/migrations/20261001000000_sql_forest_v2.sql, src/features/auth/** | PGlite(PostgreSQL 17)+Supabase 호환 auth 스텁에서 RLS(타인 조회·수정·삭제 불가, user_id 변경 불가, anon 차단), xp_events 직접 쓰기 거부, award_xp 멱등·선행조건·9,900, 배지·숙련, revision CAS, 세션 시간 상한, 데이터 삭제, 카탈로그=TS 일치, migration 재적용. 가짜 서버로 오프라인 대기·재전송·충돌 처리 테스트 | 실제 로그인/취소/재로그인/세션 만료/다른 기기 이어하기 검증(배포 주소에서) |
-| S08 GitHub Pages 준비 | done(코드) / 설정 대기(배포) | .github/workflows/deploy-pages.yml, vite.config.ts, scripts/verify-dist.mjs, README.md | `/sql-forest/` 운영 빌드 경로 검증 스크립트 통과, Pages E2E(데모 버튼 없음, 하위 경로 Worker·WASM 실행, hash 직접 링크 새로고침, `?code=`/`?error=` 처리 후 query 제거·외부 복귀 경로 거부), 운영 빌드에서 데모 플래그 거부 확인 | 저장소 생성·Pages Source=Actions·Variables 등록 완료, push 후 Actions 배포 확인 |
+| S08 GitHub Pages | done(배포됨) | .github/workflows/deploy-pages.yml, vite.config.ts, scripts/verify-dist.mjs, README.md | `/sql-forest/` 운영 빌드 경로 검증 스크립트 통과, Pages E2E(데모 버튼 없음, 하위 경로 Worker·WASM 실행, hash 직접 링크 새로고침, `?code=`/`?error=` 처리 후 query 제거·외부 복귀 경로 거부), 운영 빌드에서 데모 플래그 거부 확인 | 없음(2026-10-03 배포 확인) |
 | S09 전체 QA·보고 | done | BUILD_STATUS.md, README.md | typecheck·lint·Vitest·Playwright(dev+pages)·build 전체 재실행(아래 결과) | 위 '설정 대기' 항목 |
 
 ## 설계 결정 기록
@@ -40,6 +40,8 @@
   - Google Cloud 프로젝트 SQLD: Google 인증 플랫폼 앱 "SQL 숲 키우기", 대상=내부(seoulai.sen.hs.kr 계정만), 웹 클라이언트(JS 원본 `https://zongik-sai.github.io`, 리디렉션 URI = Supabase callback).
   - GitHub 공개 저장소 `zongik-sai/sql-forest`, Pages Source=GitHub Actions, Actions Variables(VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY) 등록. 공개 전 추적 파일에서 비밀 키·개인정보 검색: 없음.
   - 발견·수정: `check:supabase`가 프록시/방화벽의 403(text/plain)을 "비로그인 차단됨"으로 통과시키던 거짓 양성 → Supabase JSON + 42501/28000일 때만 통과, 비JSON·Invalid API key는 원인과 함께 실패. 회귀 테스트 3개 추가(Vitest 337).
+  - 2026-10-03 10:22 — 선생님이 Claude GitHub 앱을 sql-forest 저장소에 허용한 뒤 main push. Actions "Deploy to GitHub Pages"(run 37085864827) build·deploy 모두 success(typecheck·lint·Vitest·운영 빌드·경로 검증 포함).
+  - 배포 주소 확인(브라우저): https://zongik-sai.github.io/sql-forest/ 시작 화면 표시, 개발 데모 버튼 없음, "Google 계정으로 시작" 버튼 표시(Supabase 설정값 반영). `#/playground`에서 JOIN·GROUP BY SQL 실행 → AI컴퓨터 3·AI로봇 2·AI콘텐츠디자인 1(기준 seed와 일치), Worker·WASM 하위 경로 로드 정상.
 
 ## 미검증·한계(정직한 보고)
 - Supabase·Google 설정은 실제로 완료했지만, 실제 Google 로그인 왕복(로그인·취소·만료·다기기)은 배포 주소에서 선생님 계정으로 확인해야 한다. mock 성공을 실제 검증으로 보고하지 않는다.
@@ -50,6 +52,5 @@
 - 학습용 앱이라 정답 데이터가 클라이언트 번들에 포함되며 시험 보안을 제공하지 않는다.
 
 ## 다음 작업
-1. main push → Actions 배포 성공 확인 → https://zongik-sai.github.io/sql-forest/ 접속·SQL 실행 확인
-2. 배포 주소에서 실제 Google 로그인·취소·로그아웃·다른 기기 이어하기 확인
-3. 실제 OS 창 전환(Alt+Tab·최소화) 집중모드 수동 점검
+1. 배포 주소에서 실제 Google 로그인·취소·로그아웃·다른 기기 이어하기 확인
+2. 실제 OS 창 전환(Alt+Tab·최소화) 집중모드 수동 점검
