@@ -59,6 +59,7 @@ export function CgHome() {
         <div className="cg-units">
           {CG_UNITS.map((u, i) => {
             const lv = unitLevel(s, u.id);
+            const nextLv = CG_LEVELS.find((l) => !isPassed(s, u.id, l));
             return (
               <Link key={u.id} to={`/computer/unit/${u.id}`} className="panel cg-unit">
                 <span className="cg-unit-num">{i + 1}</span>
@@ -69,7 +70,7 @@ export function CgHome() {
                       <span key={l} className={isPassed(s, u.id, l) ? 'on' : ''} title={`${l}단계 ${CG_LEVEL_NAME[l]}${isPassed(s, u.id, l) ? ' 통과' : ''}`} />
                     ))}
                   </span>
-                  <span className="small muted">레벨 {lv}/5{lv < 5 ? ` · 다음: ${CG_LEVEL_NAME[(lv + 1) as 1]}` : ' · 모두 통과'}</span>
+                  <span className="small muted">레벨 {lv}/5{nextLv ? ` · 다음: ${CG_LEVEL_NAME[nextLv]}` : ' · 모두 통과'}</span>
                 </span>
               </Link>
             );

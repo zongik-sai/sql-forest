@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { learnerPrefix } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
-import { CG_MCQ_BY_ID, CG_UNIT_BY_ID } from '../content';
+import { CG_UNIT_BY_ID, mcqById } from '../content';
 import { McqRunner, ReviewCard } from '../McqRunner';
 import { activeWrongIds, noteAnswer, WRONG_MOCK_MIN } from '../model';
 import { useCg } from '../store';
@@ -13,7 +13,7 @@ export function WrongNotePage() {
   const id = useAuth().identity;
   const prefix = learnerPrefix(id ? id.learnerKey : 'guest');
   const ids = activeWrongIds(cg.state);
-  const all = useMemo(() => ids.map((x) => CG_MCQ_BY_ID[x]).filter((q): q is CgMcq => !!q), [ids]);
+  const all = useMemo(() => ids.map((x) => mcqById(x)).filter((q): q is CgMcq => !!q), [ids]);
   const [unit, setUnit] = useState<CgUnitId | 'all'>('all');
   const [retry, setRetry] = useState<CgMcq[] | null>(null);
   const [done, setDone] = useState<{ score: number; total: number } | null>(null);
@@ -65,7 +65,7 @@ export function WrongNotePage() {
               return (
                 <li key={q.id}>
                   <p className="small muted" style={{ margin: '0 0 0.2rem' }}>{q.unitId.replace('U', '')}단원 · {CG_AREA_LABEL[q.area]} · {q.set === 'basic' ? '기초' : '실력점검'} · 틀린 횟수 {w?.n ?? 1}</p>
-                  <ReviewCard q={q} picked={undefined} />
+                  <ReviewCard q={q} picked={undefined} unansweredNote={false} />
                 </li>
               );
             })}

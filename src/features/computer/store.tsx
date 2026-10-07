@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { learnerPrefix, readJson, removeWithPrefix, writeJson } from '../../lib/storage';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../auth/supabase';
-import { emptyCgState, hasProgress, mergeCgStates, normalizeCgState, plantStage, type CgState } from './model';
+import { hasProgress, mergeCgStates, normalizeCgState, plantStage, type CgState } from './model';
 
 /**
  * 컴퓨터 일반 기록 저장소.
@@ -26,7 +26,8 @@ interface CgCtx {
   /** 식물 단계가 올라갔을 때 알림(표시 후 지움) */
   grewTo: number | null;
   clearGrew: () => void;
-  resetAll: () => Promise<string | null>;
+  /** 저장 대기 중인 기록을 지금 서버로 보낸다. 모두 저장됐으면 true(로그아웃 전에 호출) */
+  flush: () => Promise<boolean>;
 }
 
 const Ctx = createContext<CgCtx | null>(null);
@@ -61,6 +62,8 @@ export function CgProvider({ children }: { children: ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingRef = useRef(false);
   const readyRef = useRef(mode !== 'user');
+  const retryRef = useRef<{ t: ReturnType<typeof setTimeout> | null; n: number }>({ t: null, n: 0 });
+  const unmountedRef = useRef(false);
 
   // 사용자 전환 시 다시 읽기
   useEffect(() => {
@@ -110,6 +113,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
         writeLocal(merged);
         dirtyRef.current = true;
       }
+      dirtyRef.current = true;
       setSaveStatus('error');
     } catch {
       dirtyRef.current = true;
@@ -117,7 +121,18 @@ export function CgProvider({ children }: { children: ReactNode }) {
     } finally {
       savingRef.current = false;
     }
+    // 실패하면 잠시 뒤 다시(5초·15초·45초…, 최대 6번). 다음 변경·온라인 복귀 때도 다시 시도한다
+    if (dirtyRef.current && !unmountedRef.current && retryRef.current.n < 6 && !retryRef.current.t) {
+      const delay = 5000 * 3 ** retryRef.current.n;
+      retryRef.current.n++;
+      retryRef.current.t = setTimeout(() => {
+        retryRef.current.t = null;
+        void pushNowRef.current();
+      }, delay);
+    } else if (!dirtyRef.current) retryRef.current.n = 0;
   }, [mode, revKey, writeLocal]);
+  const pushNowRef = useRef(pushNow);
+  pushNowRef.current = pushNow;
 
   const schedule = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -188,9 +203,29 @@ export function CgProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener('online', onOnline);
       document.removeEventListener('visibilitychange', onHide);
-      if (timer.current) clearTimeout(timer.current);
     };
   }, [pushNow, writeLocal]);
+
+  // 과목을 떠나거나 사용자가 바뀌어 사라질 때: 기다리던 저장을 버리지 않고 바로 보낸다
+  useEffect(() => {
+    unmountedRef.current = false;
+    const retry = retryRef.current;
+    return () => {
+      unmountedRef.current = true;
+      if (timer.current) clearTimeout(timer.current);
+      if (retry.t) clearTimeout(retry.t);
+      if (dirtyRef.current) void pushNowRef.current();
+    };
+  }, []);
+
+  const flush = useCallback(async () => {
+    if (mode !== 'user') return true;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    for (let i = 0; i < 20 && savingRef.current; i++) await new Promise((r) => setTimeout(r, 150));
+    await pushNow();
+    return !dirtyRef.current;
+  }, [mode, pushNow]);
 
   const commit = useCallback((fn: (s: CgState) => CgState) => {
     const prev = stateRef.current;
@@ -219,29 +254,10 @@ export function CgProvider({ children }: { children: ReactNode }) {
     setGuestToImport(null);
   }, []);
 
-  const resetAll = useCallback(async (): Promise<string | null> => {
-    if (mode === 'user') {
-      const sb = supabase();
-      if (sb) {
-        const { error } = await sb.from('cg_progress').delete().not('user_id', 'is', null);
-        if (error) return error.message;
-      }
-      revRef.current = 0;
-      writeJson(revKey, 0);
-    }
-    const empty = emptyCgState();
-    stateRef.current = empty;
-    setState(empty);
-    writeLocal(empty);
-    dirtyRef.current = false;
-    setSaveStatus(mode === 'user' ? 'saved' : 'local');
-    return null;
-  }, [mode, revKey, writeLocal]);
-
   const value = useMemo<CgCtx>(() => ({
     state, commit, mode, saveStatus, loading, isTeacher, guestToImport, importGuest, discardGuest,
-    grewTo, clearGrew: () => setGrewTo(null), resetAll,
-  }), [state, commit, mode, saveStatus, loading, isTeacher, guestToImport, importGuest, discardGuest, grewTo, resetAll]);
+    grewTo, clearGrew: () => setGrewTo(null), flush,
+  }), [state, commit, mode, saveStatus, loading, isTeacher, guestToImport, importGuest, discardGuest, grewTo, flush]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

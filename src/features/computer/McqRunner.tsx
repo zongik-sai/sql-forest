@@ -117,7 +117,7 @@ export function McqRunner({ items, storageKey, onAnswer, onFinish, finishLabel =
 }
 
 /** 풀이 후 틀린 문항 복습 카드 */
-export function ReviewCard({ q, n, picked, order }: { q: CgMcq; n?: number; picked: number | undefined; order?: number[] }) {
+export function ReviewCard({ q, n, picked, order, unansweredNote = true }: { q: CgMcq; n?: number; picked: number | undefined; order?: number[]; unansweredNote?: boolean }) {
   const ord = order ?? q.options.map((_, i) => i);
   return (
     <details className="panel cg-review">
@@ -129,7 +129,7 @@ export function ReviewCard({ q, n, picked, order }: { q: CgMcq; n?: number; pick
           </li>
         ))}
       </ol>
-      {picked === undefined && <p className="small muted" style={{ margin: 0 }}>(안 푼 문항)</p>}
+      {picked === undefined && unansweredNote && <p className="small muted" style={{ margin: 0 }}>(안 푼 문항)</p>}
       <p className="small" style={{ margin: 0 }}>{q.explanation}</p>
     </details>
   );

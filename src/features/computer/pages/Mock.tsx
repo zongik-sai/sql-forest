@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { learnerPrefix, readJson, removeRaw, writeJson } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
-import { CG_MCQ_BY_ID, CG_UNIT_BY_ID, CG_UNITS } from '../content';
+import { CG_UNIT_BY_ID, CG_UNITS, mcqById } from '../content';
 import { buildMock } from '../mock';
 import { activeWrongIds, addMock, isRegularMock, MOCK_LABEL, noteAnswer, scoreMock, WRONG_MOCK_MIN, type MockKind, type MockRecord } from '../model';
 import { MARK, ReviewCard } from '../McqRunner';
@@ -21,6 +21,7 @@ function usePrefix() {
 export function MockHubPage() {
   const cg = useCg();
   const prefix = usePrefix();
+  const [, setTick] = useState(0);
   const current = readJson<ExamState | null>(`${prefix}cg:mock:current`, null);
   const wrongN = activeWrongIds(cg.state).length;
   const hist = [...cg.state.mock].reverse();
@@ -35,8 +36,13 @@ export function MockHubPage() {
       </p>
       {current && (
         <div className="notice row">
-          <span>{MOCK_LABEL[current.kind]}을(를) 풀던 중이에요.</span>
-          <Link className="btn btn-small btn-primary" to={`/computer/mock/${current.kind}`}>이어서 풀기</Link>
+          {Date.now() - current.startedAt > CG_PASS.mock.minutes * 60_000 ? (
+            <span>{MOCK_LABEL[current.kind]}의 시간이 이미 끝났어요({Object.keys(current.answers).length}문항 답함). 채점해서 기록하거나 버릴 수 있어요.</span>
+          ) : (
+            <span>{MOCK_LABEL[current.kind]}을(를) 풀던 중이에요.</span>
+          )}
+          <Link className="btn btn-small btn-primary" to={`/computer/mock/${current.kind}`}>{Date.now() - current.startedAt > CG_PASS.mock.minutes * 60_000 ? '채점하기' : '이어서 풀기'}</Link>
+          <button className="btn btn-small btn-quiet" onClick={() => { removeRaw(`${prefix}cg:mock:current`); setTick((t) => t + 1); }}>버리기</button>
         </div>
       )}
       <div className="cg-mock-grid">
@@ -108,7 +114,7 @@ function Exam({ kind }: { kind: MockKind }) {
   const nav = useNavigate();
   const [exam, setExam] = useState<ExamState | null>(() => {
     const saved = readJson<ExamState | null>(key, null);
-    if (saved && saved.kind === kind && saved.orders && saved.ids.every((id) => CG_MCQ_BY_ID[id])) return saved;
+    if (saved && saved.kind === kind && saved.orders && saved.ids.every((id) => mcqById(id))) return saved;
     const wrongIds = activeWrongIds(cg.state);
     if (kind === 'wrong' && wrongIds.length < WRONG_MOCK_MIN) return null;
     const paper = buildMock(CG_UNITS, kind, { wrongIds });
@@ -119,7 +125,7 @@ function Exam({ kind }: { kind: MockKind }) {
   const [now, setNow] = useState(Date.now());
   const [confirm, setConfirm] = useState(false);
   const submitted = useRef(false);
-  const items = useMemo(() => (exam ? exam.ids.map((id) => CG_MCQ_BY_ID[id]).filter(Boolean) : []), [exam]);
+  const items = useMemo(() => (exam ? exam.ids.map((id) => mcqById(id)).filter((q): q is CgMcq => !!q) : []), [exam]);
   const limit = CG_PASS.mock.minutes * 60;
   const elapsed = exam ? Math.floor((now - exam.startedAt) / 1000) : 0;
   const left = limit - elapsed;
@@ -138,13 +144,18 @@ function Exam({ kind }: { kind: MockKind }) {
       seconds: Math.min(limit, Math.floor((Date.now() - exam.startedAt) / 1000)), ...(timeUp ? { timeUp: true } : {}),
       perUnit: r.perUnit, perArea: r.perArea,
     };
-    cg.commit((s) => {
-      let n = addMock(s, rec);
-      for (const x of r.results) if (exam.answers[x.id] !== undefined || !x.correct) n = noteAnswer(n, x.id, x.correct);
-      return n;
-    });
+    const answeredN = Object.keys(exam.answers).length;
+    // 하나도 안 풀고 시간이 끝난 시험은 기록하지 않는다(방치한 시험이 0점·오답 50개로 남지 않게)
+    if (answeredN > 0) {
+      cg.commit((s) => {
+        let n = addMock(s, rec);
+        // 오답노트에는 실제로 답한 문항만(안 푼 문항은 점수에서만 틀림)
+        for (const x of r.results) if (exam.answers[x.id] !== undefined) n = noteAnswer(n, x.id, x.correct);
+        return n;
+      });
+    }
     removeRaw(key);
-    setResult({ rec, items, answers: exam.answers, orders: exam.orders });
+    setResult({ rec: answeredN > 0 ? rec : { ...rec, id: '' }, items, answers: exam.answers, orders: exam.orders });
     window.scrollTo(0, 0);
   };
 
@@ -220,6 +231,7 @@ function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: C
   return (
     <div className="stack" style={{ maxWidth: 900, margin: '0 auto', width: '100%' }}>
       <h1 style={{ margin: 0 }}>{MOCK_LABEL[rec.kind]} 결과</h1>
+      {!rec.id && <p className="notice">답한 문항이 없어 기록에 남기지 않았어요.</p>}
       <div className={`notice ${pass ? 'notice-good' : 'notice-warn'}`}>
         <b style={{ fontSize: '1.3rem' }}>{rec.score} / {rec.total}</b>{' '}
         {rec.total === CG_PASS.mock.total ? (pass ? `합격 기준(${CG_PASS.mock.need}문항) 이상이에요!` : `합격 기준까지 ${CG_PASS.mock.need - rec.score}문항 남았어요.`) : ''}
@@ -247,7 +259,7 @@ function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: C
         </div>
       </div>
       <section className="stack">
-        <h2 style={{ margin: 0 }}>틀린 문항 {wrong.length}개 (오답노트에 저장됨)</h2>
+        <h2 style={{ margin: 0 }}>틀린 문항 {wrong.length}개{wrong.some((q) => answers[q.id] !== undefined) ? ' (푼 문항은 오답노트에 저장됨)' : ''}</h2>
         {wrong.map((q) => <ReviewCard key={q.id} q={q} n={items.indexOf(q) + 1} picked={answers[q.id]} order={orders[q.id]} />)}
       </section>
       <div className="row">

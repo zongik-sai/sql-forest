@@ -52,4 +52,6 @@ export function adaptBank(units: RawUnit[]): CgUnit[] {
 
 export const CG_UNITS: CgUnit[] = adaptBank(raw as RawUnit[]);
 export const CG_UNIT_BY_ID: Partial<Record<CgUnitId, CgUnit>> = Object.fromEntries(CG_UNITS.map((u) => [u.id, u]));
-export const CG_MCQ_BY_ID: Record<string, CgMcq> = Object.fromEntries(CG_UNITS.flatMap((u) => [...u.basic, ...u.check]).map((q) => [q.id, q]));
+const MCQ_MAP = new Map(CG_UNITS.flatMap((u) => [...u.basic, ...u.check]).map((q) => [q.id, q]));
+/** 문항 찾기(없는 ID·'constructor' 같은 키는 undefined) */
+export const mcqById = (id: string): CgMcq | undefined => MCQ_MAP.get(id);

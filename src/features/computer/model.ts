@@ -55,6 +55,12 @@ export interface CgState {
 
 export const MOCK_KEEP = 60;
 
+/** 문항 ID 형식: 단원 + 기초(b)/실력점검(a) 번호 */
+export const QID_RE = /^U[1-8]-[ab]\d{1,3}$/;
+
+/** 기기 시계가 서로 달라도 사건 순서가 뒤집히지 않게: 앞 사건보다 최소 1ms 뒤 시각 */
+const after = (now: string, prev?: string) => (prev && prev >= now ? new Date(Date.parse(prev) + 1).toISOString() : now);
+
 export const emptyCgState = (): CgState => ({ v: 1, units: {}, mock: [], wrong: {}, upd: '' });
 
 /** 저장된 JSON을 안전하게 읽는다(모르는 필드·잘못된 값은 버림) */
@@ -81,7 +87,8 @@ export function normalizeCgState(raw: unknown): CgState {
   }
   if (Array.isArray(r.mock)) s.mock = r.mock.filter((m) => m && typeof m.id === 'string' && typeof m.score === 'number').slice(-MOCK_KEEP);
   if (r.wrong && typeof r.wrong === 'object') {
-    for (const [k, v] of Object.entries(r.wrong)) if (v && typeof v.at === 'string') s.wrong[k] = { at: v.at, n: typeof v.n === 'number' ? v.n : 1, ...(typeof v.clearedAt === 'string' ? { clearedAt: v.clearedAt } : {}) };
+    // 문항 ID 형식(U1-b1, U8-a25)만 받는다: 'constructor' 같은 키로 화면이 깨지지 않게
+    for (const [k, v] of Object.entries(r.wrong)) if (QID_RE.test(k) && v && typeof v.at === 'string') s.wrong[k] = { at: v.at, n: typeof v.n === 'number' ? v.n : 1, ...(typeof v.clearedAt === 'string' ? { clearedAt: v.clearedAt } : {}) };
   }
   if (typeof r.upd === 'string') s.upd = r.upd;
   return s;
@@ -175,12 +182,12 @@ export function recordScore(s: CgState, u: CgUnitId, lv: 2 | 3 | 5, score: numbe
 
 /** 문항 하나를 풀었을 때 오답노트 갱신: 틀리면 넣고, 오답노트에 있던 문항을 맞히면 뺀다 */
 export function noteAnswer(s: CgState, qid: string, correct: boolean, now = new Date().toISOString()): CgState {
-  const cur = s.wrong[qid];
+  const cur = Object.hasOwn(s.wrong, qid) ? s.wrong[qid] : undefined;
   if (correct) {
     if (!cur || !isWrongActive(cur)) return s;
-    return stamp({ ...s, wrong: { ...s.wrong, [qid]: { ...cur, clearedAt: now } } }, now);
+    return stamp({ ...s, wrong: { ...s.wrong, [qid]: { ...cur, clearedAt: after(now, cur.at) } } }, now);
   }
-  return stamp({ ...s, wrong: { ...s.wrong, [qid]: { at: now, n: (cur?.n ?? 0) + 1 } } }, now);
+  return stamp({ ...s, wrong: { ...s.wrong, [qid]: { at: after(now, cur?.clearedAt), n: (cur?.n ?? 0) + 1 } } }, now);
 }
 
 export const isWrongActive = (w: WrongEntry) => !w.clearedAt || w.clearedAt < w.at;

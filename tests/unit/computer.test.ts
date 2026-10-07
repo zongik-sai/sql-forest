@@ -120,8 +120,8 @@ describe('기기 간 병합', () => {
   });
   it('저장된 JSON이 이상해도 안전하게 읽는다', () => {
     expect(normalizeCgState(null)).toEqual(emptyCgState());
-    expect(normalizeCgState({ units: { U1: { lv2: { best: 'x', passedAt: 3 } }, U99: {} }, mock: [{ bad: 1 }], wrong: { q: { at: T(1) } } })).toEqual({
-      v: 1, units: { U1: { lv2: {} } }, mock: [], wrong: { q: { at: T(1), n: 1 } }, upd: '',
+    expect(normalizeCgState({ units: { U1: { lv2: { best: 'x', passedAt: 3 } }, U99: {} }, mock: [{ bad: 1 }], wrong: { 'U2-a3': { at: T(1) } } })).toEqual({
+      v: 1, units: { U1: { lv2: {} } }, mock: [], wrong: { 'U2-a3': { at: T(1), n: 1 } }, upd: '',
     });
   });
 });
@@ -252,5 +252,19 @@ describe('선생님 반 학습 현황 집계', () => {
     expect(csv.startsWith('﻿')).toBe(true);
     expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
     expect(csv).toContain('"쉼표,있음"');
+  });
+});
+
+describe('오답노트: 기기 시계가 서로 달라도', () => {
+  it('하루 앞선 시계에서 틀린 문항을 다른 기기에서 맞히면 빠진다', () => {
+    const fast = noteAnswer(emptyCgState(), 'U1-b1', false, '2026-10-08T09:00:00.000Z');
+    const home = noteAnswer(fast, 'U1-b1', true, '2026-10-07T20:00:00.000Z');
+    expect(activeWrongIds(home)).toEqual([]);
+    // 그 뒤 다시 틀리면(시계가 늦은 기기라도) 다시 들어온다
+    const again = noteAnswer(home, 'U1-b1', false, '2026-10-07T21:00:00.000Z');
+    expect(activeWrongIds(again)).toEqual(['U1-b1']);
+  });
+  it("'constructor' 같은 이상한 키는 읽을 때 버린다", () => {
+    expect(normalizeCgState({ wrong: { constructor: { at: T(1) }, 'U1-b1': { at: T(1) }, 'U9-x1': { at: T(1) } } }).wrong).toEqual({ 'U1-b1': { at: T(1), n: 1 } });
   });
 });

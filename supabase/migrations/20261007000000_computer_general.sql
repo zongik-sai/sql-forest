@@ -5,7 +5,7 @@
 --  * 학생: 본인 기록(cg_progress 한 행)만 읽기·쓰기(RLS).
 --  * 선생님: private.teachers에 적힌 이메일 + 이메일 인증된 계정만, RPC로 전체 기록을 "읽기만".
 --    선생님 목록은 클라이언트가 바꿀 수 없다(관리자가 SQL Editor에서만 수정).
---  * 학생 이름·이메일은 저장된 값이 아니라 auth.users에서 읽는다(이름 위장 방지).
+--  * 학생 이메일은 auth.users, 이름은 Google identity에서 읽는다(학생이 바꿀 수 있는 값을 쓰지 않음).
 --  * 점수는 학생 브라우저가 계산해 저장하는 자기 학습 기록이며 평가 근거가 아니다.
 -- =====================================================================
 
@@ -55,8 +55,13 @@ declare v_uid uuid := private.require_uid(); r public.cg_progress%rowtype;
 begin
   select * into r from public.cg_progress where user_id = v_uid for update;
   if not found then
-    insert into public.cg_progress (user_id, state) values (v_uid, coalesce(p_state, '{}'::jsonb)) returning * into r;
-    return jsonb_build_object('status', 'ok', 'revision', r.revision);
+    -- 두 기기가 동시에 첫 저장을 해도 오류 대신 conflict로 돌려준다
+    insert into public.cg_progress (user_id, state) values (v_uid, coalesce(p_state, '{}'::jsonb))
+      on conflict (user_id) do nothing returning * into r;
+    if found then
+      return jsonb_build_object('status', 'ok', 'revision', r.revision);
+    end if;
+    select * into r from public.cg_progress where user_id = v_uid for update;
   end if;
   if r.revision <> coalesce(p_expected_revision, 0) then
     return jsonb_build_object('status', 'conflict', 'revision', r.revision, 'state', r.state);
@@ -77,18 +82,27 @@ revoke all on private.teachers from public, anon, authenticated;
 -- 이중 방어: 권한이 없어도 RLS를 켜 둔다(정책 없음 = 클라이언트 역할은 0행). 소유자 함수(is_teacher)는 영향 없음
 alter table private.teachers enable row level security;
 
+-- 선생님 = 목록의 이메일 + 이메일 인증 + Google 로그인으로 확인된 계정.
+-- (이메일·비밀번호 가입이나 이메일 변경으로 선생님 이메일을 흉내 내지 못하게 Google identity를 요구)
 create or replace function private.is_teacher() returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (
-    select 1 from auth.users u join private.teachers t on t.email = lower(u.email)
+    select 1 from auth.users u
+    join private.teachers t on t.email = lower(u.email)
+    join auth.identities i on i.user_id = u.id and i.provider = 'google' and lower(i.identity_data ->> 'email') = t.email
     where u.id = auth.uid() and u.email_confirmed_at is not null
   );
 $$;
 
-create or replace function private.display_name(meta jsonb, email text) returns text
-language sql immutable set search_path = '' as $$
-  select coalesce(nullif(btrim(meta ->> 'full_name'), ''), nullif(btrim(meta ->> 'name'), ''), split_part(coalesce(email, ''), '@', 1));
+-- 표시 이름: 사용자가 바꿀 수 있는 user_metadata 대신 Google이 준 identity 정보를 쓴다(이름 위장 방지)
+create or replace function private.display_name(p_uid uuid, email text) returns text
+language sql stable security definer set search_path = '' as $$
+  select coalesce(
+    (select coalesce(nullif(btrim(i.identity_data ->> 'full_name'), ''), nullif(btrim(i.identity_data ->> 'name'), ''))
+       from auth.identities i where i.user_id = p_uid and i.provider = 'google' limit 1),
+    split_part(coalesce(email, ''), '@', 1));
 $$;
+drop function if exists private.display_name(jsonb, text);
 
 -- 화면에 선생님 메뉴를 보일지 판단(권한 자체는 아래 RPC가 다시 확인)
 create or replace function public.am_i_teacher() returns boolean
@@ -106,7 +120,7 @@ begin
     raise exception '선생님 계정만 볼 수 있어요' using errcode = '42501';
   end if;
   return query
-    select p.user_id, private.display_name(u.raw_user_meta_data, u.email), u.email::text, p.state, p.updated_at
+    select p.user_id, private.display_name(p.user_id, u.email), u.email::text, p.state, p.updated_at
     from public.cg_progress p join auth.users u on u.id = p.user_id
     order by p.updated_at desc;
 end $$;
@@ -137,7 +151,7 @@ begin
       union select a.user_id from public.activity_progress a
       union select ev.user_id from ev
     )
-    select p.user_id, private.display_name(u.raw_user_meta_data, u.email), u.email::text,
+    select p.user_id, private.display_name(p.user_id, u.email), u.email::text,
            coalesce(ev.total_xp, 0), coalesce(ev.activities, 0), coalesce(ev.checkpoints, 0),
            coalesce(ev.units, 0), coalesce(ev.finals, 0),
            greatest(ev.last_award, ls.updated_at, (select max(a.updated_at) from public.activity_progress a where a.user_id = p.user_id))

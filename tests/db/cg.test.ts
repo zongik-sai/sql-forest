@@ -10,6 +10,7 @@ const S1 = '11111111-1111-1111-1111-111111111111';
 const S2 = '22222222-2222-2222-2222-222222222222';
 const T = '33333333-3333-3333-3333-333333333333'; // 선생님(인증된 이메일)
 const FAKE = '44444444-4444-4444-4444-444444444444'; // 선생님 이메일이지만 미인증
+const EMAILPW = '55555555-5555-5555-5555-555555555555'; // 선생님 이메일 + 인증됐지만 Google 로그인이 아님
 let db: PGlite;
 
 async function as<T>(uid: string | null, fn: (tx: Transaction) => Promise<T>): Promise<T> {
@@ -38,11 +39,23 @@ beforeAll(async () => {
       ($1, 's1@gmail.com', now(), '{"full_name":"가온"}'),
       ($2, 's2@school.example', now(), '{"name":"나래"}'),
       ($3, 'Teacher@School.example', now(), '{"full_name":"선생님"}'),
-      ($4, 'teacher@school.example.fake', null, '{}')`,
-    [S1, S2, T, FAKE],
+      ($4, 'teacher@school.example.fake', null, '{}'),
+      ($5, 'teacher@school.example.pw', now(), '{"full_name":"가짜 선생님"}')`,
+    [S1, S2, T, FAKE, EMAILPW],
   );
+  // 이메일·비밀번호로 가입해 인증까지 된 계정이 선생님 이메일을 쓰는 경우(Google identity 없음)
+  await db.query(`update auth.users set email = 'teacher@school.example' where id = $1`, [EMAILPW]);
   // 이메일은 같지만 인증되지 않은 계정(가짜) — 선생님 목록 이메일로 바꿔 둔다
   await db.query(`update auth.users set email = 'teacher@school.example' where id = $1`, [FAKE]);
+  // Google 로그인 identity(실제 Supabase가 만드는 것과 같은 형태)
+  await db.query(
+    `insert into auth.identities(user_id, provider, identity_data) values
+      ($1, 'google', '{"email":"s1@gmail.com","full_name":"가온"}'),
+      ($2, 'google', '{"email":"s2@school.example","name":"나래"}'),
+      ($3, 'google', '{"email":"teacher@school.example","full_name":"선생님"}'),
+      ($4, 'email', '{"email":"teacher@school.example"}')`,
+    [S1, S2, T, EMAILPW],
+  );
 }, 60000);
 
 describe('cg_progress: 본인 기록만', () => {
@@ -90,6 +103,15 @@ describe('선생님 반 학습 현황(읽기 전용)', () => {
   it('목록 이메일이어도 이메일 미인증 계정은 선생님이 아니다', async () => {
     expect((await as(FAKE, (tx) => tx.query<{ t: boolean }>('select public.am_i_teacher() as t'))).rows[0].t).toBe(false);
     await expect(as(FAKE, (tx) => tx.query('select * from public.cg_class_overview()'))).rejects.toThrow(/선생님 계정만/);
+  });
+  it('이메일·비밀번호 가입 계정은 선생님 이메일이어도 선생님이 아니다(Google identity 필요)', async () => {
+    expect((await as(EMAILPW, (tx) => tx.query<{ t: boolean }>('select public.am_i_teacher() as t'))).rows[0].t).toBe(false);
+    await expect(as(EMAILPW, (tx) => tx.query('select * from public.db_class_overview()'))).rejects.toThrow(/선생님 계정만/);
+  });
+  it('학생이 user_metadata 이름을 바꿔도 반 현황에는 Google 이름이 나온다', async () => {
+    await db.query(`update auth.users set raw_user_meta_data = '{"full_name":"선생님"}' where id = $1`, [S1]);
+    const rows = (await as(T, (tx) => tx.query<{ user_id: string; name: string }>('select user_id, name from public.cg_class_overview()'))).rows;
+    expect(rows.find((r) => r.user_id === S1)?.name).toBe('가온');
   });
   it('선생님(대소문자 무관, 인증됨)은 전체 기록을 이름·이메일과 함께 읽는다', async () => {
     expect((await as(T, (tx) => tx.query<{ t: boolean }>('select public.am_i_teacher() as t'))).rows[0].t).toBe(true);

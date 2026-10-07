@@ -126,7 +126,7 @@ test('모의고사: 50문항·제출·단원별/영역별 정답률·틀린 문�
   await expect(page.getByText('합격 기준(30문항) 이상이에요!')).toBeVisible();
   await expect(page.getByRole('heading', { name: '단원별 정답률' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '영역별 정답률' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '틀린 문항 19개 (오답노트에 저장됨)' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '틀린 문항 19개 (푼 문항은 오답노트에 저장됨)' })).toBeVisible();
   await page.getByRole('link', { name: '모의고사 목록' }).click();
   await expect(page.locator('table')).toContainText('31/50');
   await expect(page.locator('.cg-mock-grid .panel', { hasText: '오답 모의고사' })).toContainText('오답노트 19문항');
@@ -145,6 +145,12 @@ test('모의고사: 50분이 지나면 자동 제출(시간 종료)', async ({ p
   await page.reload();
   await expect(page.getByText('(시간 종료로 자동 제출)')).toBeVisible();
   await expect(page.getByText('0 / 50')).toBeVisible();
+  // 하나도 안 푼 시험은 기록·오답노트에 남기지 않는다
+  await expect(page.getByText('답한 문항이 없어 기록에 남기지 않았어요.')).toBeVisible();
+  await page.getByRole('link', { name: '모의고사 목록' }).click();
+  await expect(page.getByText('아직 기록이 없어요.')).toBeVisible();
+  await expect(page.locator('.topbar')).toContainText('오답노트');
+  await expect(page.locator('.topbar nav')).not.toContainText(/오답노트 \d/);
 });
 
 test('휴대폰 너비에서도 가로 스크롤 없이 보인다', async ({ page }) => {

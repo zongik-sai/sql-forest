@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { InAppNotice } from '../../components/InAppNotice';
 import { Plant, PLANT_STAGES } from '../../components/Plant';
@@ -17,6 +18,12 @@ const SAVE_TEXT: Record<CgSaveStatus, string> = { local: '이 기기에 저장',
 function CgTopBar() {
   const auth = useAuth();
   const cg = useCg();
+  const [unsaved, setUnsaved] = useState(false);
+  const logout = async (force = false) => {
+    if (!force && !(await cg.flush())) return setUnsaved(true);
+    setUnsaved(false);
+    await auth.signOut();
+  };
   const stage = plantStage(cg.state);
   const wrong = activeWrongIds(cg.state).length;
   return (
@@ -35,12 +42,20 @@ function CgTopBar() {
       <span className="spacer" />
       <span className="save-status" aria-live="polite">{cg.mode === 'guest' ? '로그인 없이 · 이 기기에만 저장' : SAVE_TEXT[cg.saveStatus]}</span>
       {cg.mode === 'user' ? (
-        <button className="btn btn-small btn-quiet" onClick={() => void auth.signOut()}>로그아웃</button>
+        <button className="btn btn-small btn-quiet" onClick={() => void logout()}>로그아웃</button>
       ) : cg.mode === 'demo' ? (
         <button className="btn btn-small btn-quiet" onClick={auth.exitDemo}>데모 나가기</button>
       ) : isSupabaseConfigured ? (
         <button className="btn btn-small btn-primary" onClick={() => void auth.signIn('/computer')}>Google 로그인</button>
       ) : null}
+      {unsaved && (
+        <div className="notice notice-warn row cg-unsaved" role="alert">
+          <span>아직 서버에 저장되지 않은 기록이 있어요(인터넷 연결 확인). 지금 로그아웃하면 이 기기의 기록이 지워져요.</span>
+          <button className="btn btn-small" onClick={() => void logout()}>다시 저장해 보기</button>
+          <button className="btn btn-small btn-quiet" onClick={() => void logout(true)}>그래도 로그아웃</button>
+          <button className="btn btn-small btn-quiet" onClick={() => setUnsaved(false)}>취소</button>
+        </div>
+      )}
     </header>
   );
 }
@@ -92,8 +107,9 @@ function CgLayout() {
 export function ComputerRoutes() {
   const auth = useAuth();
   if (auth.status === 'loading') return <div className="page" role="status">불러오는 중…</div>;
+  // 사용자가 바뀌면(로그아웃·다른 계정) 화면 상태를 통째로 새로: 앞 사람의 풀이가 다음 사람에게 넘어가지 않게
   return (
-    <CgProvider>
+    <CgProvider key={auth.identity?.learnerKey ?? 'guest'}>
       <Routes>
         <Route element={<CgLayout />}>
           <Route index element={<CgHome />} />

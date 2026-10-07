@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PLANT_STAGES } from '../../../components/Plant';
 import { supabase } from '../../auth/supabase';
-import { CG_MCQ_BY_ID, CG_UNIT_BY_ID } from '../content';
+import { CG_UNIT_BY_ID, mcqById } from '../content';
 import { TOTAL_STEPS } from '../model';
 import { useCg } from '../store';
 import { classSummary, downloadText, toCsv, toStudents, type CgClassRow, type CgStudent } from '../teacher';
@@ -108,7 +108,7 @@ function CgClass() {
           {sum.topWrong.length === 0 ? <p className="muted">없어요.</p> : (
             <ol className="cg-top-wrong">
               {sum.topWrong.map(([id, n]) => {
-                const mq = CG_MCQ_BY_ID[id];
+                const mq = mcqById(id);
                 return (
                   <li key={id}>
                     <span className="small muted">{n}명 · {mq?.unitId.replace('U', '')}단원</span><br />

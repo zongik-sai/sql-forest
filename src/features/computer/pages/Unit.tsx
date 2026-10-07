@@ -192,7 +192,7 @@ function Blanks({ u }: { u: CgUnit }) {
     const nextEmpty = [...u.blanks.slice(idx + 1), ...u.blanks.slice(0, idx)].find((b) => !ans[b.id]);
     if (nextEmpty) {
       setSel(nextEmpty.id);
-      blankRefs.current[nextEmpty.id]?.scrollIntoView({ block: 'nearest' });
+      blankRefs.current[nextEmpty.id]?.scrollIntoView({ block: 'center' });
     }
   };
   const submit = () => {

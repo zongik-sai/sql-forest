@@ -5,6 +5,8 @@ test('데모: 시작 → 최초 진단 건너뛰기 → U01 활동 4개(실제 �
   await page.goto('./');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
+  // 첫 화면에서 과목(데이터베이스)을 고른 뒤 시작
+  await page.getByRole('link', { name: /데이터베이스/ }).click();
   await page.getByRole('button', { name: '개발 데모로 시작' }).click();
   await expect(page.getByRole('heading', { name: '최초 진단 (5문항)' })).toBeVisible();
   await page.getByRole('button', { name: '처음부터 배우기' }).click();

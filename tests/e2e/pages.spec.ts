@@ -12,6 +12,8 @@ test('운영 빌드: 데모 버튼 없음, 로그인 설정 필요 안내', asyn
   const failed: string[] = [];
   page.on('response', (r) => { if (r.status() >= 400 && r.url().includes('/sql-forest/')) failed.push(`${r.status()} ${r.url()}`); });
   await page.goto('./');
+  await expect(page.getByRole('heading', { name: '무엇을 공부할까요?' })).toBeVisible();
+  await page.getByRole('link', { name: /데이터베이스/ }).click();
   await expect(page.getByRole('heading', { name: /작은 씨앗으로 시작해/ })).toBeVisible();
   await expect(page.getByRole('button', { name: '개발 데모로 시작' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Google 로그인 설정 필요' })).toBeVisible();
@@ -59,7 +61,13 @@ test('루트 callback: 취소(error) → query 제거, 저장해 둔 외부 URL 
   expect(page.url()).not.toContain('evil');
 });
 
-test('알 수 없는 hash 경로는 시작 화면으로', async ({ page }) => {
+test('알 수 없는 hash 경로는 과목 선택 화면으로', async ({ page }) => {
   await page.goto('./#/no/such/page');
-  await expect(page.getByRole('heading', { name: /작은 씨앗으로 시작해/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '무엇을 공부할까요?' })).toBeVisible();
+});
+
+test('운영 빌드: 컴퓨터 일반 문제은행이 하위 경로에서 따로 내려받아져 열린다', async ({ page }) => {
+  await page.goto('./#/computer/unit/U1/1');
+  await expect(page.getByRole('heading', { name: '1단계 이론' })).toBeVisible();
+  await expect(page.locator('.cg-card').first()).toContainText('자료(Data)와 정보(Information)');
 });
