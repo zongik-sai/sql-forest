@@ -118,13 +118,15 @@ export function DialectBlock({ sql, title = '시험 문법 (SQLite에서 실행�
   );
 }
 
-export function ChoiceGroup({ legend, options, value, onChange, disabled, correctIndex, name }: {
+export function ChoiceGroup({ legend, options, value, onChange, disabled, correctIndex, triedWrong, name }: {
   legend: ReactNode;
   options: string[];
   value: number | null;
   onChange: (i: number) => void;
   disabled?: boolean;
   correctIndex?: number;
+  /** 이미 골랐다가 틀린 보기(표시하고 다시 고르지 못하게) */
+  triedWrong?: number[];
   name?: string;
 }) {
   const id = useId();
@@ -132,12 +134,17 @@ export function ChoiceGroup({ legend, options, value, onChange, disabled, correc
     <fieldset disabled={disabled}>
       <legend>{legend}</legend>
       <div className="options">
-        {options.map((o, i) => (
-          <label key={i} className={`option${correctIndex === i ? ' correct' : ''}`}>
-            <input type="radio" name={name ?? id} checked={value === i} onChange={() => onChange(i)} />
-            <span>{o}</span>
-          </label>
-        ))}
+        {options.map((o, i) => {
+          const wrong = triedWrong?.includes(i) && correctIndex !== i;
+          return (
+            <label key={i} className={`option${correctIndex === i ? ' correct' : ''}${wrong ? ' tried-wrong' : ''}`}>
+              <input type="radio" name={name ?? id} checked={value === i} disabled={wrong} onChange={() => onChange(i)} />
+              <span>{o}</span>
+              {wrong && <span className="option-tag">앞에서 고른 답</span>}
+              {correctIndex === i && <span className="option-tag option-tag-good">정답</span>}
+            </label>
+          );
+        })}
       </div>
     </fieldset>
   );

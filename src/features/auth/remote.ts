@@ -153,7 +153,7 @@ export class RemoteProgress {
       const meta = st.__meta ?? {};
       activities[r.activity_id] = {
         activityId: r.activity_id, contentVersion: r.content_version, state: { ...st, __meta: undefined }, draftSql: r.draft_sql ?? '',
-        attempts: r.attempts, hintLevel: r.hint_level, predictionAnswer: meta.predictionAnswer ?? null, revealed: meta.revealed ?? false,
+        attempts: r.attempts, hintLevel: r.hint_level, predictionAnswer: meta.predictionAnswer ?? null, predictionTried: meta.predictionTried, predictionRevealed: meta.predictionRevealed, revealed: meta.revealed ?? false,
         completionKind: r.completion_kind, completedAt: meta.completedAt ?? null, review: meta.review ?? null, wrongCount: meta.wrongCount ?? 0,
         activeSeconds: r.active_seconds, serverRevision: r.revision, updatedAt: r.updated_at,
       };
@@ -185,7 +185,7 @@ export class RemoteProgress {
     this.set('saving');
     try {
       for (const [id, a] of [...this.queue]) {
-        const state = { ...a.state, __meta: { predictionAnswer: a.predictionAnswer, revealed: a.revealed, completedAt: a.completedAt, review: a.review, wrongCount: a.wrongCount } };
+        const state = { ...a.state, __meta: { predictionAnswer: a.predictionAnswer, predictionTried: a.predictionTried, predictionRevealed: a.predictionRevealed, revealed: a.revealed, completedAt: a.completedAt, review: a.review, wrongCount: a.wrongCount } };
         const { data, error } = await this.sb.rpc('save_activity_progress', {
           p_activity_id: id, p_content_version: a.contentVersion, p_state: state, p_draft_sql: a.draftSql,
           p_attempts: a.attempts, p_hint_level: a.hintLevel, p_completion_kind: a.completionKind,

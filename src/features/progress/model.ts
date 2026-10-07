@@ -17,7 +17,12 @@ export interface ActivityProgress {
   draftSql: string;
   attempts: number;
   hintLevel: 0 | 1 | 2 | 3;
+  /** 마지막으로 제출한 예측 */
   predictionAnswer: number | null;
+  /** 제출한 예측 순서(첫 값이 처음 예측). 틀리면 다른 답을 다시 고를 수 있다 */
+  predictionTried?: number[];
+  /** 예측 정답을 확인했는지(다시 고르기 대신 정답 보기) */
+  predictionRevealed?: boolean;
   revealed: boolean;
   completionKind: CompletionKind | null;
   completedAt: string | null;
@@ -150,7 +155,7 @@ function touchActivity(s: LearnerState, id: string, f: (a: ActivityProgress) => 
   return { ...s, activities: { ...s.activities, [id]: { ...f(cur), updatedAt: now } } };
 }
 
-export function saveActivityDraft(s: LearnerState, id: string, patch: Partial<Pick<ActivityProgress, 'draftSql' | 'state' | 'predictionAnswer'>>, now = new Date().toISOString()): LearnerState {
+export function saveActivityDraft(s: LearnerState, id: string, patch: Partial<Pick<ActivityProgress, 'draftSql' | 'state' | 'predictionAnswer' | 'predictionTried' | 'predictionRevealed'>>, now = new Date().toISOString()): LearnerState {
   return touchActivity(s, id, (a) => ({ ...a, ...patch }), now);
 }
 

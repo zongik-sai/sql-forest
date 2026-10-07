@@ -172,6 +172,9 @@ legend { font-weight: 600; margin-bottom: 0.4rem; padding: 0; }
 .option:has(input:checked) { border-color: var(--teal); background: var(--teal-soft); }
 .option input { margin-top: 0.3rem; accent-color: var(--teal); }
 .option.correct { border-color: var(--moss); background: var(--moss-soft); }
+.option.tried-wrong { border-style: dashed; color: var(--ink-soft); cursor: default; }
+.option-tag { margin-left: auto; font-size: 0.8rem; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.option-tag-good { color: var(--moss-strong); }
 .assign-row { display: grid; grid-template-columns: minmax(150px, 1fr) 2fr; gap: 0.5rem; align-items: center; padding: 0.5rem 0; border-bottom: 1px dashed var(--line); }
 @media (max-width: 640px) { .assign-row { grid-template-columns: 1fr; } }
 .seg { display: flex; flex-wrap: wrap; gap: 0.3rem; }

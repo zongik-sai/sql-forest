@@ -15,10 +15,11 @@ export default defineConfig({
   use: { trace: 'retain-on-failure', ...devices['Desktop Chrome'], locale: 'ko-KR' },
   projects: [
     { name: 'dev', testIgnore: /pages\.spec\.ts/, use: { baseURL: 'http://localhost:5173/' } },
+    // 개발자 .env.local(실제 Supabase 값)과 무관하게 "설정 전" 상태를 검증하도록 공개 값을 비운다
     { name: 'pages', testMatch: /pages\.spec\.ts/, use: { baseURL: 'http://localhost:4173/sql-forest/' } },
   ],
   webServer: [
     { command: 'npm run dev', url: 'http://localhost:5173/', reuseExistingServer: true, timeout: 60_000 },
-    { command: 'BASE_PATH=/sql-forest/ npx vite build --outDir dist-pages-test && npx vite preview --outDir dist-pages-test --base /sql-forest/ --port 4173 --strictPort', url: 'http://localhost:4173/sql-forest/', reuseExistingServer: true, timeout: 180_000 },
+    { command: 'BASE_PATH=/sql-forest/ VITE_SUPABASE_URL= VITE_SUPABASE_PUBLISHABLE_KEY= npx vite build --outDir dist-pages-test && npx vite preview --outDir dist-pages-test --base /sql-forest/ --port 4173 --strictPort', url: 'http://localhost:4173/sql-forest/', reuseExistingServer: true, timeout: 180_000 },
   ],
 });

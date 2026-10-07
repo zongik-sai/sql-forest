@@ -115,3 +115,34 @@ test('정답 보기 후에는 직접 다시 수행 + 결과 확인을 해야 안
   await page.getByRole('button', { name: '확인' }).click();
   await expectSuccess(page, /\+100XP 안내 학습 완료/);
 });
+
+test('예측을 틀리면 다른 답을 다시 고를 수 있고, 처음 예측은 기록에 남는다', async ({ page }) => {
+  await openWithState(page, null, '/learn/U01/U01-A02');
+  await resumeIfPaused(page);
+  await pickPrediction(page, '8개');
+  await expect(page.getByText('예측과 달라요')).toBeVisible();
+  // 틀린 직후에는 정답을 바로 드러내지 않는다
+  await expect(page.locator('.option.correct')).toHaveCount(0);
+  await page.getByRole('button', { name: '다른 답 다시 고르기' }).click();
+  // 앞에서 고른 틀린 답은 다시 고를 수 없다
+  await expect(page.getByRole('radio', { name: /8개/ })).toBeDisabled();
+  await page.getByRole('radio', { name: /^6개/ }).check();
+  await page.getByRole('button', { name: '다시 제출' }).click();
+  await expect(page.locator('.notice-good').first()).toContainText('다시 고른 답이 맞았어요! (처음 예측: 8개)');
+  await expect(page.locator('.option.correct')).toContainText('6개');
+  // 새로고침 후에도 유지
+  await page.reload();
+  await resumeIfPaused(page);
+  await expect(page.locator('.notice-good').first()).toContainText('처음 예측: 8개');
+});
+
+test('예측을 틀린 뒤 "정답 확인"을 누르면 정답과 설명을 보여 준다', async ({ page }) => {
+  await openWithState(page, null, '/learn/U01/U01-A02');
+  await resumeIfPaused(page);
+  await pickPrediction(page, '4개');
+  await page.getByRole('button', { name: '정답 확인' }).click();
+  await expect(page.getByText('정답은 "6개"예요.')).toBeVisible();
+  await expect(page.getByRole('button', { name: '다른 답 다시 고르기' })).toHaveCount(0);
+  // 예측과 관계없이 활동은 열려 있다
+  await expect(page.getByText('열(속성)', { exact: true }).first()).toBeVisible();
+});

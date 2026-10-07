@@ -100,9 +100,18 @@ export function ActivityRunner({ activity, challenge = false, onNext, nextLabel 
     if (feedback) feedbackRef.current?.focus();
   }, [feedback]);
 
+  // 예측: 틀리면 다른 답을 다시 고르거나 정답을 확인할 수 있다(경험치와 무관, 첫 예측은 기록에 남김)
+  const [repredict, setRepredict] = useState(false);
+  const predTried = progress.predictionTried ?? (progress.predictionAnswer !== null ? [progress.predictionAnswer] : []);
   const submitPrediction = async () => {
     if (pred === null || !gate.canAct()) return;
-    await commit((s) => saveActivityDraft(s, activity.id, { predictionAnswer: pred }), { activityId: activity.id, immediate: true });
+    const tried = [...predTried, pred];
+    await commit((s) => saveActivityDraft(s, activity.id, { predictionAnswer: pred, predictionTried: tried }), { activityId: activity.id, immediate: true });
+    setRepredict(false);
+  };
+  const showPredictionAnswer = async () => {
+    setRepredict(false);
+    await commit((s) => saveActivityDraft(s, activity.id, { predictionRevealed: true }), { activityId: activity.id, immediate: true });
   };
 
   const doReveal = async () => {
@@ -158,20 +167,51 @@ export function ActivityRunner({ activity, challenge = false, onNext, nextLabel 
           <p className="task-prompt">{activity.prompt}</p>
         </div>
 
-        {activity.prediction && (
-          <div className="panel stack">
-            <p className="step-label">먼저 예측해 보세요</p>
-            <ChoiceGroup legend={activity.prediction.prompt} options={activity.prediction.options} value={pred} onChange={setPred} disabled={progress.predictionAnswer !== null} correctIndex={progress.predictionAnswer !== null ? activity.prediction.correctIndex : undefined} />
-            {progress.predictionAnswer === null ? (
-              <div className="row"><button className="btn btn-primary" disabled={pred === null || !gate.active} onClick={() => void submitPrediction()}>예측 제출</button></div>
-            ) : (
-              <p className={`notice ${progress.predictionAnswer === activity.prediction.correctIndex ? 'notice-good' : ''}`}>
-                {progress.predictionAnswer === activity.prediction.correctIndex ? '예측이 맞았어요. ' : '예측과 달라요 — 괜찮아요, 직접 확인해 봐요. '}
-                {activity.prediction.reveal}
-              </p>
-            )}
-          </div>
-        )}
+        {activity.prediction && (() => {
+          const p = activity.prediction;
+          const submitted = progress.predictionAnswer !== null;
+          const right = progress.predictionAnswer === p.correctIndex;
+          const answerShown = submitted && (right || !!progress.predictionRevealed);
+          const choosing = !submitted || repredict;
+          const wrongTried = predTried.filter((i) => i !== p.correctIndex);
+          return (
+            <div className="panel stack">
+              <p className="step-label">먼저 예측해 보세요</p>
+              <ChoiceGroup
+                legend={p.prompt}
+                options={p.options}
+                value={pred}
+                onChange={setPred}
+                disabled={!choosing}
+                correctIndex={answerShown ? p.correctIndex : undefined}
+                triedWrong={wrongTried}
+              />
+              {choosing ? (
+                <div className="row">
+                  <button className="btn btn-primary" disabled={pred === null || wrongTried.includes(pred) || !gate.active} onClick={() => void submitPrediction()}>
+                    {repredict ? '다시 제출' : '예측 제출'}
+                  </button>
+                  {repredict && <button className="btn btn-quiet" onClick={() => { setRepredict(false); setPred(progress.predictionAnswer); }}>취소</button>}
+                </div>
+              ) : right ? (
+                <p className="notice notice-good">
+                  {predTried.length > 1 ? `다시 고른 답이 맞았어요! (처음 예측: ${p.options[predTried[0]]}) ` : '예측이 맞았어요. '}
+                  {p.reveal}
+                </p>
+              ) : answerShown ? (
+                <p className="notice">정답은 "{p.options[p.correctIndex]}"예요. {p.reveal}</p>
+              ) : (
+                <div className="stack">
+                  <p className="notice" style={{ margin: 0 }}>예측과 달라요 — 괜찮아요. 다른 답을 다시 골라 보거나, 정답을 확인하고 아래에서 직접 실행해 봐요.</p>
+                  <div className="row">
+                    <button className="btn" disabled={!gate.active} onClick={() => { setPred(null); setRepredict(true); }}>다른 답 다시 고르기</button>
+                    <button className="btn btn-quiet" disabled={!gate.active} onClick={() => void showPredictionAnswer()}>정답 확인</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {predictionDone ? (
           <TaskView
