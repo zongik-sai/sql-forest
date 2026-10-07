@@ -2,7 +2,8 @@
 create role anon nologin noinherit;
 create role authenticated nologin noinherit;
 create schema auth;
-create table auth.users (id uuid primary key, email text);
+-- 실제 Supabase auth.users의 일부 열(email_confirmed_at, raw_user_meta_data)
+create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb not null default '{}'::jsonb);
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
