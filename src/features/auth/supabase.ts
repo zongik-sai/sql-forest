@@ -23,7 +23,7 @@ export function supabase(): SupabaseClient | null {
 export async function signInWithGoogle(returnPath: string): Promise<string | null> {
   const sb = supabase();
   if (!sb) return '로그인 설정(VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY)이 없어요.';
-  const safe = sanitizeReturnPath(returnPath) ?? '/garden';
+  const safe = sanitizeReturnPath(returnPath) ?? '/';
   sessionSet(RETURN_KEY, safe);
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',

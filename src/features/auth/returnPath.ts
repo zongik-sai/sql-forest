@@ -29,7 +29,7 @@ export function readCallbackParams(search: string): CallbackParams {
 
 /** code·error 등 OAuth query를 제거하고 hash 경로로 복귀할 URL */
 export function cleanUrl(baseUrl: string, returnPath: string | null): string {
-  const path = sanitizeReturnPath(returnPath) ?? '/garden';
+  const path = sanitizeReturnPath(returnPath) ?? '/'; // 복귀 경로가 없으면 과목 선택
   return `${baseUrl}#${path}`;
 }
 

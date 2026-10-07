@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import { HashRouter, Link, MemoryRouter, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Garden } from '../components/Garden';
 import { useAuth } from '../features/auth/AuthContext';
@@ -11,6 +11,10 @@ import { Playground } from '../features/playground/Playground';
 import { UNIT_BY_ID } from '../content';
 import { LearnerProvider, useLearner } from './LearnerContext';
 import { AboutPage, SetupPage, StartPage } from './StartPage';
+import { LAST_SUBJECT_KEY, SubjectHome, subjectOfPath } from './SubjectHome';
+import { writeRaw } from '../lib/storage';
+// 컴퓨터 일반은 문제은행이 커서 들어갈 때만 내려받는다
+const ComputerRoutes = lazy(() => import('../features/computer/ComputerApp'));
 
 function SaveStatus() {
   const L = useLearner();
@@ -31,6 +35,7 @@ function TopBar({ learning }: { learning?: boolean }) {
       {L.identity.kind === 'demo' && <span className="demo-flag" title="개발용 데모: 이 브라우저에만 저장">개발 데모</span>}
       {!learning && (
         <nav aria-label="주 메뉴">
+          <NavLink to="/" end>과목</NavLink>
           <NavLink to="/garden">나의 정원</NavLink>
           <NavLink to="/review">오답 복습</NavLink>
           <NavLink to="/practice">자유 실습장</NavLink>
@@ -165,7 +170,7 @@ function Protected() {
   const auth = useAuth();
   const loc = useLocation();
   if (auth.status === 'loading') return <div className="page" role="status">로그인 상태를 확인하는 중…</div>;
-  if (!auth.identity) return <Navigate to="/" replace state={{ from: loc.pathname }} />;
+  if (!auth.identity) return <Navigate to="/db" replace state={{ from: loc.pathname }} />;
   return (
     <LearnerProvider key={auth.identity.learnerKey} identity={auth.identity}>
       <FirstRun />
@@ -180,7 +185,8 @@ function FirstRun() {
   return <Outlet />;
 }
 
-function Home() {
+/** 데이터베이스 과목 첫 화면: 로그인했으면 나의 정원으로 */
+function DbHome() {
   const auth = useAuth();
   if (auth.status === 'loading') return <div className="page" role="status">불러오는 중…</div>;
   if (auth.identity) return <Navigate to="/garden" replace />;
@@ -196,16 +202,29 @@ function NavTracker() {
       markInAppNavigation();
       setFirst(loc.pathname);
     }
+    const subj = subjectOfPath(loc.pathname);
+    if (subj) writeRaw(LAST_SUBJECT_KEY, subj);
     window.scrollTo(0, 0);
   }, [loc.pathname, first]);
   return null;
 }
 
 function PublicShell() {
+  const auth = useAuth();
+  const loc = useLocation();
+  const inDb = subjectOfPath(loc.pathname) === 'db';
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link to="/" className="brand"><Garden level={30} small className="garden-mini" title="SQL 숲" /> SQL 숲 키우기</Link>
+        <Link to="/" className="brand"><Garden level={30} small className="garden-mini" title="배움 숲" /> 배움 숲</Link>
+        {inDb && <span className="crumbs">데이터베이스</span>}
+        <span className="spacer" />
+        {auth.identity?.kind === 'user' && (
+          <>
+            <span className="small muted">{auth.identity.name ?? auth.identity.email}</span>
+            <button className="btn btn-small btn-quiet" onClick={() => void auth.signOut()}>로그아웃</button>
+          </>
+        )}
       </header>
       <main id="main"><Outlet /></main>
     </div>
@@ -227,7 +246,8 @@ export function App() {
       <NavTracker />
       <Routes>
         <Route element={<PublicShell />}>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<SubjectHome />} />
+          <Route path="/db" element={<DbHome />} />
           <Route path="/setup" element={<SetupPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/playground" element={<PlaygroundRoute />} />
@@ -248,6 +268,7 @@ export function App() {
             <Route path="/final" element={<FinalPage />} />
           </Route>
         </Route>
+        <Route path="/computer/*" element={<Suspense fallback={<div className="page" role="status">불러오는 중…</div>}><ComputerRoutes /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

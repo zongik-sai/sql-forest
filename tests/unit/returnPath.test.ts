@@ -12,8 +12,8 @@ describe('OAuth 루트 callback 복귀 경로', () => {
   });
   it('code query를 지우고 hash 경로로 복귀, 없으면 대시보드', () => {
     expect(cleanUrl('/sql-forest/', '/learn/U03')).toBe('/sql-forest/#/learn/U03');
-    expect(cleanUrl('/sql-forest/', 'https://evil.example')).toBe('/sql-forest/#/garden');
-    expect(cleanUrl('/', null)).toBe('/#/garden');
+    expect(cleanUrl('/sql-forest/', 'https://evil.example')).toBe('/sql-forest/#/');
+    expect(cleanUrl('/', null)).toBe('/#/');
   });
   it('callback 파라미터 읽기', () => {
     expect(readCallbackParams('?code=abc')).toEqual({ code: 'abc', error: null });

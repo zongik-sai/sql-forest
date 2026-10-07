@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Garden } from '../components/Garden';
+import { InAppNotice } from '../components/InAppNotice';
 import { useAuth } from '../features/auth/AuthContext';
 import { isDemoEnabled, isSupabaseConfigured } from '../lib/config';
 
@@ -8,6 +9,8 @@ export function StartPage() {
   const from = (useLocation().state as { from?: string } | null)?.from ?? '/garden';
   return (
     <div className="page">
+      <InAppNotice />
+      <p className="crumbs" style={{ margin: 0 }}><Link to="/">과목 선택</Link> / 데이터베이스</p>
       <section className="hero">
         <div className="stack">
           <h1>작은 씨앗으로 시작해 나만의 SQL 숲을 키워보세요.</h1>
