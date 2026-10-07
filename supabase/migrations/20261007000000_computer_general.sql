@@ -74,6 +74,8 @@ create table if not exists private.teachers (
   email text primary key check (email = lower(btrim(email)) and email like '%_@_%')
 );
 revoke all on private.teachers from public, anon, authenticated;
+-- 이중 방어: 권한이 없어도 RLS를 켜 둔다(정책 없음 = 클라이언트 역할은 0행). 소유자 함수(is_teacher)는 영향 없음
+alter table private.teachers enable row level security;
 
 create or replace function private.is_teacher() returns boolean
 language sql stable security definer set search_path = '' as $$
