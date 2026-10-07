@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { learnerPrefix } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
 import { CG_MCQ_BY_ID, CG_UNIT_BY_ID } from '../content';
-import { McqRunner } from '../McqRunner';
-import { activeWrongIds, noteAnswer } from '../model';
+import { McqRunner, ReviewCard } from '../McqRunner';
+import { activeWrongIds, noteAnswer, WRONG_MOCK_MIN } from '../model';
 import { useCg } from '../store';
 import { CG_AREA_LABEL, CG_UNIT_IDS, type CgMcq, type CgUnitId } from '../types';
 
@@ -30,7 +30,7 @@ export function WrongNotePage() {
           items={retry}
           storageKey={`${prefix}cg:run:wrong:${retry.map((q) => q.id).join(',').slice(0, 60)}`}
           onAnswer={(q, correct) => cg.commit((s) => noteAnswer(s, q.id, correct))}
-          onFinish={(score, total) => { setDone({ score, total }); setRetry(null); }}
+          onFinish={(r) => { setDone({ score: r.score, total: r.total }); setRetry(null); }}
           finishLabel="끝내기"
         />
       </div>
@@ -57,22 +57,15 @@ export function WrongNotePage() {
             <button className="btn btn-primary" onClick={() => { setDone(null); setRetry(shown.slice(0, 40)); }}>
               {shown.length > 40 ? '최근 40문항 다시 풀기' : `${shown.length}문항 다시 풀기`}
             </button>
-            <Link className="btn" to="/computer/mock/wrong">오답 모의고사</Link>
+            {all.length >= WRONG_MOCK_MIN ? <Link className="btn" to="/computer/mock/wrong">오답 모의고사(50분)</Link> : <span className="small muted">오답 {WRONG_MOCK_MIN}문항부터 오답 모의고사</span>}
           </div>
           <ol className="cg-wrong-list">
             {shown.map((q) => {
               const w = cg.state.wrong[q.id];
               return (
-                <li key={q.id} className="panel">
-                  <details>
-                    <summary>
-                      <span className="small muted">{q.unitId.replace('U', '')}단원 · {CG_AREA_LABEL[q.area]} · {q.set === 'basic' ? '기초' : '실력점검'} · 틀린 횟수 {w?.n ?? 1}</span><br />
-                      {q.question}
-                    </summary>
-                    {q.extra && <pre className="codeblock">{q.extra}</pre>}
-                    <ol className="cg-opts">{q.options.map((o, i) => <li key={i} className={i === q.answer ? 'ans' : ''}>{o}{i === q.answer ? ' ← 정답' : ''}</li>)}</ol>
-                    <p className="small" style={{ margin: 0 }}>{q.explanation}</p>
-                  </details>
+                <li key={q.id}>
+                  <p className="small muted" style={{ margin: '0 0 0.2rem' }}>{q.unitId.replace('U', '')}단원 · {CG_AREA_LABEL[q.area]} · {q.set === 'basic' ? '기초' : '실력점검'} · 틀린 횟수 {w?.n ?? 1}</p>
+                  <ReviewCard q={q} picked={undefined} />
                 </li>
               );
             })}

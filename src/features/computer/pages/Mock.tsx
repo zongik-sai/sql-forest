@@ -4,7 +4,8 @@ import { learnerPrefix, readJson, removeRaw, writeJson } from '../../../lib/stor
 import { useAuth } from '../../auth/AuthContext';
 import { CG_MCQ_BY_ID, CG_UNIT_BY_ID, CG_UNITS } from '../content';
 import { buildMock } from '../mock';
-import { activeWrongIds, addMock, isRegularMock, MOCK_LABEL, noteAnswer, scoreMock, type MockKind, type MockRecord } from '../model';
+import { activeWrongIds, addMock, isRegularMock, MOCK_LABEL, noteAnswer, scoreMock, WRONG_MOCK_MIN, type MockKind, type MockRecord } from '../model';
+import { MARK, ReviewCard } from '../McqRunner';
 import { useCg } from '../store';
 import { CG_AREA_LABEL, CG_AREAS, CG_PASS, CG_UNIT_IDS, type CgMcq } from '../types';
 
@@ -41,15 +42,15 @@ export function MockHubPage() {
       <div className="cg-mock-grid">
         {KINDS.map((k) => {
           const b = best(k);
-          const disabled = k === 'wrong' && wrongN === 0;
+          const disabled = k === 'wrong' && wrongN < WRONG_MOCK_MIN;
           return (
             <div key={k} className="panel stack" style={{ gap: '0.4rem' }}>
               <b>{MOCK_LABEL[k]}</b>
               <span className="small muted">
                 {k === 'random' ? '볼 때마다 새로 뽑아요' : k === 'wrong' ? `오답노트 ${wrongN}문항에서 출제(최대 ${CG_PASS.mock.total})` : '고정 문항(다시 풀어도 같은 문제)'}
               </span>
-              <span className="small">{b >= 0 ? `최고 ${b}/${k === 'wrong' ? '…' : CG_PASS.mock.total}` : '아직 안 봤어요'}</span>
-              {disabled ? <span className="small muted">틀린 문항이 생기면 열려요.</span> : (
+              <span className="small">{b >= 0 ? `최고 ${b}점` : '아직 안 봤어요'}</span>
+              {disabled ? <span className="small muted">오답이 {WRONG_MOCK_MIN}문항 이상 모이면 열려요.</span> : (
                 <Link className="btn btn-small btn-primary" to={`/computer/mock/${k}`} onClick={() => { if (current && current.kind !== k) removeRaw(`${prefix}cg:mock:current`); }}>
                   {current?.kind === k ? '이어서 풀기' : '시작'}
                 </Link>
@@ -86,6 +87,8 @@ export function MockHubPage() {
 interface ExamState {
   kind: MockKind;
   ids: string[];
+  /** 문항별 보기 순서 */
+  orders: Record<string, number[]>;
   answers: Record<string, number>;
   startedAt: number;
   idx: number;
@@ -105,12 +108,14 @@ function Exam({ kind }: { kind: MockKind }) {
   const nav = useNavigate();
   const [exam, setExam] = useState<ExamState | null>(() => {
     const saved = readJson<ExamState | null>(key, null);
-    if (saved && saved.kind === kind && saved.ids.every((id) => CG_MCQ_BY_ID[id])) return saved;
-    const items = buildMock(CG_UNITS, kind, { wrongIds: activeWrongIds(cg.state) });
-    if (!items.length) return null;
-    return { kind, ids: items.map((q) => q.id), answers: {}, startedAt: Date.now(), idx: 0 };
+    if (saved && saved.kind === kind && saved.orders && saved.ids.every((id) => CG_MCQ_BY_ID[id])) return saved;
+    const wrongIds = activeWrongIds(cg.state);
+    if (kind === 'wrong' && wrongIds.length < WRONG_MOCK_MIN) return null;
+    const paper = buildMock(CG_UNITS, kind, { wrongIds });
+    if (!paper.items.length) return null;
+    return { kind, ids: paper.items.map((q) => q.id), orders: Object.fromEntries(paper.items.map((q, i) => [q.id, paper.orders[i]])), answers: {}, startedAt: Date.now(), idx: 0 };
   });
-  const [result, setResult] = useState<{ rec: MockRecord; items: CgMcq[]; answers: Record<string, number> } | null>(null);
+  const [result, setResult] = useState<{ rec: MockRecord; items: CgMcq[]; answers: Record<string, number>; orders: Record<string, number[]> } | null>(null);
   const [now, setNow] = useState(Date.now());
   const [confirm, setConfirm] = useState(false);
   const submitted = useRef(false);
@@ -139,7 +144,7 @@ function Exam({ kind }: { kind: MockKind }) {
       return n;
     });
     removeRaw(key);
-    setResult({ rec, items, answers: exam.answers });
+    setResult({ rec, items, answers: exam.answers, orders: exam.orders });
     window.scrollTo(0, 0);
   };
 
@@ -155,7 +160,7 @@ function Exam({ kind }: { kind: MockKind }) {
 
   if (!exam) return (
     <div className="stack">
-      <p className="notice">오답노트에 문항이 없어 오답 모의고사를 만들 수 없어요.</p>
+      <p className="notice">오답노트에 문항이 {WRONG_MOCK_MIN}개 이상 모이면 오답 모의고사를 볼 수 있어요.</p>
       <Link className="btn" to="/computer/mock">모의고사 목록</Link>
     </div>
   );
@@ -183,14 +188,13 @@ function Exam({ kind }: { kind: MockKind }) {
       <div className="panel stack">
         <p className="small muted" style={{ margin: 0 }}>{exam.idx + 1}번 · {CG_AREA_LABEL[q.area]}</p>
         <h2 className="cg-q" style={{ margin: 0 }}>{exam.idx + 1}. {q.question}</h2>
-        {q.extra && <pre className="codeblock">{q.extra}</pre>}
         <fieldset>
           <legend className="sr-only">보기</legend>
           <div className="options">
-            {q.options.map((o, i) => (
-              <label key={i} className="option">
-                <input type="radio" name={`mock-${q.id}`} checked={exam.answers[q.id] === i} onChange={() => setAns(i)} />
-                <span>{'①②③④⑤'[i]} {o}</span>
+            {(exam.orders[q.id] ?? q.options.map((_, i) => i)).map((oi, p) => (
+              <label key={oi} className="option">
+                <input type="radio" name={`mock-${q.id}`} checked={exam.answers[q.id] === oi} onChange={() => setAns(oi)} />
+                <span>{MARK[p]} {q.options[oi]}</span>
               </label>
             ))}
           </div>
@@ -210,7 +214,7 @@ function Exam({ kind }: { kind: MockKind }) {
   );
 }
 
-function MockResult({ rec, items, answers }: { rec: MockRecord; items: CgMcq[]; answers: Record<string, number> }) {
+function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: CgMcq[]; answers: Record<string, number>; orders: Record<string, number[]> }) {
   const pass = rec.total === CG_PASS.mock.total && rec.score >= CG_PASS.mock.need;
   const wrong = items.filter((q) => answers[q.id] !== q.answer);
   return (
@@ -244,16 +248,7 @@ function MockResult({ rec, items, answers }: { rec: MockRecord; items: CgMcq[]; 
       </div>
       <section className="stack">
         <h2 style={{ margin: 0 }}>틀린 문항 {wrong.length}개 (오답노트에 저장됨)</h2>
-        {wrong.map((q) => (
-          <details key={q.id} className="panel">
-            <summary>{items.indexOf(q) + 1}. {q.question}</summary>
-            <p className="small" style={{ marginTop: '0.5rem' }}>
-              고른 답: {answers[q.id] !== undefined ? `${'①②③④'[answers[q.id]]} ${q.options[answers[q.id]]}` : '(안 풂)'}<br />
-              <b>정답: {'①②③④'[q.answer]} {q.options[q.answer]}</b>
-            </p>
-            <p className="small" style={{ margin: 0 }}>{q.explanation}</p>
-          </details>
-        ))}
+        {wrong.map((q) => <ReviewCard key={q.id} q={q} n={items.indexOf(q) + 1} picked={answers[q.id]} order={orders[q.id]} />)}
       </section>
       <div className="row">
         <Link className="btn btn-primary" to="/computer/mock">모의고사 목록</Link>

@@ -1,0 +1,21 @@
+import { chromium } from '@playwright/test';
+const [,, out] = process.argv;
+const b = await chromium.launch();
+const shot = async (path, name, w = 1280, h = 900, prep) => {
+  const p = await b.newPage({ viewport: { width: w, height: h }, locale: 'ko-KR' });
+  await p.goto('http://localhost:5173/');
+  await p.evaluate(() => { localStorage.clear(); localStorage.setItem('sqlforest:v1:guest:cg:state', JSON.stringify({ v: 1, units: { U1: { lv1: { passedAt: '2026-10-07T00:00:00Z' }, lv2: { best: 26, total: 30, passedAt: '2026-10-07T00:00:00Z' } } }, mock: [], wrong: { 'U1-b3': { at: '2026-10-07T00:00:00Z', n: 1 }, 'U2-a4': { at: '2026-10-07T00:00:01Z', n: 2 } }, upd: '' })); });
+  await p.goto('about:blank'); await p.goto(`http://localhost:5173/#${path}`); await p.waitForTimeout(900);
+  if (prep) await prep(p);
+  await p.screenshot({ path: `${out}/${name}.png`, fullPage: false });
+  await p.close();
+};
+await shot('/computer/unit/U1/1', 'theory');
+await shot('/computer/unit/U1/2', 'blanks', 1280, 900, async (p) => { await p.locator('.cg-blank').nth(0).click(); await p.locator('.cg-chip').nth(3).click(); });
+await shot('/computer/unit/U1/2', 'blanks-m', 390, 844);
+await shot('/computer/unit/U1/3', 'quiz', 1280, 900, async (p) => { await p.locator('.options .option').nth(1).click(); await p.getByRole('button', { name: '채점' }).click(); });
+await shot('/computer/unit/U3/4', 'summary', 1280, 900, async (p) => { const btn = p.getByRole('button', { name: '그래도 풀어보기' }); if (await btn.count()) await btn.click(); });
+await shot('/computer/mock', 'mockhub');
+await shot('/computer/mock/set1', 'exam', 1280, 900);
+await shot('/computer/wrong', 'wrong');
+await b.close();

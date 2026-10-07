@@ -3,18 +3,11 @@ import {
   activeWrongIds, addMock, emptyCgState, isOpen, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
   passNeed, passedCount, plantStage, recordScore, scoreMock, unitLevel, type CgState, type MockRecord,
 } from '../../src/features/computer/model';
-import { buildMock, orderByArea, seededRandom, unitQuota } from '../../src/features/computer/mock';
-import { CG_AREAS, CG_UNIT_IDS, type CgArea, type CgMcq, type CgUnit, type CgUnitId } from '../../src/features/computer/types';
+import { buildMock, optionOrder, orderByArea, seededRandom } from '../../src/features/computer/mock';
+import { CG_UNITS } from '../../src/features/computer/content';
+import { BLANK_RE, CG_AREAS, CG_UNIT_IDS, type CgArea } from '../../src/features/computer/types';
 
 const T = (n: number) => `2026-10-07T00:00:${String(n).padStart(2, '0')}.000Z`;
-
-function fakeUnits(): CgUnit[] {
-  return CG_UNIT_IDS.map((u, ui) => {
-    const mk = (set: 'basic' | 'check', n: number): CgMcq[] =>
-      Array.from({ length: n }, (_, i) => ({ id: `${u}-${set}-${i + 1}`, unitId: u, set, question: 'q', options: ['a', 'b', 'c', 'd'], answer: i % 4, explanation: 'e', area: CG_AREAS[(i + ui) % 5] }));
-    return { id: u, title: u, cards: [], blanks: [], wordBox: [], basic: mk('basic', 40), summary: { lines: [], tables: [], pitfalls: [] }, check: mk('check', 25) };
-  });
-}
 
 function passAll(s: CgState, upToStep = 40): CgState {
   let n = 0;
@@ -57,7 +50,7 @@ describe('통과 기준', () => {
     // 3단계를 먼저 통과("그래도 풀어보기")해도 통과로 센다. 단원 레벨은 연속 통과 기준
     s = recordScore(s, 'U2', 3, 40, 40, T(2)).state;
     expect(passedCount(s)).toBe(2);
-    expect(unitLevel(s, 'U2')).toBe(1);
+    expect(unitLevel(s, 'U2')).toBe(2); // 원래 페이지와 같이 통과한 단계 수
   });
 });
 
@@ -133,43 +126,131 @@ describe('기기 간 병합', () => {
   });
 });
 
-describe('모의고사 구성', () => {
-  const units = fakeUnits();
-  it('50문항, 단원별 6~7문항으로 고르게, 영역 순서(OS→HW→MAINT→NET→GEN)', () => {
-    const q = buildMock(units, 'set1');
-    expect(q.length).toBe(50);
-    const perUnit = new Map<CgUnitId, number>();
-    for (const x of q) perUnit.set(x.unitId, (perUnit.get(x.unitId) ?? 0) + 1);
-    expect([...perUnit.values()].every((n) => n === 6 || n === 7)).toBe(true);
-    const areaIdx = q.map((x) => CG_AREAS.indexOf(x.area as CgArea));
+describe('모의고사 구성(실제 문제은행)', () => {
+  const units = CG_UNITS;
+  it('50문항: 단원마다 실력점검 4 + 기초 2 이상, 영역 순서(OS→HW→MAINT→NET→GEN), 중복 없음', () => {
+    const { items, orders } = buildMock(units, 'set1');
+    expect(items.length).toBe(50);
+    expect(orders.length).toBe(50);
+    for (const u of CG_UNIT_IDS) {
+      expect(items.filter((x) => x.unitId === u && x.set === 'check').length).toBeGreaterThanOrEqual(4);
+      expect(items.filter((x) => x.unitId === u && x.set === 'basic').length).toBe(2);
+    }
+    const areaIdx = items.map((x) => CG_AREAS.indexOf(x.area as CgArea));
     expect([...areaIdx].sort((a, b) => a - b)).toEqual(areaIdx);
-    expect(new Set(q.map((x) => x.id)).size).toBe(50);
+    expect(new Set(items.map((x) => x.id)).size).toBe(50);
+    for (const o of orders) expect([...o].sort()).toEqual([0, 1, 2, 3]);
   });
-  it('고정 회차는 항상 같은 문항, 1~3회는 서로 겹치지 않음', () => {
-    const s1 = buildMock(units, 'set1').map((x) => x.id);
-    expect(buildMock(units, 'set1').map((x) => x.id)).toEqual(s1);
-    const s2 = buildMock(units, 'set2').map((x) => x.id);
-    const s3 = buildMock(units, 'set3').map((x) => x.id);
-    expect(s1.filter((x) => s2.includes(x) || s3.includes(x))).toEqual([]);
-    expect(s2.filter((x) => s3.includes(x))).toEqual([]);
+  it('고정 회차는 항상 같은 문항·같은 보기 순서, 1~3회는 서로 겹치지 않음', () => {
+    const s1 = buildMock(units, 'set1');
+    expect(buildMock(units, 'set1')).toEqual(s1);
+    const ids = (k: 'set1' | 'set2' | 'set3') => buildMock(units, k).items.map((x) => x.id);
+    const [a, b, c] = [ids('set1'), ids('set2'), ids('set3')];
+    expect(a.filter((x) => b.includes(x) || c.includes(x))).toEqual([]);
+    expect(b.filter((x) => c.includes(x))).toEqual([]);
   });
   it('랜덤은 시드마다 다르고, 오답 모의고사는 오답노트 문항만(최대 50)', () => {
-    expect(buildMock(units, 'random', { seed: 'a' }).map((x) => x.id)).not.toEqual(buildMock(units, 'random', { seed: 'b' }).map((x) => x.id));
-    const w = buildMock(units, 'wrong', { wrongIds: ['U3-basic-2', 'U1-check-1', 'nope'] });
-    expect(w.map((x) => x.id).sort()).toEqual(['U1-check-1', 'U3-basic-2']);
+    expect(buildMock(units, 'random', { seed: 'a' }).items.map((x) => x.id)).not.toEqual(buildMock(units, 'random', { seed: 'b' }).items.map((x) => x.id));
+    const w = buildMock(units, 'wrong', { wrongIds: ['U3-b2', 'U1-a1', 'nope'] });
+    expect(w.items.map((x) => x.id).sort()).toEqual(['U1-a1', 'U3-b2']);
     const many = units.flatMap((u) => u.basic.map((x) => x.id));
-    expect(buildMock(units, 'wrong', { wrongIds: many }).length).toBe(50);
+    expect(buildMock(units, 'wrong', { wrongIds: many }).items.length).toBe(50);
   });
   it('채점: 단원별·영역별 정답률', () => {
-    const items = orderByArea(buildMock(units, 'set2'));
+    const items = orderByArea(buildMock(units, 'set2').items);
     const answers = Object.fromEntries(items.map((q, i) => [q.id, i < 30 ? q.answer : (q.answer + 1) % 4]));
     const r = scoreMock(items, answers);
     expect(r.score).toBe(30);
-    expect(Object.values(r.perUnit).reduce((s, [, t]) => s + t, 0)).toBe(50);
-    expect(Object.values(r.perArea).reduce((s, [c]) => s + c, 0)).toBe(30);
+    expect(Object.values(r.perUnit).reduce((s, x) => s + x![1], 0)).toBe(50);
+    expect(Object.values(r.perArea).reduce((s, x) => s + x![0], 0)).toBe(30);
   });
-  it('단원 배분 합계는 항상 전체 문항 수', () => {
-    const q = unitQuota(50, CG_UNIT_IDS, seededRandom('x'));
-    expect(Object.values(q).reduce((a, b) => a + b, 0)).toBe(50);
+  it('보기 순서 섞기는 항상 0~3의 순열', () => {
+    const r = seededRandom('x');
+    for (let i = 0; i < 20; i++) expect([...optionOrder(4, r)].sort()).toEqual([0, 1, 2, 3]);
+  });
+});
+
+describe('문제은행 검증(선생님 원본 데이터)', () => {
+  it('8단원, 단원마다 이론 13~14장·빈칸 30·예시답안 50·기초 40·실력점검 25', () => {
+    expect(CG_UNITS.map((u) => u.id)).toEqual(CG_UNIT_IDS);
+    for (const u of CG_UNITS) {
+      expect(u.cards.length, u.id).toBeGreaterThanOrEqual(13);
+      expect(u.cards.length, u.id).toBeLessThanOrEqual(14);
+      expect(u.blanks.length).toBe(30);
+      expect(u.wordBox.length).toBe(50);
+      expect(new Set(u.wordBox).size).toBe(50);
+      expect(u.basic.length).toBe(40);
+      expect(u.check.length).toBe(25);
+      expect(u.summary.keys.length).toBe(16);
+      expect(u.summary.traps.length).toBeGreaterThan(0);
+      expect(u.cards.filter((c) => c.ext).length).toBeGreaterThanOrEqual(2);
+    }
+    expect(CG_UNITS.reduce((s, u) => s + u.basic.length, 0)).toBe(320);
+    expect(CG_UNITS.reduce((s, u) => s + u.check.length, 0)).toBe(200);
+  });
+  it('빈칸: 문장마다 빈칸 하나, 정답은 예시답안 안에 있음', () => {
+    for (const u of CG_UNITS) for (const b of u.blanks) {
+      expect(b.text.split(BLANK_RE).length, b.id).toBe(2);
+      expect(u.wordBox, b.id).toContain(b.answer);
+    }
+  });
+  it('객관식: 보기 4개(중복 없음), 정답 번호 범위, 해설·영역, 전체 ID 고유', () => {
+    const all = CG_UNITS.flatMap((u) => [...u.basic, ...u.check]);
+    for (const q of all) {
+      expect(q.options.length, q.id).toBe(4);
+      expect(new Set(q.options).size, q.id).toBe(4);
+      expect(q.answer >= 0 && q.answer < 4, q.id).toBe(true);
+      expect(q.explanation.length, q.id).toBeGreaterThan(5);
+      expect(CG_AREAS, q.id).toContain(q.area);
+    }
+    expect(new Set(all.map((q) => q.id)).size).toBe(all.length);
+  });
+  it('정답 번호가 한쪽에 몰리지 않음(단원마다 각 번호 25% ± 5%p)', () => {
+    for (const u of CG_UNITS) {
+      const qs = [...u.basic, ...u.check];
+      for (let k = 0; k < 4; k++) {
+        const share = qs.filter((q) => q.answer === k).length / qs.length;
+        expect(Math.abs(share - 0.25), `${u.id} ${k}`).toBeLessThan(0.05);
+      }
+    }
+  });
+});
+
+describe('첫 화면 과목 판정', () => {
+  it('경로로 과목 구분', async () => {
+    const { subjectOfPath } = await import('../../src/app/SubjectHome');
+    expect(subjectOfPath('/computer/unit/U1')).toBe('cg');
+    expect(subjectOfPath('/learn/U01/U01-A02')).toBe('db');
+    expect(subjectOfPath('/garden')).toBe('db');
+    expect(subjectOfPath('/')).toBeNull();
+    expect(subjectOfPath('/about')).toBeNull();
+  });
+});
+
+describe('선생님 반 학습 현황 집계', () => {
+  it('학생 수·최근 7일·평균 통과·모의 합격·단원 평균·오답 Top8·CSV', async () => {
+    const { classSummary, toCsv, toStudents } = await import('../../src/features/computer/teacher');
+    const now = Date.parse('2026-10-07T12:00:00Z');
+    const a = addMock(passAll(emptyCgState(), 40), { id: 'm', kind: 'set1', at: T(1), score: 31, total: 50, seconds: 1, perUnit: {}, perArea: {} });
+    let b = passAll(emptyCgState(), 6);
+    b = noteAnswer(noteAnswer(b, 'U1-b1', false, T(1)), 'U2-a3', false, T(2));
+    const c = noteAnswer(emptyCgState(), 'U1-b1', false, T(3));
+    const students = toStudents([
+      { user_id: '1', name: '가온', email: 'a@x.kr', state: a, updated_at: '2026-10-07T00:00:00Z' },
+      { user_id: '2', name: null, email: 'nare@x.kr', state: b, updated_at: '2026-10-05T00:00:00Z' },
+      { user_id: '3', name: '다온', email: 'c@x.kr', state: c, updated_at: '2026-09-01T00:00:00Z' },
+    ]);
+    expect(students.map((s) => [s.name, s.passed, s.plant, s.mockPassed, s.wrong])).toEqual([
+      ['가온', 40, 6, true, 0], ['nare', 6, 1, false, 2], ['다온', 0, 0, false, 1],
+    ]);
+    const sum = classSummary(students, now);
+    expect(sum).toMatchObject({ n: 3, active7: 2, mockPassed: 1 });
+    expect(sum.avgPassed).toBeCloseTo(46 / 3);
+    expect(sum.unitAvg.U1).toBeCloseTo((5 + 5 + 0) / 3);
+    expect(sum.topWrong[0]).toEqual(['U1-b1', 2]);
+    const csv = toCsv(['이름', '메모'], [['=HYPERLINK("x")', '쉼표,있음']]);
+    expect(csv.startsWith('﻿')).toBe(true);
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(csv).toContain('"쉼표,있음"');
   });
 });

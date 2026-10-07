@@ -16,8 +16,15 @@ async function fresh(page: Page, path = '/') {
   await page.goto(`./#${path}`);
 }
 
-async function answerMcq(page: Page, optionIdx: number) {
-  await page.locator('.options .option').nth(optionIdx).click();
+/** 보기 순서가 섞이므로 보기 글자로 고른다 */
+async function pickText(page: Page, text: string) {
+  const idx = await page.locator('.options .option > span:not(.option-tag)').evaluateAll(
+    (els, t) => els.findIndex((e) => (e.textContent ?? '').replace(/^[①②③④⑤]\s/, '') === t), text);
+  expect(idx, text).toBeGreaterThanOrEqual(0);
+  await page.locator('.options .option').nth(idx).click();
+}
+async function answerMcq(page: Page, text: string) {
+  await pickText(page, text);
   await page.getByRole('button', { name: '채점' }).click();
 }
 
@@ -47,42 +54,50 @@ test('이론 → 끼워맞추기 → 기초 객관식: 통과 기준·잠금·�
   await expect(page.getByText('앞 단계 1단계 이론를 통과하면 열려요.')).toBeVisible();
   await expect(page.getByRole('button', { name: '그래도 풀어보기' })).toBeVisible();
 
-  // 1단계 이론: 카드를 끝까지 넘기고 완료
+  // 1단계 이론: 카드 전체를 읽고 완료
   await page.goto(`./#/computer/unit/${U1.id}/1`);
-  for (let i = 1; i < U1.cards.length; i++) await page.getByRole('button', { name: '다음 카드' }).click();
-  await page.getByRole('button', { name: '이론 완료' }).click();
+  await expect(page.locator('.cg-card')).toHaveCount(U1.cards.length);
+  await page.getByRole('button', { name: '이론 학습 완료' }).click();
   await expect(page.getByRole('dialog', { name: '식물이 자랐어요' })).toContainText('새싹');
   await page.getByRole('button', { name: '닫기' }).click();
 
-  // 2단계 끼워맞추기: 기준 미만 → 고쳐서 통과
+  // 2단계 끼워맞추기: 빈칸을 누르고 예시답안을 고른다. 기준 미만 → 정답·해설 공개 → 다시 풀어 통과
   await page.getByRole('button', { name: /다음 단계: 개념 끼워맞추기/ }).click();
-  const selects = page.locator('.cg-blanks select');
   const need = Math.ceil(0.8 * U1.blanks.length);
-  for (let i = 0; i < need - 1; i++) await selects.nth(i).selectOption(U1.blanks[i].answer);
-  await page.getByRole('button', { name: /채점하기/ }).click();
-  await expect(page.locator('.notice-warn').first()).toContainText(`${need - 1}/${U1.blanks.length}개 맞았어요. 1개 더 맞히면 통과예요.`);
-  await selects.nth(need - 1).selectOption(U1.blanks[need - 1].answer);
-  await page.getByRole('button', { name: /채점하기/ }).click();
+  const fill = async (n: number) => {
+    for (let i = 0; i < n; i++) {
+      await page.locator('.cg-blank').nth(i).click();
+      await page.locator('.cg-bank').getByRole('button', { name: U1.blanks[i].answer, exact: true }).click();
+    }
+  };
+  await fill(need - 1);
+  await page.getByRole('button', { name: '채점하기' }).click();
+  await expect(page.locator('.notice-warn').first()).toContainText(`${need - 1}/${U1.blanks.length}개 맞았어요.`);
+  await expect(page.locator('.cg-fix').first()).toContainText(`정답: ${U1.blanks[need - 1].answer}`);
+  await page.getByRole('button', { name: '다시 풀기(새 순서)' }).click();
+  await fill(need);
+  await page.getByRole('button', { name: '채점하기' }).click();
   await expect(page.locator('.notice-good').first()).toContainText('통과! 다음 단계가 열렸어요.');
 
   // 3단계 기초 객관식: 첫 문제는 일부러 틀리고 나머지는 맞힘
   await page.getByRole('button', { name: /다음 단계: 기초 객관식/ }).click();
   const qs = U1.basic;
-  await answerMcq(page, (qs[0].answer + 1) % qs[0].options.length);
+  await answerMcq(page, qs[0].options[(qs[0].answer + 1) % 4]);
   await expect(page.getByText(/틀렸어요. 정답은/)).toBeVisible();
   for (let i = 1; i < qs.length; i++) {
     await page.getByRole('button', { name: '다음 문제' }).click();
-    await answerMcq(page, qs[i].answer);
+    await answerMcq(page, qs[i].options[qs[i].answer]);
   }
   await page.getByRole('button', { name: '결과 보기' }).click();
   await expect(page.getByText(`${qs.length - 1}/${qs.length}개 맞았어요.`)).toBeVisible();
   await expect(page.getByText('통과! 다음 단계가 열렸어요.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '틀린 문항 1개' })).toBeVisible();
 
   // 오답노트: 틀린 1문항 → 다시 풀어 맞히면 빠짐
   await page.getByRole('link', { name: '오답노트' }).first().click();
   await expect(page.getByRole('heading', { name: /오답노트/ })).toContainText('1문항');
   await page.getByRole('button', { name: '1문항 다시 풀기' }).click();
-  await answerMcq(page, qs[0].answer);
+  await answerMcq(page, qs[0].options[qs[0].answer]);
   await page.getByRole('button', { name: '끝내기' }).click();
   await expect(page.getByText('오답노트가 비어 있어요.')).toBeVisible();
 
@@ -98,11 +113,11 @@ test('모의고사: 50문항·제출·단원별/영역별 정답률·틀린 문�
   await fresh(page, '/computer/mock');
   await page.locator('.cg-mock-grid .panel', { hasText: '모의고사 1회' }).getByRole('link', { name: '시작' }).click();
   await expect(page.getByText(/남은 시간 (49|50):/)).toBeVisible();
-  const items = buildMock(CG_UNITS, 'set1');
+  const { items } = buildMock(CG_UNITS, 'set1');
   expect(items.length).toBe(50);
   for (let i = 0; i < items.length; i++) {
-    const pickIdx = i < 31 ? items[i].answer : (items[i].answer + 1) % items[i].options.length;
-    await page.locator('.options .option').nth(pickIdx).click();
+    await expect(page.locator('.cg-q')).toContainText(items[i].question.slice(0, 20));
+    await pickText(page, items[i].options[i < 31 ? items[i].answer : (items[i].answer + 1) % 4]);
     if (i < items.length - 1) await page.getByRole('button', { name: '다음', exact: true }).click();
   }
   await page.locator('.cg-exam-bar').getByRole('button', { name: '제출' }).click();

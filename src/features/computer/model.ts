@@ -100,14 +100,9 @@ export const isPassed = (s: CgState, u: CgUnitId, lv: CgLevel) => !!s.units[u]?.
 /** 앞 단계를 통과해야 열린다(1단계는 항상 열림). 잠겨 있어도 "그래도 풀어보기"로 도전할 수 있다. */
 export const isOpen = (s: CgState, u: CgUnitId, lv: CgLevel) => lv === 1 || isPassed(s, u, (lv - 1) as CgLevel);
 
-/** 단원 레벨 = 앞에서부터 연속으로 통과한 단계 수(0~5) */
+/** 단원 레벨 = 통과한 단계 수(0~5). "그래도 풀어보기"로 먼저 통과한 단계도 센다 */
 export function unitLevel(s: CgState, u: CgUnitId): number {
-  let n = 0;
-  for (const lv of CG_LEVELS) {
-    if (!isPassed(s, u, lv)) break;
-    n++;
-  }
-  return n;
+  return CG_LEVELS.filter((lv) => isPassed(s, u, lv)).length;
 }
 
 /** 통과한 단계 수(전체 40) — 순서와 관계없이 센다 */
@@ -139,9 +134,13 @@ export function nextPlantGoal(s: CgState): string | null {
   return `${next - n}단계 더 통과하면 다음 모습으로 자라요.`;
 }
 
+/** 정규 모의고사(50문항 전체) 최고 점수 */
 export function bestRegularMock(s: CgState): number {
-  return s.mock.filter((m) => isRegularMock(m.kind)).reduce((b, m) => Math.max(b, m.score), 0);
+  return s.mock.filter((m) => isRegularMock(m.kind) && m.total === CG_PASS.mock.total).reduce((b, m) => Math.max(b, m.score), 0);
 }
+
+/** 오답 모의고사를 열 수 있는 최소 오답 수 */
+export const WRONG_MOCK_MIN = 5;
 
 const stamp = (s: CgState, now: string): CgState => ({ ...s, upd: now });
 

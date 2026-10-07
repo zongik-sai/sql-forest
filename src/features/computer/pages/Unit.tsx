@@ -1,12 +1,13 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { learnerPrefix, readJson, writeJson } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
 import { CG_UNIT_BY_ID } from '../content';
-import { McqRunner } from '../McqRunner';
+import { McqRunner, ReviewCard, type McqResult } from '../McqRunner';
+import { shuffle } from '../mock';
 import { isOpen, isPassed, markDone, noteAnswer, passNeed, recordScore, unitLevel } from '../model';
 import { useCg } from '../store';
-import { CG_LEVELS, CG_LEVEL_NAME, type CgLevel, type CgTable, type CgUnit, type CgUnitId } from '../types';
+import { BLANK_RE, CG_LEVELS, CG_LEVEL_NAME, type CgLevel, type CgMcq, type CgTable, type CgUnit, type CgUnitId } from '../types';
 
 function useLearnerPrefix() {
   const id = useAuth().identity;
@@ -71,6 +72,7 @@ export function UnitPage() {
     <div className="stack page-narrow" style={{ margin: '0 auto' }}>
       <p className="crumbs" style={{ margin: 0 }}><Link to="/computer">컴퓨터 일반</Link> / {u.id.replace('U', '')}단원</p>
       <h1 style={{ margin: 0 }}>{u.title}</h1>
+      <p style={{ margin: 0 }}>{u.intro}</p>
       <p className="muted" style={{ margin: 0 }}>레벨 {lv}/5 · 앞 단계를 통과하면 다음 단계가 열려요.</p>
       <ol className="cg-levels">
         {CG_LEVELS.map((l) => (
@@ -134,94 +136,134 @@ function NextStep({ u, lv }: { u: CgUnit; lv: CgLevel }) {
 
 function Theory({ u }: { u: CgUnit }) {
   const cg = useCg();
-  const [i, setI] = useState(0);
-  const c = u.cards[i];
-  const last = i === u.cards.length - 1;
   const done = isPassed(cg.state, u.id, 1);
-  if (!c) return <p className="muted">카드가 없어요.</p>;
   return (
     <div className="stack">
-      <div className="panel stack cg-card">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <span className="small muted">카드 {i + 1} / {u.cards.length}</span>
-          {c.ext && <span className="badge badge-sim">PC정비사 확장</span>}
+      <p className="muted" style={{ margin: 0 }}>개념 카드 {u.cards.length}장을 차례로 읽어 보세요. 끝에 있는 "확장" 카드는 시험에 자주 나오는 실무 내용이에요.</p>
+      {u.cards.map((c, i) => (
+        <article key={c.id} className={`panel stack cg-card${c.ext ? ' ext' : ''}`} aria-labelledby={`card-${c.id}`}>
+          <h2 id={`card-${c.id}`} style={{ margin: 0 }}>
+            <span className="cg-card-no">{String(i + 1).padStart(2, '0')}</span> {c.title} {c.ext && <span className="badge badge-sim">확장</span>}
+          </h2>
+          <ul className="cg-points">{c.points.map((p, k) => <li key={k}>{p}</li>)}</ul>
+          {c.table && <Table t={c.table} />}
+          {c.tip && <p className="cg-tip">💡 {c.tip}</p>}
+        </article>
+      ))}
+      {done ? (
+        <><p className="notice notice-good" style={{ margin: 0 }}>이론 학습을 완료했어요.</p><NextStep u={u} lv={1} /></>
+      ) : (
+        <div className="panel row" style={{ justifyContent: 'space-between' }}>
+          <span>모든 카드를 읽었으면 완료를 누르고 개념 끼워맞추기로 넘어가세요.</span>
+          <button className="btn btn-primary" onClick={() => cg.commit((s) => markDone(s, u.id, 1))}>이론 학습 완료</button>
         </div>
-        <h2 style={{ margin: 0 }}>{c.title}</h2>
-        <div className="cg-lines"><Lines lines={c.lines} /></div>
-        {c.table && <Table t={c.table} />}
-      </div>
-      <div className="row">
-        <button className="btn" disabled={i === 0} onClick={() => setI(i - 1)}>이전</button>
-        {!last && <button className="btn btn-primary" onClick={() => setI(i + 1)}>다음 카드</button>}
-        {last && !done && <button className="btn btn-primary" onClick={() => cg.commit((s) => markDone(s, u.id, 1))}>이론 완료</button>}
-      </div>
-      <div className="cg-dots" aria-hidden="true">{u.cards.map((_, k) => <span key={k} className={k === i ? 'on' : k < i ? 'seen' : ''} />)}</div>
-      {done && <><p className="notice notice-good" style={{ margin: 0 }}>이론을 완료했어요.</p><NextStep u={u} lv={1} /></>}
+      )}
     </div>
   );
 }
+
+interface BlankDraft { ans: Record<string, string>; order: string[] }
 
 function Blanks({ u }: { u: CgUnit }) {
   const cg = useCg();
   const prefix = useLearnerPrefix();
   const key = `${prefix}cg:blanks:${u.id}`;
-  const [ans, setAns] = useState<Record<string, string>>(() => readJson(key, {}));
-  const [checked, setChecked] = useState(false);
-  const [result, setResult] = useState<{ score: number; passed: boolean } | null>(null);
-  const words = useMemo(() => [...u.wordBox].sort((a, b) => a.localeCompare(b, 'ko')), [u.wordBox]);
-  const used = new Set(Object.values(ans));
   const need = passNeed(2, u.blanks.length);
-  const set = (id: string, v: string) => {
-    const n = { ...ans, [id]: v };
-    setAns(n);
-    writeJson(key, n);
-    setChecked(false);
-    setResult(null);
+  const fresh = (): BlankDraft => ({ ans: {}, order: shuffle(u.wordBox) });
+  const [draft, setDraft] = useState<BlankDraft>(() => {
+    const d = readJson<BlankDraft | null>(key, null);
+    return d && Array.isArray(d.order) && d.order.length === u.wordBox.length ? d : fresh();
+  });
+  const [sel, setSel] = useState<string | null>(u.blanks[0]?.id ?? null);
+  const [graded, setGraded] = useState<{ score: number } | null>(null);
+  const blankRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  useEffect(() => {
+    writeJson(key, draft);
+  }, [draft, key]);
+  const used = new Set(Object.values(draft.ans));
+  const filled = u.blanks.filter((b) => draft.ans[b.id]).length;
+
+  const place = (word: string) => {
+    if (!sel || graded) return;
+    const ans = { ...draft.ans, [sel]: word };
+    setDraft({ ...draft, ans });
+    // 다음 빈칸(비어 있는 것)으로 이동
+    const idx = u.blanks.findIndex((b) => b.id === sel);
+    const nextEmpty = [...u.blanks.slice(idx + 1), ...u.blanks.slice(0, idx)].find((b) => !ans[b.id]);
+    if (nextEmpty) {
+      setSel(nextEmpty.id);
+      blankRefs.current[nextEmpty.id]?.scrollIntoView({ block: 'nearest' });
+    }
   };
   const submit = () => {
-    const score = u.blanks.filter((b) => ans[b.id] === b.answer).length;
+    const score = u.blanks.filter((b) => draft.ans[b.id] === b.answer).length;
     cg.commit((s) => recordScore(s, u.id, 2, score, u.blanks.length).state);
-    setChecked(true);
-    setResult({ score, passed: score >= need });
+    setGraded({ score });
+    window.scrollTo(0, 0);
   };
-  const filled = u.blanks.filter((b) => ans[b.id]).length;
+  const retry = () => {
+    setDraft(fresh());
+    setGraded(null);
+    setSel(u.blanks[0]?.id ?? null);
+  };
+
   return (
     <div className="stack">
-      <p className="muted" style={{ margin: 0 }}>문장마다 빈칸에 알맞은 말을 예시답안에서 고르세요. {u.blanks.length}개 중 {need}개 이상 맞으면 통과예요. 예시답안에는 헷갈리는 용어도 섞여 있어요.</p>
-      <details className="panel">
-        <summary>예시답안 {u.wordBox.length}개 보기</summary>
-        <ul className="cg-words">{words.map((w) => <li key={w} className={used.has(w) ? 'used' : ''}>{w}</li>)}</ul>
-      </details>
-      <ol className="cg-blanks">
-        {u.blanks.map((b) => {
-          const [before, after] = b.sentence.split('___');
-          const ok = checked ? ans[b.id] === b.answer : null;
-          return (
-            <li key={b.id} className={ok === null ? '' : ok ? 'ok' : 'bad'}>
-              <span>{before}</span>
-              <select aria-label={`빈칸: ${b.sentence.replace('___', '(빈칸)')}`} value={ans[b.id] ?? ''} onChange={(e) => set(b.id, e.target.value)}>
-                <option value="">(고르기)</option>
-                {words.map((w) => <option key={w} value={w}>{w}</option>)}
-              </select>
-              <span>{after ?? ''}</span>
-              {ok === false && <span className="small cg-fix"> → 다시 생각해 보기</span>}
-              {ok === true && <span className="status-done"> ✓</span>}
-            </li>
-          );
-        })}
-      </ol>
-      <div className="row">
-        <button className="btn btn-primary" disabled={filled === 0} onClick={submit}>채점하기 ({filled}/{u.blanks.length} 채움)</button>
-        {checked && <button className="btn btn-quiet" onClick={() => { setChecked(false); setResult(null); }}>표시 지우고 고치기</button>}
-      </div>
-      {result && (
-        <div aria-live="polite" className="stack">
-          <p className={`notice ${result.passed ? 'notice-good' : 'notice-warn'}`} style={{ margin: 0 }}>
-            {result.score}/{u.blanks.length}개 맞았어요. {result.passed ? '통과! 다음 단계가 열렸어요.' : `${need - result.score}개 더 맞히면 통과예요. 표시된 빈칸을 고쳐서 다시 채점해 보세요.`}
-          </p>
-          {result.passed && <NextStep u={u} lv={2} />}
+      <p className="muted" style={{ margin: 0 }}>빈칸을 누른 뒤 예시답안에서 알맞은 말을 고르세요. 예시답안 {u.wordBox.length}개 중 {u.wordBox.length - u.blanks.length}개는 헷갈리게 넣은 함정이에요. {u.blanks.length}개 중 {need}개 이상 맞히면 통과예요.</p>
+      {graded && (
+        <div className={`notice ${graded.score >= need ? 'notice-good' : 'notice-warn'}`} aria-live="polite">
+          <b>{graded.score}/{u.blanks.length}개 맞았어요.</b> {graded.score >= need ? '통과! 다음 단계가 열렸어요.' : `통과 기준은 ${need}개예요. 틀린 빈칸의 정답과 해설을 확인하고 다시 풀어 보세요.`}
+          <div className="row" style={{ marginTop: '0.5rem' }}>
+            <button className="btn btn-small" onClick={retry}>다시 풀기(새 순서)</button>
+            {graded.score >= need && <NextStep u={u} lv={2} />}
+          </div>
         </div>
       )}
+      <div className="cg-fill">
+        <ol className="cg-blanks">
+          {u.blanks.map((b, i) => {
+            const [before, after] = b.text.split(BLANK_RE);
+            const v = draft.ans[b.id];
+            const ok = graded ? v === b.answer : null;
+            return (
+              <li key={b.id} className={ok === null ? '' : ok ? 'ok' : 'bad'}>
+                <span className="cg-blank-no">{i + 1}</span>
+                <span>
+                  {before}
+                  <button
+                    ref={(el) => { blankRefs.current[b.id] = el; }}
+                    type="button"
+                    className={`cg-blank${sel === b.id && !graded ? ' sel' : ''}${ok === true ? ' ok' : ok === false ? ' no' : ''}`}
+                    aria-label={`${i + 1}번 빈칸: ${v ?? '비어 있음'}`}
+                    aria-pressed={sel === b.id}
+                    disabled={!!graded}
+                    onClick={() => setSel(b.id)}
+                  >{v ?? '　　　'}</button>
+                  {after}
+                  {ok === false && <span className="cg-fix">정답: <b>{b.answer}</b> — {b.explanation}</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        {!graded && (
+          <aside className="cg-bank" aria-label={`예시답안 ${u.wordBox.length}개`}>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <b>예시답안</b>
+              <span className="small muted">{filled}/{u.blanks.length} 채움</span>
+            </div>
+            <div className="cg-chips">
+              {draft.order.map((w) => (
+                <button key={w} type="button" className={`cg-chip${used.has(w) ? ' used' : ''}`} disabled={!sel} onClick={() => place(w)}>{w}</button>
+              ))}
+            </div>
+            <div className="row">
+              <button className="btn btn-primary btn-small" disabled={filled === 0} onClick={submit}>채점하기</button>
+              {sel && draft.ans[sel] && <button className="btn btn-small btn-quiet" onClick={() => { const a = { ...draft.ans }; delete a[sel]; setDraft({ ...draft, ans: a }); }}>이 빈칸 비우기</button>}
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }
@@ -231,21 +273,24 @@ function Summary({ u }: { u: CgUnit }) {
   const done = isPassed(cg.state, u.id, 4);
   return (
     <div className="stack">
-      <div className="panel stack">
-        <h2 style={{ margin: 0 }}>핵심 정리</h2>
-        <ol className="cg-summary">{u.summary.lines.map((l, i) => <li key={i}>{l}</li>)}</ol>
-      </div>
+      <section className="stack">
+        <h2 style={{ margin: 0 }}>핵심 {u.summary.keys.length}줄</h2>
+        <div className="cg-keys">{u.summary.keys.map((k, i) => <div key={i} className="panel"><b>{k.k}</b><span>{k.v}</span></div>)}</div>
+      </section>
       {u.summary.tables.map((t, i) => <div key={i} className="panel"><Table t={t} /></div>)}
-      {u.summary.pitfalls.length > 0 && (
+      {u.summary.traps.length > 0 && (
         <div className="panel stack">
           <h2 style={{ margin: 0 }}>시험에서 자주 틀리는 포인트</h2>
-          <ul style={{ margin: 0 }}>{u.summary.pitfalls.map((p, i) => <li key={i}>{p}</li>)}</ul>
+          <ul className="cg-traps">{u.summary.traps.map((p, i) => <li key={i}>{p}</li>)}</ul>
         </div>
       )}
       {done ? (
         <><p className="notice notice-good" style={{ margin: 0 }}>요약을 확인했어요.</p><NextStep u={u} lv={4} /></>
       ) : (
-        <div className="row"><button className="btn btn-primary" onClick={() => cg.commit((s) => markDone(s, u.id, 4))}>요약 확인 완료</button></div>
+        <div className="panel row" style={{ justifyContent: 'space-between' }}>
+          <span>요약을 확인했으면 실력점검에 도전하세요(통과 {passNeed(5, u.check.length)}/{u.check.length}).</span>
+          <button className="btn btn-primary" onClick={() => cg.commit((s) => markDone(s, u.id, 4))}>요약 확인 완료</button>
+        </div>
       )}
     </div>
   );
@@ -254,36 +299,52 @@ function Summary({ u }: { u: CgUnit }) {
 function Quiz({ u, lv }: { u: CgUnit; lv: 3 | 5 }) {
   const cg = useCg();
   const prefix = useLearnerPrefix();
-  const items = lv === 3 ? u.basic : u.check;
-  const need = passNeed(lv, items.length);
+  const all = lv === 3 ? u.basic : u.check;
+  const need = passNeed(lv, all.length);
+  const [items, setItems] = useState<CgMcq[]>(all);
   const [round, setRound] = useState(0);
-  const [result, setResult] = useState<{ score: number; passed: boolean } | null>(null);
+  const [result, setResult] = useState<(McqResult & { full: boolean }) | null>(null);
   if (result) {
+    const wrong = items.filter((q) => result.answers[q.id] !== q.answer);
+    const passed = result.full && result.score >= need;
     return (
       <div className="stack" aria-live="polite">
-        <div className={`notice ${result.passed ? 'notice-good' : 'notice-warn'}`}>
-          <b>{result.score}/{items.length}개 맞았어요.</b>{' '}
-          {result.passed ? (lv === 5 ? '실력점검 통과! 이 단원의 5단계를 모두 마쳤어요.' : '통과! 다음 단계가 열렸어요.') : `기준은 ${need}개예요. ${need - result.score}개 더 맞히면 통과해요. 틀린 문항은 오답노트에 모였어요.`}
+        <div className={`notice ${passed ? 'notice-good' : 'notice-warn'}`}>
+          <b>{result.score}/{result.total}개 맞았어요.</b>{' '}
+          {!result.full ? '틀린 문항 다시 풀기는 연습이에요(통과 판정은 전체 문항으로).' :
+            passed ? (lv === 5 ? '실력점검 통과! 이 단원의 5단계를 모두 마쳤어요.' : '통과! 다음 단계가 열렸어요.') :
+            `통과 기준은 ${need}개예요. ${need - result.score}개 더 맞히면 통과해요. 틀린 문항은 오답노트에 모였어요.`}
         </div>
         <div className="row">
-          <button className="btn" onClick={() => { setResult(null); setRound((r) => r + 1); }}>다시 풀기</button>
-          <Link className="btn" to="/computer/wrong">오답노트</Link>
+          {wrong.length > 0 && <button className="btn btn-primary" onClick={() => { setItems(wrong); setResult(null); setRound((r) => r + 1); }}>틀린 {wrong.length}문항만 다시</button>}
+          <button className="btn" onClick={() => { setItems(all); setResult(null); setRound((r) => r + 1); }}>처음부터 다시</button>
+          <Link className="btn btn-quiet" to="/computer/wrong">오답노트</Link>
         </div>
-        {result.passed && <NextStep u={u} lv={lv} />}
+        {passed && <NextStep u={u} lv={lv} />}
+        {wrong.length > 0 && (
+          <section className="stack">
+            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>틀린 문항 {wrong.length}개</h2>
+            {wrong.map((q) => <ReviewCard key={q.id} q={q} n={items.indexOf(q) + 1} picked={result.answers[q.id]} order={result.orders[q.id]} />)}
+          </section>
+        )}
       </div>
     );
   }
+  const full = items.length === all.length;
   return (
     <div className="stack">
-      <p className="muted" style={{ margin: 0 }}>{items.length}문항을 한 문제씩 풀고 바로 채점해요. {need}개 이상 맞으면 통과예요. 틀린 문항은 오답노트에 자동으로 모여요.</p>
+      <p className="muted" style={{ margin: 0 }}>
+        {full ? `${all.length}문항을 한 문제씩 풀고 바로 채점해요. ${need}개 이상 맞으면 통과예요.` : `틀린 ${items.length}문항을 다시 풀어요(연습).`} 틀린 문항은 오답노트에 자동으로 모여요.
+      </p>
       <McqRunner
         key={round}
         items={items}
-        storageKey={`${prefix}cg:run:${u.id}:${lv}`}
+        storageKey={`${prefix}cg:run:${u.id}:${lv}${full ? '' : ':retry'}`}
         onAnswer={(q, correct) => cg.commit((s) => noteAnswer(s, q.id, correct))}
-        onFinish={(score, total) => {
-          cg.commit((s) => recordScore(s, u.id, lv, score, total).state);
-          setResult({ score, passed: score >= passNeed(lv, total) });
+        onFinish={(r) => {
+          if (full) cg.commit((s) => recordScore(s, u.id, lv, r.score, r.total).state);
+          setResult({ ...r, full });
+          window.scrollTo(0, 0);
         }}
       />
     </div>

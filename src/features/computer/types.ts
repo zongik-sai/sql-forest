@@ -1,6 +1,6 @@
 /**
  * 과목 "컴퓨터 일반" 콘텐츠 타입(앱 내부 표준 형태).
- * 원본 문제은행(pc_bank.json)은 adapter에서 이 형태로 바꾼다.
+ * 원본 문제은행(pc_bank.json: 선생님의 'PC정비사 자기학습' 페이지 데이터)은 content/index.ts에서 이 형태로 바꾼다.
  */
 export type CgUnitId = 'U1' | 'U2' | 'U3' | 'U4' | 'U5' | 'U6' | 'U7' | 'U8';
 export const CG_UNIT_IDS: CgUnitId[] = ['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8'];
@@ -28,19 +28,22 @@ export interface CgTable {
 }
 
 export interface CgCard {
+  id: string;
   title: string;
-  /** 문단·목록 줄 */
-  lines: string[];
+  points: string[];
   table?: CgTable;
-  /** "PC정비사 확장" 카드 */
-  ext?: boolean;
+  /** 한 줄 요약(외우기 팁) */
+  tip?: string;
+  /** 시험 대비 확장 카드 */
+  ext: boolean;
 }
 
 export interface CgBlank {
   id: string;
-  /** 빈칸 자리는 ___ */
-  sentence: string;
+  /** 빈칸 자리는 밑줄(____) */
+  text: string;
   answer: string;
+  explanation: string;
 }
 
 export interface CgMcq {
@@ -49,28 +52,29 @@ export interface CgMcq {
   /** 기초(3단계) / 실력점검(5단계) */
   set: 'basic' | 'check';
   question: string;
-  /** 표나 코드 같은 보조 자료(선택) */
-  extra?: string;
   options: string[];
   answer: number;
   explanation: string;
   area: CgArea;
+  /** 실력점검 유형: 계산·응용·부정형·비교·확장 */
   tag?: string;
 }
 
 export interface CgSummary {
-  lines: string[];
+  keys: { k: string; v: string }[];
   tables: CgTable[];
-  pitfalls: string[];
+  traps: string[];
 }
 
 export interface CgUnit {
   id: CgUnitId;
+  num: number;
   title: string;
+  intro: string;
   cards: CgCard[];
-  blanks: CgBlank[];
-  /** 끼워맞추기 예시답안(정답 + 헷갈림 용어) */
+  /** 끼워맞추기 예시답안(정답 30 + 헷갈림 용어 20) */
   wordBox: string[];
+  blanks: CgBlank[];
   basic: CgMcq[];
   summary: CgSummary;
   check: CgMcq[];
@@ -83,3 +87,6 @@ export const CG_PASS = {
   check: { need: 15, total: 25 },
   mock: { need: 30, total: 50, minutes: 50 },
 } as const;
+
+/** 빈칸 표시 */
+export const BLANK_RE = /_{3,}/;
