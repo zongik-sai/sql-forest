@@ -1,4 +1,17 @@
-# SQL 숲 키우기 v2
+# 배움 숲 (SQL 숲 키우기 v2 + 컴퓨터 일반)
+
+첫 화면에서 **과목**을 골라 공부하는 자기주도 학습 웹앱입니다.
+
+| 과목 | 내용 | 성장 |
+|---|---|---|
+| 데이터베이스 | SQL 12단원·360분, 브라우저 안에서 실제 SQL 실행 | 레벨 0 씨앗 → 99 숲 |
+| 컴퓨터 일반 | 8단원 × 5단계(이론·개념 끼워맞추기·기초 객관식·단원 요약·실력점검), 모의고사 50문항·50분, 오답노트 | 통과 단계 수로 씨앗 → 열매(7단계) |
+
+컴퓨터 일반 문제은행(`src/features/computer/content/pc_bank.json`)은 선생님이 만든 'PC정비사 자기학습' 페이지의 데이터를 그대로 옮긴 것입니다(이론 카드 110·빈칸 240·기초 320·실력점검 200).
+
+---
+
+## 데이터베이스(SQL 숲)
 
 레벨 0 씨앗에서 레벨 99 숲까지 성장하며 SQLD 범위를 처음 경험하는 12단원·360분 자기주도 학습 웹앱입니다.
 SQL 사전학습이 없는 고등학생을 대상으로, 짧은 설명 → 예측 → 시각 조작/SQL 조립 → 실제 실행 → 피드백 순서로 진행합니다.
@@ -37,7 +50,10 @@ Playwright 브라우저가 없다면 처음 한 번 `npx playwright install chro
 ### 2) 실제 서비스(Google 로그인)
 docs/12_SETUP_GUIDE.md의 순서를 따릅니다. 요약:
 
-1. Supabase 프로젝트 생성 → SQL Editor에서 `supabase/migrations/20261001000000_sql_forest_v2.sql` 실행(여러 번 실행해도 안전).
+1. Supabase 프로젝트 생성 → SQL Editor에서 `supabase/migrations/`의 SQL을 **파일 이름 순서대로** 실행(여러 번 실행해도 안전).
+   - `20261001000000_sql_forest_v2.sql`: 데이터베이스 과목(진도·XP 원장)
+   - `20261007000000_computer_general.sql`: 컴퓨터 일반 기록(cg_progress)과 선생님 반 학습 현황
+   - 선생님 등록(공개 저장소에 이메일을 남기지 않도록 SQL Editor에서 따로): `insert into private.teachers(email) values ('선생님@학교.kr') on conflict do nothing;` 선생님은 그 이메일로 **Google 로그인**해야 반 학습 현황이 보입니다.
 2. Google Cloud Console에서 "웹 애플리케이션" OAuth 클라이언트 생성 → 승인된 리디렉션 URI에 **Supabase가 보여주는 callback URL**(`https://<project>.supabase.co/auth/v1/callback`)을 등록.
 3. Supabase Auth → Providers → Google에 client ID/secret 입력(secret은 Supabase에만).
 4. Supabase Auth → URL Configuration: Site URL = `https://OWNER.github.io/REPO/`, Redirect URLs = `https://OWNER.github.io/REPO/`, `http://localhost:5173/` (정확히, 끝의 `/` 포함. hash 경로를 등록하지 않음).
@@ -57,6 +73,10 @@ docs/12_SETUP_GUIDE.md의 순서를 따릅니다. 요약:
 
 ## 운영 안내
 
+- **컴퓨터 일반 저장**: 로그인하면 학생 한 명당 한 행(`cg_progress`)에 저장되고 여러 기기 기록은 합쳐집니다. 로그인 없이 둘러보면 그 기기에만 저장되고, 나중에 로그인하면 "내 계정으로 가져오기"가 나옵니다. 로그아웃하면 그 기기의 사본을 지우며, 서버에 아직 못 보낸 기록이 있으면 먼저 경고합니다.
+- **반 학습 현황**: 등록된 선생님(Google 로그인)만 보며 읽기 전용입니다. 학생 이름은 Google 계정 이름, 점수는 학생 브라우저가 계산한 자기 학습 기록이라 평가 근거로 쓰지 않습니다.
+- **카카오톡 등 앱 안 브라우저**: Google이 로그인을 막으므로 "기본 브라우저로 열기" 안내가 나옵니다.
+
 - **비용**: GitHub Pages(공개 저장소)는 무료. Supabase 무료 플랜으로 한 학급 규모는 충분하지만, 무료 프로젝트는 일정 기간 사용이 없으면 일시정지될 수 있으니 학기 중 주기적으로 접속하거나 유료 플랜을 검토하세요(요금·한도는 Supabase 공식 페이지에서 확인).
 - **데이터 삭제**: 학생은 "나의 정원" 아래 "내 학습 기록 지우기"로 본인 기록(진도·초안·원장·배지·진단)을 삭제할 수 있습니다(`delete_my_progress` RPC). 계정 자체 삭제는 관리자가 Supabase Auth → Users에서 수행하며 `on delete cascade`로 관련 행이 함께 지워집니다.
 - **보관 정책(권장)**: 학기 종료 후 일정 기간(예: 1년) 뒤 `xp_events` 등 사용자 테이블을 정리하세요. 앱은 학번·실명을 받지 않고 다른 사이트 목록·화면 캡처를 저장하지 않습니다.
@@ -70,6 +90,8 @@ src/content/        단원·활동(48)·도전(12)·문항(체크포인트 36+�
 src/sql/            SQLite 엔진·문장 판정기·결과 기반 채점기·Worker·데이터셋(main/alt seed)
 src/features/       learning(활동 13종 렌더러) · progress(진도 모델·XP 원장·보고서) · growth(레벨·정원)
                     focus(집중모드 상태기계) · auth(Supabase·OAuth·동기화) · playground
+                    computer(컴퓨터 일반: 문제은행·단계·모의고사·오답노트·선생님 현황)
+src/app/SubjectHome.tsx  과목 선택 첫 화면
 supabase/migrations 테이블·RLS·RPC
 tests/unit, tests/db, tests/e2e
 BUILD_STATUS.md     단계별 구현·검증 기록
