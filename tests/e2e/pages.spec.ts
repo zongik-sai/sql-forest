@@ -71,3 +71,12 @@ test('운영 빌드: 컴퓨터 일반 문제은행이 하위 경로에서 따로
   await expect(page.getByRole('heading', { name: '1단계 이론' })).toBeVisible();
   await expect(page.locator('.cg-card').first()).toContainText('자료(Data)와 정보(Information)');
 });
+
+test('개인정보처리방침: 하위 경로의 정적 페이지로 열리고 첫 화면에서 연결된다', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('link', { name: '개인정보처리방침' }).click();
+  await expect(page).toHaveURL(/\/sql-forest\/privacy\.html$/);
+  await expect(page.getByRole('heading', { name: '개인정보처리방침' })).toBeVisible();
+  await page.getByRole('link', { name: '← 배움 숲으로' }).click();
+  await expect(page.getByRole('heading', { name: '무엇을 공부할까요?' })).toBeVisible();
+});

@@ -64,7 +64,7 @@ export function StartPage() {
           <p className="small">과정 전체를 경험했다는 뜻이에요. SQLD 합격이나 완전한 숙달을 보장하지 않아요.</p>
         </div>
       </div>
-      <p className="small muted" style={{ marginTop: '1.5rem' }}><Link to="/about">개인정보·저장 방식·도구의 한계 안내</Link></p>
+      <p className="small muted" style={{ marginTop: '1.5rem' }}><Link to="/about">저장 방식·도구의 한계 안내</Link> · <a href={`${import.meta.env.BASE_URL}privacy.html`}>개인정보처리방침</a></p>
     </div>
   );
 }
@@ -91,13 +91,14 @@ export function AboutPage() {
     <div className="page page-narrow stack">
       <h1>저장 방식과 도구의 한계</h1>
       <h2>무엇을 저장하나요</h2>
-      <p>Google 로그인 사용자는 진도, SQL 초안, 활동 시간, 경험치 원장, 배지, 진단 답안을 Supabase에 저장해요. 학번·실명은 받지 않고, Google 계정의 이름·이메일만 로그인에 쓰여요. 다른 사이트 목록이나 화면 캡처는 저장하지 않아요. 같은 내용을 이 브라우저에도 임시로 보관해 오프라인에서도 이어갈 수 있어요.</p>
+      <p>Google 로그인 사용자는 데이터베이스 과목의 진도, SQL 초안, 활동 시간, 경험치 원장, 배지, 진단 답안과 컴퓨터 일반 과목의 단계 점수, 모의고사 결과, 오답노트를 Supabase(서울)에 저장해요. 지정된 선생님은 학생 기록을 읽기만 할 수 있어요. 학번·실명은 받지 않고, Google 계정의 이름·이메일만 로그인에 쓰여요. 다른 사이트 목록이나 화면 캡처는 저장하지 않아요. 같은 내용을 이 브라우저에도 임시로 보관해 오프라인에서도 이어갈 수 있어요.</p>
       <h2>SQL 실습은 어디서 실행되나요</h2>
       <p>모든 SQL 실습은 이 브라우저 안의 SQLite(WebAssembly) Worker에서만 실행돼요. 학습용 SQL을 서버로 보내 실행하지 않아요.</p>
       <h2>집중모드의 범위</h2>
       <p>이 창이 숨겨지거나 포커스를 잃으면 화면을 가리고 멈춰요. 웹앱은 다른 프로그램 목록, 다른 탭의 주소, 분할 화면의 다른 창, 두 번째 모니터를 알 수 없어요. 감시·차단 기능이 아니고, 일시정지에 벌점은 없어요. 화면이 숨겨지는 순간 운영체제가 보여준 마지막 화면까지 지울 수 있다고 보장하지 않아요.</p>
       <h2>신뢰 경계</h2>
       <p>학습용 앱이라 채점은 브라우저에서 이뤄지고, 서버는 보상 ID 중복과 선행 조건만 확인해요. 시험 보안 시스템이나 출석 증거가 아니에요.</p>
+      <p><a href={`${import.meta.env.BASE_URL}privacy.html`}>개인정보처리방침 전체 보기</a></p>
       <h2>데이터 삭제</h2>
       <p>나의 정원 화면 아래 "내 학습 기록 지우기"로 본인 기록을 지울 수 있어요. 계정 자체 삭제는 운영 관리자에게 요청하세요.</p>
       <Link className="btn" to="/">처음으로</Link>

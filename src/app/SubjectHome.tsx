@@ -79,7 +79,7 @@ export function SubjectHome() {
           </Link>
         ))}
       </div>
-      <p className="small muted" style={{ marginTop: '1.5rem' }}><Link to="/about">개인정보·저장 방식·도구의 한계 안내</Link></p>
+      <p className="small muted" style={{ marginTop: '1.5rem' }}><Link to="/about">저장 방식·도구의 한계 안내</Link> · <a href={`${import.meta.env.BASE_URL}privacy.html`}>개인정보처리방침</a></p>
     </div>
   );
 }
