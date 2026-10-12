@@ -16,10 +16,16 @@ export const CG_AREA_LABEL: Record<CgArea, string> = {
   GEN: '컴퓨터 일반',
 };
 
-/** 단계: 1 이론 · 2 개념 끼워맞추기 · 3 기초 객관식 · 4 단원 요약 · 5 실력점검 */
+/** 단계: 1 이론·개념 맞추기(카드별) · 2 전체 개념 끼워맞추기 · 3 기초 객관식 · 4 단원 요약 · 5 실력점검 */
 export type CgLevel = 1 | 2 | 3 | 4 | 5;
 export const CG_LEVELS: CgLevel[] = [1, 2, 3, 4, 5];
-export const CG_LEVEL_NAME: Record<CgLevel, string> = { 1: '이론', 2: '개념 끼워맞추기', 3: '기초 객관식', 4: '단원 요약', 5: '실력점검' };
+export const CG_LEVEL_NAME: Record<CgLevel, string> = { 1: '이론·개념 맞추기', 2: '전체 개념 끼워맞추기', 3: '기초 객관식', 4: '단원 요약', 5: '실력점검' };
+
+/** 카드 한 장을 읽고 푸는 개념 맞추기: 뜻 3개 ↔ 용어 3개(+헷갈리는 용어 1개) */
+export interface CgCardMatch {
+  pairs: { term: string; desc: string }[];
+  distractor: string;
+}
 
 export interface CgTable {
   caption?: string;
@@ -36,6 +42,8 @@ export interface CgCard {
   tip?: string;
   /** 시험 대비 확장 카드 */
   ext: boolean;
+  /** 카드를 읽은 뒤 푸는 개념 맞추기(card_match.json) */
+  match?: CgCardMatch;
 }
 
 export interface CgBlank {

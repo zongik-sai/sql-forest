@@ -54,7 +54,7 @@ export function CgHome() {
       <section aria-labelledby="units-h" className="stack">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 id="units-h" style={{ margin: 0 }}>단원</h2>
-          <span className="small muted">단원마다 이론 → 끼워맞추기 → 기초 → 요약 → 실력점검</span>
+          <span className="small muted">단원마다 이론·개념 맞추기 → 전체 끼워맞추기 → 기초 → 요약 → 실력점검</span>
         </div>
         <div className="cg-units">
           {CG_UNITS.map((u, i) => {

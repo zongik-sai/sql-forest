@@ -49,6 +49,8 @@ export interface CgState {
   units: Partial<Record<CgUnitId, UnitRecord>>;
   mock: MockRecord[];
   wrong: Record<string, WrongEntry>;
+  /** 개념 맞추기를 마친 이론 카드(카드 ID → 처음 마친 시각) */
+  cards: Record<string, string>;
   /** 마지막 변경 시각 */
   upd: string;
 }
@@ -57,11 +59,13 @@ export const MOCK_KEEP = 60;
 
 /** 문항 ID 형식: 단원 + 기초(b)/실력점검(a) 번호 */
 export const QID_RE = /^U[1-8]-[ab]\d{1,3}$/;
+/** 이론 카드 ID 형식 */
+export const CARD_ID_RE = /^U[1-8]-t\d{1,3}$/;
 
 /** 기기 시계가 서로 달라도 사건 순서가 뒤집히지 않게: 앞 사건보다 최소 1ms 뒤 시각 */
 const after = (now: string, prev?: string) => (prev && prev >= now ? new Date(Date.parse(prev) + 1).toISOString() : now);
 
-export const emptyCgState = (): CgState => ({ v: 1, units: {}, mock: [], wrong: {}, upd: '' });
+export const emptyCgState = (): CgState => ({ v: 1, units: {}, mock: [], wrong: {}, cards: {}, upd: '' });
 
 /** 저장된 JSON을 안전하게 읽는다(모르는 필드·잘못된 값은 버림) */
 export function normalizeCgState(raw: unknown): CgState {
@@ -89,6 +93,9 @@ export function normalizeCgState(raw: unknown): CgState {
   if (r.wrong && typeof r.wrong === 'object') {
     // 문항 ID 형식(U1-b1, U8-a25)만 받는다: 'constructor' 같은 키로 화면이 깨지지 않게
     for (const [k, v] of Object.entries(r.wrong)) if (QID_RE.test(k) && v && typeof v.at === 'string') s.wrong[k] = { at: v.at, n: typeof v.n === 'number' ? v.n : 1, ...(typeof v.clearedAt === 'string' ? { clearedAt: v.clearedAt } : {}) };
+  }
+  if (r.cards && typeof r.cards === 'object') {
+    for (const [k, v] of Object.entries(r.cards)) if (CARD_ID_RE.test(k) && typeof v === 'string') s.cards[k] = v;
   }
   if (typeof r.upd === 'string') s.upd = r.upd;
   return s;
@@ -155,6 +162,21 @@ function setLevel(s: CgState, u: CgUnitId, lv: CgLevel, f: (r: LevelRecord) => L
   const ur = { ...(s.units[u] ?? {}) };
   ur[`lv${lv}`] = f(ur[`lv${lv}`] ?? {});
   return stamp({ ...s, units: { ...s.units, [u]: ur } }, now);
+}
+
+/** 카드 목록 중 개념 맞추기를 마친 장 수 */
+export const cardsDone = (s: CgState, cardIds: string[]) => cardIds.filter((id) => Object.hasOwn(s.cards, id)).length;
+
+/**
+ * 카드 한 장의 개념 맞추기를 마쳤을 때. 단원 카드를 모두 마치면 1단계 통과로 기록한다.
+ * unitCardIds: 이 단원의 모든 카드 ID
+ */
+export function markCard(s: CgState, u: CgUnitId, cardId: string, unitCardIds: string[], now = new Date().toISOString()): { state: CgState; unitDone: boolean; firstPass: boolean } {
+  let state = Object.hasOwn(s.cards, cardId) ? stamp(s, now) : stamp({ ...s, cards: { ...s.cards, [cardId]: now } }, now);
+  const unitDone = cardsDone(state, unitCardIds) === unitCardIds.length;
+  const firstPass = unitDone && !isPassed(state, u, 1);
+  if (unitDone) state = setLevel(state, u, 1, (r) => ({ ...r, best: unitCardIds.length, total: unitCardIds.length, passedAt: r.passedAt ?? now, lastAt: now }), now);
+  return { state, unitDone, firstPass };
 }
 
 /** 이론(1)·요약(4) 확인 표시 */
@@ -242,11 +264,13 @@ export function mergeCgStates(a: CgState, b: CgState): CgState {
     const clearedAt = maxIso(wa.clearedAt, wb.clearedAt);
     wrong[k] = { at, n: Math.max(wa.n, wb.n), ...(clearedAt ? { clearedAt } : {}) };
   }
-  return { v: 1, units, mock, wrong, upd: maxIso(a.upd, b.upd) ?? '' };
+  const cards: CgState['cards'] = {};
+  for (const k of new Set([...Object.keys(a.cards), ...Object.keys(b.cards)])) cards[k] = minIso(a.cards[k], b.cards[k])!;
+  return { v: 1, units, mock, wrong, cards, upd: maxIso(a.upd, b.upd) ?? '' };
 }
 
 /** 의미 있는 진행이 있는지(가져오기 안내용) */
-export const hasProgress = (s: CgState) => passedCount(s) > 0 || s.mock.length > 0 || Object.keys(s.wrong).length > 0 || Object.values(s.units).some((u) => u && Object.keys(u).length > 0);
+export const hasProgress = (s: CgState) => passedCount(s) > 0 || s.mock.length > 0 || Object.keys(s.wrong).length > 0 || Object.keys(s.cards).length > 0 || Object.values(s.units).some((u) => u && Object.keys(u).length > 0);
 
 /** 모의고사 결과 집계 */
 export function scoreMock(

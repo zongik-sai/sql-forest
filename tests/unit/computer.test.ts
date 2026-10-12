@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeWrongIds, addMock, emptyCgState, isOpen, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
+  activeWrongIds, addMock, cardsDone, emptyCgState, isOpen, isPassed, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
   passNeed, passedCount, plantStage, recordScore, scoreMock, unitLevel, type CgState, type MockRecord,
 } from '../../src/features/computer/model';
 import { buildMock, optionOrder, orderByArea, seededRandom } from '../../src/features/computer/mock';
@@ -121,7 +121,7 @@ describe('기기 간 병합', () => {
   it('저장된 JSON이 이상해도 안전하게 읽는다', () => {
     expect(normalizeCgState(null)).toEqual(emptyCgState());
     expect(normalizeCgState({ units: { U1: { lv2: { best: 'x', passedAt: 3 } }, U99: {} }, mock: [{ bad: 1 }], wrong: { 'U2-a3': { at: T(1) } } })).toEqual({
-      v: 1, units: { U1: { lv2: {} } }, mock: [], wrong: { 'U2-a3': { at: T(1), n: 1 } }, upd: '',
+      v: 1, units: { U1: { lv2: {} } }, mock: [], wrong: { 'U2-a3': { at: T(1), n: 1 } }, cards: {}, upd: '',
     });
   });
 });
@@ -266,5 +266,66 @@ describe('오답노트: 기기 시계가 서로 달라도', () => {
   });
   it("'constructor' 같은 이상한 키는 읽을 때 버린다", () => {
     expect(normalizeCgState({ wrong: { constructor: { at: T(1) }, 'U1-b1': { at: T(1) }, 'U9-x1': { at: T(1) } } }).wrong).toEqual({ 'U1-b1': { at: T(1), n: 1 } });
+  });
+});
+
+describe('1단계: 카드별 개념 맞추기', () => {
+  const ids = ['U1-t1', 'U1-t2', 'U1-t3'];
+  it('카드를 모두 마쳐야 1단계 통과(처음 한 번만 firstPass), 다시 해도 처음 시각 유지', () => {
+    let s = emptyCgState();
+    let r = markCard(s, 'U1', 'U1-t1', ids, T(1));
+    expect(r).toMatchObject({ unitDone: false, firstPass: false });
+    expect(isPassed(r.state, 'U1', 1)).toBe(false);
+    s = markCard(r.state, 'U1', 'U1-t3', ids, T(2)).state;
+    s = markCard(s, 'U1', 'U1-t1', ids, T(3)).state; // 복습
+    expect(s.cards['U1-t1']).toBe(T(1));
+    expect(cardsDone(s, ids)).toBe(2);
+    r = markCard(s, 'U1', 'U1-t2', ids, T(4));
+    expect(r).toMatchObject({ unitDone: true, firstPass: true });
+    expect(r.state.units.U1?.lv1).toMatchObject({ best: 3, total: 3, passedAt: T(4) });
+    expect(unitLevel(r.state, 'U1')).toBe(1);
+    expect(markCard(r.state, 'U1', 'U1-t2', ids, T(5)).firstPass).toBe(false);
+  });
+  it('예전 방식(완료 버튼)으로 통과한 기록은 그대로 통과', () => {
+    const s = markDone(emptyCgState(), 'U2', 1, T(1));
+    expect(isPassed(s, 'U2', 1)).toBe(true);
+    expect(markCard(s, 'U2', 'U2-t1', ['U2-t1'], T(2)).firstPass).toBe(false);
+  });
+  it('기기 간 병합: 마친 카드는 합집합, 시각은 이른 쪽', () => {
+    const a = markCard(emptyCgState(), 'U1', 'U1-t1', ids, T(5)).state;
+    const b = markCard(markCard(emptyCgState(), 'U1', 'U1-t1', ids, T(2)).state, 'U1', 'U1-t2', ids, T(3)).state;
+    expect(mergeCgStates(a, b).cards).toEqual({ 'U1-t1': T(2), 'U1-t2': T(3) });
+  });
+  it('저장 JSON: 카드 ID 형식만 받고, 예전 기록(cards 없음)도 읽힌다', () => {
+    expect(normalizeCgState({ v: 1, units: {} }).cards).toEqual({});
+    expect(normalizeCgState({ cards: { 'U1-t1': T(1), constructor: T(1), 'U1-b1': T(1), 'U9-t1': T(1), 'U2-t3': 5 } }).cards).toEqual({ 'U1-t1': T(1) });
+  });
+});
+
+describe('카드별 개념 맞추기 데이터 검증', () => {
+  const text = (c: (typeof CG_UNITS)[number]['cards'][number]) =>
+    [c.title, ...c.points, c.tip ?? '', ...(c.table ? [...c.table.header, ...c.table.rows.flat()] : [])].join('\n');
+  it('모든 카드(110장)에 뜻 3개 + 헷갈리는 용어 1개', () => {
+    const cards = CG_UNITS.flatMap((u) => u.cards);
+    expect(cards.length).toBe(110);
+    for (const c of cards) {
+      expect(c.match, c.id).toBeDefined();
+      expect(c.match!.pairs.length, c.id).toBe(3);
+    }
+  });
+  it('용어는 카드 본문에 그대로 있고, 뜻에 자기 용어·다른 용어가 들어 있지 않으며, 함정은 정답과 다름', () => {
+    for (const u of CG_UNITS) for (const c of u.cards) {
+      const m = c.match!;
+      const terms = m.pairs.map((p) => p.term);
+      expect(new Set(terms).size, c.id).toBe(3);
+      expect(new Set(m.pairs.map((p) => p.desc)).size, c.id).toBe(3);
+      expect(terms, c.id).not.toContain(m.distractor);
+      for (const p of m.pairs) {
+        expect(text(c), `${c.id} ${p.term}`).toContain(p.term);
+        for (const t of terms) expect(p.desc.includes(t), `${c.id}: "${p.desc}" ⊃ "${t}"`).toBe(false);
+        expect(p.desc.length, c.id).toBeGreaterThanOrEqual(8);
+        expect(p.desc.length, c.id).toBeLessThanOrEqual(60);
+      }
+    }
   });
 });

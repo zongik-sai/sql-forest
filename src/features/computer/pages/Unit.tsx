@@ -1,13 +1,19 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { learnerPrefix, readJson, writeJson } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
 import { CG_UNIT_BY_ID } from '../content';
 import { McqRunner, ReviewCard, type McqResult } from '../McqRunner';
 import { shuffle } from '../mock';
-import { isOpen, isPassed, markDone, noteAnswer, passNeed, recordScore, unitLevel } from '../model';
+import { cardsDone, isOpen, isPassed, markCard, markDone, noteAnswer, passNeed, recordScore, unitLevel } from '../model';
 import { useCg } from '../store';
-import { BLANK_RE, CG_LEVELS, CG_LEVEL_NAME, type CgLevel, type CgMcq, type CgTable, type CgUnit, type CgUnitId } from '../types';
+import { BLANK_RE, CG_LEVELS, CG_LEVEL_NAME, type CgCard, type CgLevel, type CgMcq, type CgTable, type CgUnit, type CgUnitId } from '../types';
+
+/** 목적격 조사(을/를): 받침이 있으면 '을' */
+const objParticle = (w: string) => {
+  const c = w.charCodeAt(w.length - 1) - 0xac00;
+  return c >= 0 && c <= 11171 && c % 28 ? '을' : '를';
+};
 
 function useLearnerPrefix() {
   const id = useAuth().identity;
@@ -51,13 +57,18 @@ function LevelStatus({ unitId, lv }: { unitId: CgUnitId; lv: CgLevel }) {
   const rec = state.units[unitId]?.[`lv${lv}`];
   if (rec?.passedAt) return <span className="badge badge-exec">통과{rec.best !== undefined ? ` ${rec.best}/${rec.total}` : ''}</span>;
   if (!isOpen(state, unitId, lv)) return <span className="badge badge-plain">잠김</span>;
+  if (lv === 1) {
+    const ids = CG_UNIT_BY_ID[unitId]?.cards.map((c) => c.id) ?? [];
+    const n = cardsDone(state, ids);
+    if (n > 0) return <span className="badge badge-sim">카드 {n}/{ids.length}</span>;
+  }
   if (rec?.best !== undefined) return <span className="badge badge-sim">최고 {rec.best}/{rec.total}</span>;
   return <span className="badge badge-dialect">열림</span>;
 }
 
 const levelDetail = (u: CgUnit, lv: CgLevel) =>
-  lv === 1 ? `개념 카드 ${u.cards.length}장` :
-  lv === 2 ? `빈칸 ${u.blanks.length}개 · ${passNeed(2, u.blanks.length)}개 이상` :
+  lv === 1 ? `카드 ${u.cards.length}장 · 한 장씩 읽고 개념 맞추기` :
+  lv === 2 ? `단원 전체 빈칸 ${u.blanks.length}개 · ${passNeed(2, u.blanks.length)}개 이상` :
   lv === 3 ? `${u.basic.length}문항 · ${passNeed(3, u.basic.length)}개 이상` :
   lv === 4 ? '핵심 정리 · 비교표 · 자주 틀리는 포인트' :
   `${u.check.length}문항 · ${passNeed(5, u.check.length)}개 이상`;
@@ -112,7 +123,7 @@ export function LevelPage() {
       </div>
       {!open && !force ? (
         <div className="panel stack">
-          <p style={{ margin: 0 }}>앞 단계 <b>{lv - 1}단계 {CG_LEVEL_NAME[(lv - 1) as CgLevel]}</b>를 통과하면 열려요.</p>
+          <p style={{ margin: 0 }}>앞 단계 <b>{lv - 1}단계 {CG_LEVEL_NAME[(lv - 1) as CgLevel]}</b>{objParticle(CG_LEVEL_NAME[(lv - 1) as CgLevel])} 통과하면 열려요.</p>
           <div className="row">
             <Link className="btn btn-primary" to={`/computer/unit/${u.id}/${lv - 1}`}>앞 단계로</Link>
             <button className="btn" onClick={() => setForce(true)}>그래도 풀어보기</button>
@@ -134,29 +145,174 @@ function NextStep({ u, lv }: { u: CgUnit; lv: CgLevel }) {
   );
 }
 
+function CardBody({ c, n }: { c: CgCard; n: number }) {
+  return (
+    <>
+      <h2 id={`card-${c.id}`} style={{ margin: 0 }}>
+        <span className="cg-card-no">{String(n).padStart(2, '0')}</span> {c.title} {c.ext && <span className="badge badge-sim">확장</span>}
+      </h2>
+      <ul className="cg-points">{c.points.map((p, k) => <li key={k}>{p}</li>)}</ul>
+      {c.table && <Table t={c.table} />}
+      {c.tip && <p className="cg-tip">💡 {c.tip}</p>}
+    </>
+  );
+}
+
+/** 카드 한 장의 개념 맞추기: 뜻마다 용어 4개(정답 3 + 헷갈리는 용어 1) 중 하나를 고른다. 모두 맞혀야 끝난다. */
+function CardMatch({ c, onDone }: { c: CgCard; onDone: () => void }) {
+  const m = c.match!;
+  const rows = useMemo(() => shuffle(m.pairs), [m]);
+  const terms = useMemo(() => shuffle([...m.pairs.map((p) => p.term), m.distractor]), [m]);
+  const [pick, setPick] = useState<Record<string, string>>({});
+  const [checked, setChecked] = useState<Record<string, boolean> | null>(null);
+  const locked = (desc: string) => checked?.[desc] === true;
+  const allOk = !!checked && rows.every((r) => checked[r.desc]);
+  const choose = (desc: string, term: string) => {
+    if (locked(desc) || allOk) return;
+    const next: Record<string, string> = {};
+    // 같은 용어는 한 뜻에만: 다른 줄에서 고른 것은 빼고 옮긴다(맞힌 줄은 그대로)
+    for (const [d, t] of Object.entries(pick)) if (t !== term || locked(d)) next[d] = t;
+    next[desc] = term;
+    setPick(next);
+    if (checked && checked[desc] === false) {
+      const ck = { ...checked };
+      delete ck[desc];
+      setChecked(ck);
+    }
+  };
+  const check = () => {
+    const res = Object.fromEntries(rows.map((r) => [r.desc, pick[r.desc] === r.term]));
+    setChecked(res);
+    if (rows.every((r) => res[r.desc])) onDone();
+  };
+  const usedByLocked = new Set(rows.filter((r) => locked(r.desc)).map((r) => pick[r.desc]));
+  const wrongN = checked ? rows.filter((r) => checked[r.desc] === false).length : 0;
+  return (
+    <section className="panel stack cg-match" aria-labelledby={`match-${c.id}`}>
+      <h3 id={`match-${c.id}`} style={{ margin: 0 }}>개념 맞추기</h3>
+      <p className="small muted" style={{ margin: 0 }}>뜻에 맞는 용어를 고르세요. 용어 {terms.length}개 중 1개는 헷갈리게 넣은 함정이에요.</p>
+      <ol className="cg-match-rows">
+        {rows.map((r) => {
+          const st = checked?.[r.desc];
+          return (
+            <li key={r.desc} className={st === true ? 'ok' : st === false ? 'bad' : ''}>
+              <p className="cg-match-desc">{r.desc}</p>
+              <div className="cg-chips" role="group" aria-label={`뜻: ${r.desc}`}>
+                {terms.map((t) => {
+                  const on = pick[r.desc] === t;
+                  const takenElsewhere = !on && usedByLocked.has(t);
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`cg-chip${on ? ' on' : ''}${on && st === true ? ' ok' : ''}${on && st === false ? ' no' : ''}`}
+                      aria-pressed={on}
+                      disabled={locked(r.desc) || allOk || takenElsewhere}
+                      onClick={() => choose(r.desc, t)}
+                    >{t}</button>
+                  );
+                })}
+              </div>
+              {st === true && <span className="small cg-match-mark">✓ 맞았어요</span>}
+              {st === false && <span className="small cg-match-mark">다시 골라 보세요. 카드에서 찾아봐도 돼요.</span>}
+            </li>
+          );
+        })}
+      </ol>
+      {!allOk && (
+        <div className="row">
+          <button className="btn btn-primary" disabled={rows.some((r) => !pick[r.desc])} onClick={check}>확인</button>
+          {wrongN > 0 && <span className="small muted" aria-live="polite">{wrongN}개가 틀렸어요. 틀린 줄만 다시 고르고 확인을 누르세요.</span>}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Theory({ u }: { u: CgUnit }) {
   const cg = useCg();
-  const done = isPassed(cg.state, u.id, 1);
+  const nav = useNavigate();
+  const ids = useMemo(() => u.cards.map((c) => c.id), [u]);
+  const isDone = (id: string) => Object.hasOwn(cg.state.cards, id);
+  const firstTodo = () => Math.max(0, u.cards.findIndex((c) => !isDone(c.id)));
+  const [idx, setIdx] = useState(firstTodo);
+  const [phase, setPhase] = useState<'read' | 'match'>('read');
+  const [round, setRound] = useState(0);
+  const [justDone, setJustDone] = useState(false);
+  const top = useRef<HTMLDivElement>(null);
+  const doneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (justDone) doneRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [justDone]);
+  const c = u.cards[idx];
+  const doneN = cardsDone(cg.state, ids);
+  const passed = isPassed(cg.state, u.id, 1);
+  const cardDone = isDone(c.id);
+  const go = (i: number) => {
+    setIdx(i);
+    setPhase('read');
+    setJustDone(false);
+    setRound((r) => r + 1);
+    top.current?.scrollIntoView({ block: 'start' });
+  };
+  const nextTodo = () => {
+    const after = [...u.cards.slice(idx + 1), ...u.cards.slice(0, idx)].find((x) => !isDone(x.id));
+    return after ? u.cards.indexOf(after) : -1;
+  };
+  const finish = () => {
+    cg.commit((s) => markCard(s, u.id, c.id, ids).state);
+    setJustDone(true);
+  };
+  const nt = nextTodo();
   return (
-    <div className="stack">
-      <p className="muted" style={{ margin: 0 }}>개념 카드 {u.cards.length}장을 차례로 읽어 보세요. 끝에 있는 "확장" 카드는 시험에 자주 나오는 실무 내용이에요.</p>
-      {u.cards.map((c, i) => (
-        <article key={c.id} className={`panel stack cg-card${c.ext ? ' ext' : ''}`} aria-labelledby={`card-${c.id}`}>
-          <h2 id={`card-${c.id}`} style={{ margin: 0 }}>
-            <span className="cg-card-no">{String(i + 1).padStart(2, '0')}</span> {c.title} {c.ext && <span className="badge badge-sim">확장</span>}
-          </h2>
-          <ul className="cg-points">{c.points.map((p, k) => <li key={k}>{p}</li>)}</ul>
-          {c.table && <Table t={c.table} />}
-          {c.tip && <p className="cg-tip">💡 {c.tip}</p>}
+    <div className="stack" ref={top} style={{ scrollMarginTop: '4.5rem' }}>
+      <p className="muted" style={{ margin: 0 }}>카드를 한 장씩 읽고, 바로 아래 개념 맞추기를 모두 맞히면 다음 카드로 넘어가요. {u.cards.length}장을 모두 마치면 1단계 통과예요.</p>
+      <div className="cg-card-nav" role="group" aria-label="카드 고르기">
+        {u.cards.map((x, i) => (
+          <button key={x.id} type="button" className={`cg-card-dot${i === idx ? ' cur' : ''}${isDone(x.id) ? ' done' : ''}`} aria-current={i === idx ? 'step' : undefined} aria-label={`${i + 1}번 카드${isDone(x.id) ? ' (맞추기 완료)' : ''}`} onClick={() => go(i)}>
+            {isDone(x.id) ? '✓' : i + 1}
+          </button>
+        ))}
+        <span className="small muted">맞춘 카드 {doneN}/{u.cards.length}</span>
+      </div>
+      {phase === 'read' || !c.match ? (
+        <article className={`panel stack cg-card${c.ext ? ' ext' : ''}`} aria-labelledby={`card-${c.id}`}>
+          <CardBody c={c} n={idx + 1} />
+          <div className="row">
+            {c.match ? (
+              <button className="btn btn-primary" onClick={() => { setPhase('match'); requestAnimationFrame(() => top.current?.scrollIntoView({ block: 'start' })); }}>{cardDone ? '개념 맞추기 다시 하기' : '다 읽었어요 → 개념 맞추기'}</button>
+            ) : !cardDone && <button className="btn btn-primary" onClick={finish}>다 읽었어요</button>}
+            {cardDone && <span className="badge badge-exec">맞추기 완료</span>}
+            {cardDone && idx < u.cards.length - 1 && <button className="btn" onClick={() => go(idx + 1)}>다음 카드 →</button>}
+          </div>
         </article>
-      ))}
-      {done ? (
-        <><p className="notice notice-good" style={{ margin: 0 }}>이론 학습을 완료했어요.</p><NextStep u={u} lv={1} /></>
       ) : (
-        <div className="panel row" style={{ justifyContent: 'space-between' }}>
-          <span>모든 카드를 읽었으면 완료를 누르고 개념 끼워맞추기로 넘어가세요.</span>
-          <button className="btn btn-primary" onClick={() => cg.commit((s) => markDone(s, u.id, 1))}>이론 학습 완료</button>
+        <>
+          <details className="panel cg-card-peek">
+            <summary>{String(idx + 1).padStart(2, '0')} {c.title} — 카드 다시 보기</summary>
+            <div className="stack" style={{ marginTop: '0.5rem' }}><CardBody c={c} n={idx + 1} /></div>
+          </details>
+          <CardMatch key={`${c.id}:${round}`} c={c} onDone={finish} />
+        </>
+      )}
+      {justDone && (
+        <div ref={doneRef} className="notice notice-good stack" aria-live="polite" style={{ margin: 0 }}>
+          {passed && nt < 0 ? (
+            <>
+              <b>카드 {u.cards.length}장을 모두 마쳤어요. 1단계 통과!</b>
+              <span>이제 단원 전체 개념을 훑어보는 끼워맞추기를 해 보세요.</span>
+              <div className="row"><button className="btn btn-primary" onClick={() => nav(`/computer/unit/${u.id}/2`)}>다음 단계: {CG_LEVEL_NAME[2]}</button></div>
+            </>
+          ) : (
+            <>
+              <b>{idx + 1}번 카드 완료! ({doneN}/{u.cards.length})</b>
+              {nt >= 0 && <div className="row"><button className="btn btn-primary" onClick={() => go(nt)}>{nt === idx + 1 ? '다음 카드 →' : `${nt + 1}번 카드로 →`}</button></div>}
+            </>
+          )}
         </div>
+      )}
+      {passed && !justDone && (
+        <><p className="notice notice-good" style={{ margin: 0 }}>1단계를 통과했어요. 카드를 다시 보거나 개념 맞추기를 복습할 수 있어요.</p><NextStep u={u} lv={1} /></>
       )}
     </div>
   );
@@ -209,7 +365,7 @@ function Blanks({ u }: { u: CgUnit }) {
 
   return (
     <div className="stack">
-      <p className="muted" style={{ margin: 0 }}>빈칸을 누른 뒤 예시답안에서 알맞은 말을 고르세요. 예시답안 {u.wordBox.length}개 중 {u.wordBox.length - u.blanks.length}개는 헷갈리게 넣은 함정이에요. {u.blanks.length}개 중 {need}개 이상 맞히면 통과예요.</p>
+      <p className="muted" style={{ margin: 0 }}>카드에서 익힌 개념을 단원 전체로 훑어봐요. 빈칸을 누른 뒤 예시답안에서 알맞은 말을 고르세요. 예시답안 {u.wordBox.length}개 중 {u.wordBox.length - u.blanks.length}개는 헷갈리게 넣은 함정이에요. {u.blanks.length}개 중 {need}개 이상 맞히면 통과예요.</p>
       {graded && (
         <div className={`notice ${graded.score >= need ? 'notice-good' : 'notice-warn'}`} aria-live="polite">
           <b>{graded.score}/{u.blanks.length}개 맞았어요.</b> {graded.score >= need ? '통과! 다음 단계가 열렸어요.' : `통과 기준은 ${need}개예요. 틀린 빈칸의 정답과 해설을 확인하고 다시 풀어 보세요.`}

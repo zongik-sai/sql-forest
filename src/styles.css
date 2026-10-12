@@ -393,3 +393,27 @@ input[type='search'] { font: inherit; padding: 0.35rem 0.6rem; border: 1px solid
   .cg-exam-bar { top: 0; z-index: 25; }
 }
 .cg-unsaved { flex-basis: 100%; margin: 0.25rem 0 0; }
+
+/* 1단계: 카드 한 장 읽기 → 개념 맞추기 */
+.cg-card-nav { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.cg-card-dot { min-width: 2rem; height: 2rem; padding: 0 0.3rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.cg-card-dot.done { background: var(--moss-soft); border-color: var(--moss); color: var(--moss-strong); font-weight: 700; }
+.cg-card-dot.cur { outline: 2px solid var(--teal); outline-offset: 1px; }
+.cg-card-nav .small { margin-left: 0.4rem; }
+.cg-card-peek summary { cursor: pointer; font-weight: 600; }
+.cg-match { border-color: var(--teal); }
+.cg-match h3 { font-size: 1.05rem; }
+.cg-match-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; counter-reset: m; }
+.cg-match-rows li { counter-increment: m; display: grid; gap: 0.35rem; padding: 0.6rem 0.7rem; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); }
+.cg-match-rows li.ok { background: var(--moss-soft); border-color: var(--moss); }
+.cg-match-rows li.bad { background: var(--warn-soft); border-color: var(--warn); }
+.cg-match-desc { margin: 0; font-weight: 600; }
+.cg-match-desc::before { content: counter(m) '. '; font-family: var(--mono); color: var(--ink-soft); font-weight: 400; }
+.cg-match .cg-chips { max-height: none; overflow: visible; gap: 0.4rem; }
+.cg-match .cg-chip { padding: 0.35rem 0.75rem; font-size: 0.95rem; min-height: 2.25rem; }
+.cg-chip.on { border-color: var(--teal); background: var(--teal-soft); font-weight: 700; }
+.cg-chip.on.ok { border-color: var(--moss); background: var(--moss-soft); color: var(--moss-strong); }
+.cg-chip.on.no { border-color: var(--bad); background: var(--bad-soft); text-decoration: line-through; }
+.cg-match .cg-chip:disabled:not(.on) { opacity: 0.45; }
+.cg-match-mark { color: var(--ink-soft); }
+.cg-match-rows li.ok .cg-match-mark { color: var(--moss-strong); font-weight: 700; }

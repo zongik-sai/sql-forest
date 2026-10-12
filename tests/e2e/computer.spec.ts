@@ -34,7 +34,7 @@ test('첫 화면은 과목명으로 고른다(자격증 이름 없음)', async (
   await expect(page.getByRole('heading', { name: '데이터베이스' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '컴퓨터 일반' })).toBeVisible();
   const main = await page.locator('main').innerText();
-  expect(main).not.toMatch(/SQLD|PC정비사|정보처리/);
+  expect(main).not.toMatch(/SQLD|PC정비사|정보처리기사/);
   await page.getByRole('link', { name: /데이터베이스/ }).click();
   await expect(page).toHaveURL(/#\/db$/);
   await expect(page.getByRole('heading', { name: /작은 씨앗으로 시작해/ })).toBeVisible();
@@ -47,22 +47,62 @@ test('첫 화면은 과목명으로 고른다(자격증 이름 없음)', async (
   await expect(page.locator('.subject-card', { hasText: '컴퓨터 일반' }).getByText('최근 공부')).toBeVisible();
 });
 
-test('이론 → 끼워맞추기 → 기초 객관식: 통과 기준·잠금·식물 성장·오답노트', async ({ page }) => {
+test('이론·개념 맞추기 → 전체 끼워맞추기 → 기초 객관식: 통과 기준·잠금·식물 성장·오답노트', async ({ page }) => {
   await fresh(page, `/computer/unit/${U1.id}`);
   // 2단계는 잠김 → "그래도 풀어보기" 가능
   await page.goto(`./#/computer/unit/${U1.id}/2`);
-  await expect(page.getByText('앞 단계 1단계 이론를 통과하면 열려요.')).toBeVisible();
+  await expect(page.getByText('앞 단계 1단계 이론·개념 맞추기를 통과하면 열려요.')).toBeVisible();
   await expect(page.getByRole('button', { name: '그래도 풀어보기' })).toBeVisible();
+  await page.goto(`./#/computer/unit/${U1.id}/3`);
+  await expect(page.getByText('앞 단계 2단계 전체 개념 끼워맞추기를 통과하면 열려요.')).toBeVisible();
+  await page.goto(`./#/computer/unit/${U1.id}/4`);
+  await expect(page.getByText('앞 단계 3단계 기초 객관식을 통과하면 열려요.')).toBeVisible();
 
-  // 1단계 이론: 카드 전체를 읽고 완료
+  // 1단계: 카드 한 장씩 읽고 → 개념 맞추기(모두 맞혀야 다음 카드)
   await page.goto(`./#/computer/unit/${U1.id}/1`);
-  await expect(page.locator('.cg-card')).toHaveCount(U1.cards.length);
-  await page.getByRole('button', { name: '이론 학습 완료' }).click();
+  await expect(page.locator('.cg-card-dot')).toHaveCount(U1.cards.length);
+  await expect(page.getByText(`맞춘 카드 0/${U1.cards.length}`)).toBeVisible();
+  await expect(page.locator('.cg-card')).toHaveCount(1);
+  await expect(page.locator('.cg-card h2')).toContainText(U1.cards[0].title);
+  const row = (desc: string) => page.locator('.cg-match-rows li').filter({ has: page.locator('.cg-match-desc', { hasText: desc }) });
+  const chip = (desc: string, term: string) => row(desc).getByRole('button', { name: term, exact: true });
+
+  // 첫 카드: 같은 용어는 한 뜻에만(옮겨짐) · 하나 틀리면 그 줄만 다시
+  const m0 = U1.cards[0].match!;
+  await page.getByRole('button', { name: '다 읽었어요 → 개념 맞추기' }).click();
+  await expect(page.locator('.cg-match-rows li')).toHaveCount(3);
+  await expect(row(m0.pairs[0].desc).getByRole('button')).toHaveCount(4);
+  await chip(m0.pairs[0].desc, m0.pairs[1].term).click();
+  await chip(m0.pairs[1].desc, m0.pairs[1].term).click();
+  await expect(chip(m0.pairs[0].desc, m0.pairs[1].term)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: '확인' })).toBeDisabled();
+  await chip(m0.pairs[0].desc, m0.distractor).click();
+  await chip(m0.pairs[2].desc, m0.pairs[2].term).click();
+  await page.getByRole('button', { name: '확인' }).click();
+  await expect(row(m0.pairs[0].desc)).toHaveClass(/bad/);
+  await expect(row(m0.pairs[1].desc)).toHaveClass(/ok/);
+  await expect(page.getByText('1개가 틀렸어요.')).toBeVisible();
+  await expect(page.getByText(/번 카드 완료/)).toHaveCount(0);
+  await chip(m0.pairs[0].desc, m0.pairs[0].term).click();
+  await page.getByRole('button', { name: '확인' }).click();
+  await expect(page.getByText(`1번 카드 완료! (1/${U1.cards.length})`)).toBeVisible();
+
+  // 나머지 카드
+  for (let i = 1; i < U1.cards.length; i++) {
+    await page.getByRole('button', { name: '다음 카드 →' }).click();
+    await expect(page.locator('.cg-card h2')).toContainText(U1.cards[i].title);
+    await page.getByRole('button', { name: '다 읽었어요 → 개념 맞추기' }).click();
+    for (const p of U1.cards[i].match!.pairs) await chip(p.desc, p.term).click();
+    await page.getByRole('button', { name: '확인' }).click();
+    if (i < U1.cards.length - 1) await expect(page.getByText(`${i + 1}번 카드 완료! (${i + 1}/${U1.cards.length})`)).toBeVisible();
+  }
   await expect(page.getByRole('dialog', { name: '식물이 자랐어요' })).toContainText('새싹');
   await page.getByRole('button', { name: '닫기' }).click();
+  await expect(page.getByText(`카드 ${U1.cards.length}장을 모두 마쳤어요. 1단계 통과!`)).toBeVisible();
+  await expect(page.getByText(`맞춘 카드 ${U1.cards.length}/${U1.cards.length}`)).toBeVisible();
 
   // 2단계 끼워맞추기: 빈칸을 누르고 예시답안을 고른다. 기준 미만 → 정답·해설 공개 → 다시 풀어 통과
-  await page.getByRole('button', { name: /다음 단계: 개념 끼워맞추기/ }).click();
+  await page.getByRole('button', { name: /다음 단계: 전체 개념 끼워맞추기/ }).first().click();
   const need = Math.ceil(0.8 * U1.blanks.length);
   const fill = async (n: number) => {
     for (let i = 0; i < n; i++) {
@@ -107,6 +147,7 @@ test('이론 → 끼워맞추기 → 기초 객관식: 통과 기준·잠금·�
   await expect(page.getByText(/통과한 단계 3 \/ 40/)).toBeVisible();
   const saved = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{}'), GUEST_STATE);
   expect(Object.keys(saved.units.U1)).toEqual(expect.arrayContaining(['lv1', 'lv2', 'lv3']));
+  expect(Object.keys(saved.cards).sort()).toEqual(U1.cards.map((c) => c.id).sort());
 });
 
 test('모의고사: 50문항·제출·단원별/영역별 정답률·틀린 문항은 오답노트로', async ({ page }) => {

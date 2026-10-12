@@ -1,10 +1,12 @@
+import matchRaw from './card_match.json' with { type: 'json' };
 import raw from './pc_bank.json' with { type: 'json' };
-import { CG_AREAS, type CgArea, type CgMcq, type CgTable, type CgUnit, type CgUnitId } from '../types';
+import { CG_AREAS, type CgArea, type CgCardMatch, type CgMcq, type CgTable, type CgUnit, type CgUnitId } from '../types';
 
 /**
  * 컴퓨터 일반 8단원 문제은행.
  * 원본: 선생님의 'PC정비사 자기학습' 페이지에 들어 있던 데이터(pc_bank.json, 형식 그대로 보관)를
  * 앱 표준 형태로 바꾼다. 문항 ID는 단원 안에서만 고유하므로 'U1-b1'처럼 단원을 붙인다.
+ * 카드별 개념 맞추기(card_match.json)는 원본과 따로 보관한다(카드 ID 'U1-t1' 기준, 선생님 검토용).
  */
 interface RawTable { head: string[]; rows: string[][] }
 interface RawQ { id: string; q: string; o: string[]; a: number; exp: string; area: string; type?: string }
@@ -32,15 +34,20 @@ function mcq(unitId: CgUnitId, set: 'basic' | 'check', q: RawQ): CgMcq {
   };
 }
 
-export function adaptBank(units: RawUnit[]): CgUnit[] {
+export function adaptBank(units: RawUnit[], matches: Record<string, CgCardMatch> = {}): CgUnit[] {
   return units.map((u) => {
     const id = `U${u.unit}` as CgUnitId;
     return {
       id, num: u.unit, title: u.title, intro: u.intro,
-      cards: u.theory.map((t) => ({
-        id: `${id}-${t.id}`, title: t.title.replace(/^\[확장\]\s*/, ''), points: t.points,
-        ...(t.table ? { table: table(t.table) } : {}), ...(t.tip ? { tip: t.tip } : {}), ext: !!t.ext,
-      })),
+      cards: u.theory.map((t) => {
+        const cid = `${id}-${t.id}`;
+        const m = Object.hasOwn(matches, cid) ? matches[cid] : undefined;
+        return {
+          id: cid, title: t.title.replace(/^\[확장\]\s*/, ''), points: t.points,
+          ...(t.table ? { table: table(t.table) } : {}), ...(t.tip ? { tip: t.tip } : {}), ext: !!t.ext,
+          ...(m ? { match: m } : {}),
+        };
+      }),
       wordBox: u.bank,
       blanks: u.fill.map((f) => ({ id: `${id}-${f.id}`, text: f.text, answer: f.answer, explanation: f.exp })),
       basic: u.basic.map((q) => mcq(id, 'basic', q)),
@@ -50,7 +57,7 @@ export function adaptBank(units: RawUnit[]): CgUnit[] {
   });
 }
 
-export const CG_UNITS: CgUnit[] = adaptBank(raw as RawUnit[]);
+export const CG_UNITS: CgUnit[] = adaptBank(raw as RawUnit[], matchRaw as Record<string, CgCardMatch>);
 export const CG_UNIT_BY_ID: Partial<Record<CgUnitId, CgUnit>> = Object.fromEntries(CG_UNITS.map((u) => [u.id, u]));
 const MCQ_MAP = new Map(CG_UNITS.flatMap((u) => [...u.basic, ...u.check]).map((q) => [q.id, q]));
 /** 문항 찾기(없는 ID·'constructor' 같은 키는 undefined) */
