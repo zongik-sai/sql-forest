@@ -1,0 +1,403 @@
+{
+  "unit": "U12",
+  "cards": [
+    {
+      "id": "U12-t1",
+      "title": "분석 시작: 표 구조와 키 읽기",
+      "points": [
+        "통합 미션은 하나의 질문에 모델·조회·집계·조인·서브쿼리·순위를 이어 붙여 답하는 과제예요.",
+        "먼저 엔터티(표)를 찾아요. 캠프 데이터에는 departments(학과), students(학생), courses(캠프), enrollment(수강)가 있어요.",
+        "기본키(PK)는 한 행을 다른 행과 구별하는 열이고, 외래키(FK)는 다른 표의 기본키 값을 담아 두 표를 잇는 열이에요.",
+        "학생과 캠프는 다대다라서 두 키를 함께 담은 중간 테이블 enrollment로 풀었어요. 이 연결선이 곧 조인 경로예요."
+      ],
+      "table": {
+        "header": ["표", "기본키(PK)", "외래키(FK) → 연결 대상"],
+        "rows": [
+          ["departments", "dept_id", "없음"],
+          ["students", "student_id", "dept_id → departments"],
+          ["courses", "course_id", "없음"],
+          ["enrollment", "student_id + course_id", "student_id → students, course_id → courses"]
+        ]
+      },
+      "tip": "조인 조건은 보통 'FK = PK'예요. 표의 화살표를 따라가면 ON 절이 보여요.",
+      "match": {
+        "pairs": [
+          { "term": "기본키(PK)", "desc": "표 안에서 한 행을 다른 행과 구별해 주는 열(또는 열 조합)" },
+          { "term": "외래키(FK)", "desc": "다른 표의 대표 키 값을 담아 두 표를 이어 주는 열" },
+          { "term": "중간 테이블", "desc": "다대다 관계를 풀려고 양쪽 키를 함께 담아 만든 표" }
+        ],
+        "distractor": "도메인"
+      }
+    },
+    {
+      "id": "U12-t2",
+      "title": "SELECT·WHERE: 필요한 행과 열 고르기",
+      "points": [
+        "SELECT는 보여 줄 열을, FROM은 읽을 표를, WHERE는 남길 행의 조건을 정해요. 예: 3학년 학생만 → WHERE grade = 3",
+        "SQL은 쓰는 순서와 처리 순서가 달라요. 아래 처리 순서를 알면 어떤 조건을 어느 절에 써야 할지 보여요.",
+        "NULL은 '값이 없음'이라 = 로 비교하면 참이 되지 않아요(UNKNOWN). 빈 값은 IS NULL / IS NOT NULL로 찾아요."
+      ],
+      "table": {
+        "header": ["처리 순서", "절", "하는 일"],
+        "rows": [
+          ["1", "FROM", "읽을 표 정하기(조인 포함)"],
+          ["2", "WHERE", "행 하나하나 거르기"],
+          ["3", "GROUP BY", "행을 묶음으로 모으기"],
+          ["4", "HAVING", "묶음 거르기"],
+          ["5", "SELECT", "열·계산·순위 만들기"],
+          ["6", "ORDER BY", "결과 정렬하기"]
+        ]
+      },
+      "tip": "NULL 찾기는 = NULL이 아니라 IS NULL! = NULL은 어떤 행도 고르지 못해요.",
+      "match": {
+        "pairs": [
+          { "term": "WHERE", "desc": "조건에 맞는 행만 남기는 절로, 묶기 전에 처리돼요" },
+          { "term": "IS NULL", "desc": "값이 비어 있는 행을 찾는 올바른 비교 방법" },
+          { "term": "ORDER BY", "desc": "가장 마지막에 처리되어 결과의 순서를 정하는 절" }
+        ],
+        "distractor": "HAVING"
+      }
+    },
+    {
+      "id": "U12-t3",
+      "title": "GROUP BY·HAVING: 묶어서 요약하기",
+      "points": [
+        "GROUP BY는 같은 값을 가진 행을 한 묶음으로 모아, 묶음마다 한 행의 요약을 만들어요. 예: 학과별 학생 수.",
+        "집계 함수 COUNT·SUM·AVG·MIN·MAX는 묶음 안의 여러 값을 하나로 줄여요.",
+        "COUNT(*)는 행을 모두 세고, COUNT(열)·AVG(열)는 NULL을 빼고 계산해요. 아래는 enrollment 점수 6개로 계산한 예예요.",
+        "HAVING은 묶은 뒤 집계 결과로 묶음을 거르는 절이에요. 예: 평균 80 이상인 학생만 → HAVING AVG(score) >= 80"
+      ],
+      "table": {
+        "header": ["계산(점수: 90, 80, 90, NULL, 70, 80)", "결과", "이유"],
+        "rows": [
+          ["COUNT(*)", "6", "행 6개를 모두 셈"],
+          ["COUNT(score)", "5", "NULL 1개는 빼고 셈"],
+          ["AVG(score)", "82", "410 ÷ 5 (NULL 제외)"]
+        ]
+      },
+      "tip": "WHERE는 묶기 전 '행'을, HAVING은 묶은 뒤 '묶음'을 걸러요. WHERE에는 집계 함수를 못 써요.",
+      "match": {
+        "pairs": [
+          { "term": "GROUP BY", "desc": "같은 값을 가진 행들을 하나의 묶음으로 모으는 절" },
+          { "term": "HAVING", "desc": "묶은 뒤 집계 결과를 보고 묶음을 거르는 절" },
+          { "term": "COUNT(*)", "desc": "NULL이 있든 없든 행의 개수를 모두 세는 함수" }
+        ],
+        "distractor": "COUNT(score)"
+      }
+    },
+    {
+      "id": "U12-t4",
+      "title": "JOIN: 키로 표를 연결하기",
+      "points": [
+        "JOIN은 두 표에서 키 값이 같은 행끼리 이어 붙여 한 행으로 만드는 연산이에요. 예: 학생 + 학과명.",
+        "INNER JOIN은 짝이 있는 행만 남기고, LEFT JOIN은 왼쪽 표의 행을 모두 남긴 뒤 짝이 없으면 오른쪽 열을 NULL로 채워요.",
+        "1:N으로 조인하면 '1' 쪽 행이 짝 수만큼 늘어나요. 아래는 students LEFT JOIN enrollment 결과의 일부예요.",
+        "늘어난 행으로 사람 수를 셀 때는 COUNT(DISTINCT e.student_id)처럼 중복을 빼고 세요."
+      ],
+      "table": {
+        "header": ["student_name", "course_id", "score"],
+        "rows": [
+          ["가온", "101", "90"],
+          ["가온", "102", "80"],
+          ["다온", "101", "NULL"],
+          ["라온", "NULL", "NULL"]
+        ]
+      },
+      "tip": "'참여 안 한 학생'은 LEFT JOIN 뒤 오른쪽 키 IS NULL. 점수 NULL(다온)과 헷갈리지 마요.",
+      "match": {
+        "pairs": [
+          { "term": "INNER JOIN", "desc": "양쪽 표에 짝이 있는 행만 결과에 남기는 조인" },
+          { "term": "LEFT JOIN", "desc": "왼쪽 표의 행은 모두 남기고 짝이 없으면 NULL로 채우는 조인" },
+          { "term": "COUNT(DISTINCT e.student_id)", "desc": "조인으로 늘어난 행에서 서로 다른 학생만 세는 식" }
+        ],
+        "distractor": "CROSS JOIN"
+      }
+    },
+    {
+      "id": "U12-t5",
+      "title": "서브쿼리: 쿼리 안의 쿼리",
+      "points": [
+        "서브쿼리는 괄호 안에 넣은 또 하나의 SELECT예요. 바깥 쿼리가 그 결과를 값·목록·표처럼 써요.",
+        "EXISTS는 안쪽에 맞는 행이 하나라도 있으면 참, NOT EXISTS는 하나도 없으면 참이에요. 여부만 보니 학생이 한 번씩만 나와요.",
+        "NOT IN은 비교 목록에 NULL이 하나라도 섞이면 어떤 행도 참이 되지 않아 결과가 비어 버릴 수 있어요.",
+        "인라인 뷰는 FROM 절에 넣은 서브쿼리로, 그 결과를 임시 표처럼 다시 거르거나 조인해요."
+      ],
+      "table": {
+        "header": ["넣는 위치", "이름", "예"],
+        "rows": [
+          ["SELECT 절", "스칼라 서브쿼리", "(SELECT AVG(score) FROM enrollment)"],
+          ["FROM 절", "인라인 뷰", "FROM (SELECT …) t"],
+          ["WHERE 절", "중첩 서브쿼리", "WHERE EXISTS (SELECT 1 …)"]
+        ]
+      },
+      "tip": "안쪽에서 바깥 표 열(s.student_id)을 쓰면 상관 서브쿼리예요. 바깥 행마다 다시 확인해요.",
+      "match": {
+        "pairs": [
+          { "term": "EXISTS", "desc": "안쪽에 맞는 행이 하나라도 있는지만 보고 참·거짓을 정하는 조건" },
+          { "term": "NOT IN", "desc": "비교 목록에 NULL이 섞이면 결과가 비어 버릴 수 있는 조건" },
+          { "term": "인라인 뷰", "desc": "FROM 절에 넣어 임시 표처럼 쓰는 서브쿼리" }
+        ],
+        "distractor": "스칼라 서브쿼리"
+      }
+    },
+    {
+      "id": "U12-t6",
+      "title": "윈도우 함수와 Top N: 순위 붙이기",
+      "points": [
+        "윈도우 함수는 행을 줄이지 않고 각 행 옆에 순위·누적합 같은 값을 붙여요. GROUP BY는 행을 줄여요.",
+        "OVER (PARTITION BY 묶음 ORDER BY 기준)으로 범위와 순서를 정해요. PARTITION BY를 쓰면 묶음마다 1위부터 다시 매겨요.",
+        "동점 처리가 달라요. 아래처럼 RANK()는 1,1,3, DENSE_RANK()는 1,1,2, ROW_NUMBER()는 1,2,3으로 매겨요.",
+        "윈도우 함수는 SELECT 단계에서 만들어져 같은 쿼리의 WHERE에서 못 써요. 인라인 뷰로 감싼 뒤 바깥 WHERE에서 걸러요."
+      ],
+      "table": {
+        "header": ["점수", "RANK()", "DENSE_RANK()", "ROW_NUMBER()"],
+        "rows": [
+          ["90", "1", "1", "1"],
+          ["90", "1", "1", "2"],
+          ["80", "3", "2", "3"]
+        ]
+      },
+      "tip": "'동점 포함 상위 N명'은 RANK + 바깥 WHERE. LIMIT N이나 ROW_NUMBER는 동점자를 놓칠 수 있어요.",
+      "match": {
+        "pairs": [
+          { "term": "RANK()", "desc": "동점은 같은 순위를 주고 다음 순위는 건너뛰어요(90,90,80 → 1,1,3)" },
+          { "term": "ROW_NUMBER()", "desc": "동점이어도 겹치지 않게 1, 2, 3 번호를 매겨요" },
+          { "term": "PARTITION BY", "desc": "묶음마다 순위를 1부터 다시 매기도록 계산 범위를 나눠요" }
+        ],
+        "distractor": "DENSE_RANK()"
+      }
+    },
+    {
+      "id": "U12-t7",
+      "title": "질문 문장을 SQL 도구로 바꾸기",
+      "points": [
+        "통합 미션은 질문 속 핵심 말을 SQL 도구로 번역하는 연습이에요. 아래 표처럼 말과 도구를 짝지어 보세요.",
+        "보통 ① 필요한 표와 조인 경로 찾기 ② WHERE로 행 거르기 ③ GROUP BY로 묶기 ④ 순위 붙이기 ⑤ 정렬 순으로 쌓아요.",
+        "한 번에 다 쓰지 말고 한 단계씩 실행해 중간 결과의 행 수와 NULL을 확인하며 넓혀 가요."
+      ],
+      "table": {
+        "header": ["질문 속 말", "쓸 도구"],
+        "rows": [
+          ["한 번씩만", "DISTINCT 또는 EXISTS"],
+          ["참여하지 않은", "NOT EXISTS 또는 LEFT JOIN + IS NULL"],
+          ["학과별", "GROUP BY 학과"],
+          ["0명 학과도 포함", "학과 기준 LEFT JOIN + COUNT(열)"],
+          ["동점 포함 상위 2명", "RANK() + 인라인 뷰 + 바깥 WHERE 순위 <= 2"]
+        ]
+      },
+      "tip": "막히면 '지금 한 행이 무엇인가?'부터 물어요. 수강과 조인한 뒤 한 행은 수강 1건이에요.",
+      "match": {
+        "pairs": [
+          { "term": "참여하지 않은", "desc": "짝이 되는 수강 기록이 없는 행만 골라내는 방법이 필요해요" },
+          { "term": "학과별", "desc": "같은 학과끼리 묶어 집계하는 절이 필요해요" },
+          { "term": "동점 포함 상위 2명", "desc": "같은 점수에 같은 순위를 주는 함수와 바깥 조건이 필요해요" }
+        ],
+        "distractor": "한 번씩만"
+      }
+    }
+  ],
+  "quiz": [
+    {
+      "id": "U12-c1",
+      "question": "학생 한 명은 여러 캠프를 듣고, 캠프 하나에는 여러 학생이 있어요. 관계형 DB에서 이 다대다 관계를 표현하는 일반적인 방법은?",
+      "options": [
+        "students 표에 course_id1, course_id2 열을 계속 추가한다",
+        "courses 표에 수강 학생 이름을 쉼표로 이어 저장한다",
+        "학생 키와 캠프 키를 함께 담은 중간 테이블(enrollment)을 만든다",
+        "students와 courses를 한 표로 합친다"
+      ],
+      "answer": 2,
+      "explanation": "다대다는 양쪽 키를 FK로 담은 중간 테이블로 풀어 1:N 관계 두 개로 바꿔요. 열을 늘리거나 쉼표로 저장하면 1정규형을 어기고 조회도 어려워져요.",
+      "tag": "다대다 중간 테이블"
+    },
+    {
+      "id": "U12-c2",
+      "question": "enrollment의 score 6개 중 1개가 NULL이에요. 다음 SQL의 결과는?\nSELECT COUNT(*) FROM enrollment WHERE score = NULL;",
+      "options": ["1", "6", "오류", "0"],
+      "answer": 3,
+      "explanation": "NULL과 = 로 비교하면 결과가 UNKNOWN이라 어떤 행도 참이 되지 않아 0이에요. NULL인 행을 찾으려면 WHERE score IS NULL을 써야 1이 나와요.",
+      "tag": "NULL"
+    },
+    {
+      "id": "U12-c3",
+      "question": "SELECT 문의 논리적 처리 순서로 옳은 것은?",
+      "options": [
+        "SELECT → FROM → WHERE → GROUP BY → HAVING → ORDER BY",
+        "FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY",
+        "FROM → GROUP BY → WHERE → SELECT → HAVING → ORDER BY",
+        "FROM → SELECT → WHERE → GROUP BY → ORDER BY → HAVING"
+      ],
+      "answer": 1,
+      "explanation": "표를 읽고(FROM) 행을 거른 뒤(WHERE) 묶고(GROUP BY) 묶음을 거르고(HAVING) 열을 만든 다음(SELECT) 마지막에 정렬(ORDER BY)해요.",
+      "tag": "논리적 처리 순서"
+    },
+    {
+      "id": "U12-c4",
+      "question": "score 값이 10, NULL, 20, NULL인 4행짜리 표에서 SELECT COUNT(*), COUNT(score), AVG(score)를 실행하면 결과는?",
+      "options": ["4, 2, 15", "4, 4, 7.5", "2, 2, 15", "4, 2, 7.5"],
+      "answer": 0,
+      "explanation": "COUNT(*)는 행 4개를 모두 세고, COUNT(score)와 AVG(score)는 NULL을 빼요. 그래서 개수는 2, 평균은 (10+20)÷2 = 15예요.",
+      "tag": "COUNT(*)와 COUNT(열)"
+    },
+    {
+      "id": "U12-c5",
+      "question": "다음 SQL이 오류가 나는 이유는?\nSELECT student_id, AVG(score) FROM enrollment WHERE AVG(score) >= 80 GROUP BY student_id;",
+      "options": [
+        "WHERE는 묶기 전에 처리돼 집계 함수를 쓸 수 없어서",
+        "AVG는 NULL이 있으면 계산할 수 없어서",
+        "SELECT에 별칭(AS)이 없어서",
+        "GROUP BY에 score가 빠져서"
+      ],
+      "answer": 0,
+      "explanation": "WHERE는 GROUP BY보다 먼저 처리돼 그때는 아직 평균이 없어요. 집계 결과로 거르는 조건은 GROUP BY 뒤에 HAVING AVG(score) >= 80으로 써요.",
+      "tag": "HAVING"
+    },
+    {
+      "id": "U12-c6",
+      "question": "학생 6명의 수강 건수가 가온 2, 다온 2, 나래 1, 바다 1, 라온 0, 마루 0이에요. students s LEFT JOIN enrollment e ON e.student_id = s.student_id 결과의 행 수는?",
+      "options": ["6", "8", "4", "36"],
+      "answer": 1,
+      "explanation": "짝이 있는 학생은 짝 수만큼(2+2+1+1 = 6행), 짝이 없는 라온·마루는 NULL로 채운 1행씩(2행) 남아 모두 8행이에요.",
+      "tag": "LEFT JOIN"
+    },
+    {
+      "id": "U12-c7",
+      "question": "departments LEFT JOIN students LEFT JOIN enrollment 후 GROUP BY 학과, COUNT(*)로 참여 학생 수를 세었더니 참여 학생이 없는 학과가 1로 나왔어요. 0으로 바르게 세는 방법은?",
+      "options": [
+        "COUNT(*)를 COUNT(1)로 바꾼다",
+        "LEFT JOIN을 INNER JOIN으로 바꾼다",
+        "COUNT(DISTINCT e.student_id)로 센다",
+        "WHERE e.student_id IS NOT NULL을 추가한다"
+      ],
+      "answer": 2,
+      "explanation": "짝 없는 학과도 NULL로 채운 1행이 남아 COUNT(*)는 1이에요. COUNT(DISTINCT 열)은 NULL을 빼고 중복 학생도 한 번만 세요. INNER JOIN이나 WHERE는 그 학과 행을 아예 지워요.",
+      "tag": "COUNT(*)와 COUNT(열)"
+    },
+    {
+      "id": "U12-c8",
+      "question": "WHERE student_id NOT IN (서브쿼리)에서 서브쿼리 결과가 1, 2, NULL이면 이 조건으로 남는 행은?",
+      "options": [
+        "student_id가 1, 2가 아닌 학생이 모두 남는다",
+        "어떤 행도 남지 않는다(0행)",
+        "student_id가 NULL인 학생만 남는다",
+        "NULL은 무시되어 1, 2인 학생만 남는다"
+      ],
+      "answer": 1,
+      "explanation": "NOT IN은 '≠1 AND ≠2 AND ≠NULL'인데 ≠NULL이 UNKNOWN이라 어떤 행도 참이 되지 않아요. 그래서 '없는 것' 찾기는 NOT EXISTS가 안전해요.",
+      "tag": "IN/EXISTS/ANY/ALL"
+    },
+    {
+      "id": "U12-c9",
+      "question": "SELECT 절에서 RANK() OVER (ORDER BY score DESC) AS rnk로 순위를 붙였어요. 순위가 2 이하인 행만 남기는 올바른 방법은?",
+      "options": [
+        "같은 쿼리의 WHERE에 rnk <= 2를 쓴다",
+        "같은 쿼리에 HAVING rnk <= 2를 쓴다",
+        "GROUP BY rnk를 추가한다",
+        "인라인 뷰로 감싸고 바깥 WHERE에 rnk <= 2를 쓴다"
+      ],
+      "answer": 3,
+      "explanation": "윈도우 함수는 WHERE보다 늦은 SELECT 단계에서 만들어져 같은 쿼리의 WHERE에서 못 써요. FROM (…) t로 감싸면 rnk가 보통 열이 되어 바깥 WHERE로 거를 수 있어요.",
+      "tag": "Top N"
+    },
+    {
+      "id": "U12-c10",
+      "question": "평균이 90, 85, 85, 70인 학생 4명에 RANK() OVER (ORDER BY 평균 DESC)를 붙이면 순위는?",
+      "options": ["1, 2, 2, 4", "1, 2, 2, 3", "1, 2, 3, 4", "1, 1, 2, 3"],
+      "answer": 0,
+      "explanation": "RANK는 동점에 같은 순위를 주고 동점 수만큼 다음 순위를 건너뛰어요. 1, 2, 2, 3은 DENSE_RANK, 1, 2, 3, 4는 ROW_NUMBER의 결과예요.",
+      "tag": "RANK/DENSE_RANK/ROW_NUMBER"
+    }
+  ],
+  "practice": [
+    {
+      "id": "U12-p1",
+      "title": "분석 1단계: 조인으로 수강 기록 펼치기",
+      "goal": "FK = PK 조인으로 네 표를 이어 '누가·어느 학과·어떤 캠프·몇 점'인지 한 행으로 봐요.",
+      "dataset": "school",
+      "sql": "SELECT s.student_name, d.dept_name, c.course_name, e.score\nFROM enrollment e\nJOIN students s ON s.student_id = e.student_id\nJOIN departments d ON d.dept_id = s.dept_id\nJOIN courses c ON c.course_id = e.course_id\nWHERE e.score IS NOT NULL\nORDER BY s.student_name, c.course_name;",
+      "run": true,
+      "steps": [
+        "FROM enrollment에서 시작해요. 조인한 뒤 결과의 한 행은 '수강 1건'이에요.",
+        "각 JOIN의 ON은 FK = PK예요. student_id로 학생 이름, dept_id로 학과명, course_id로 캠프 이름을 붙여요.",
+        "WHERE e.score IS NOT NULL이 점수가 빈 다온의 SQL캠프 기록을 빼서 5행이 남아요.",
+        "가온은 수강이 2건이라 이름이 두 번 나와요. 사람 수를 셀 때는 이 중복을 조심해요(미션 1·3)."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "s.student_id = e.student_id", "desc": "수강 기록의 학생 번호를 학생 표의 번호와 맞춰 이어요" },
+          { "term": "WHERE e.score IS NOT NULL", "desc": "점수가 비어 있는 수강 기록은 결과에서 빼요" },
+          { "term": "ORDER BY s.student_name", "desc": "결과를 학생 이름 가나다순으로 정렬해요" }
+        ],
+        "distractor": "GROUP BY s.student_name"
+      }
+    },
+    {
+      "id": "U12-p2",
+      "title": "분석 2단계: 학생별 참여 수 집계(0건 포함)",
+      "goal": "LEFT JOIN과 GROUP BY로 모든 학생의 참여 캠프 수와 평균을 구하고 미참여 학생을 0으로 확인해요.",
+      "dataset": "school",
+      "sql": "SELECT s.student_name, COUNT(e.course_id) AS camps, AVG(e.score) AS avg_score\nFROM students s\nLEFT JOIN enrollment e ON e.student_id = s.student_id\nGROUP BY s.student_id, s.student_name\nORDER BY camps DESC, s.student_name;",
+      "run": true,
+      "steps": [
+        "LEFT JOIN으로 학생 6명이 모두 남아요. 수강이 없는 라온·마루는 e 쪽 열이 NULL인 1행이 돼요.",
+        "GROUP BY가 학생마다 한 묶음을 만들어 결과는 학생 수와 같은 6행이에요.",
+        "COUNT(e.course_id)는 NULL을 세지 않아 라온·마루가 0이에요. COUNT(*)였다면 1이 나와요.",
+        "AVG(e.score)도 NULL을 빼요. 다온은 (NULL, 70)이라 평균 70이고, 라온·마루는 평균이 NULL이에요.",
+        "ORDER BY는 SELECT 다음에 처리되어 별칭 camps를 쓸 수 있어요."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "LEFT JOIN", "desc": "수강 기록이 없는 학생도 결과에 한 행으로 남겨요" },
+          { "term": "COUNT(e.course_id)", "desc": "NULL을 세지 않아 미참여 학생은 0이 나와요" },
+          { "term": "AVG(e.score)", "desc": "점수가 빈 기록은 빼고 학생의 평균 점수를 내요" }
+        ],
+        "distractor": "COUNT(*)"
+      }
+    },
+    {
+      "id": "U12-p3",
+      "title": "분석 3단계: SQL캠프 미참여 학생 찾기",
+      "goal": "NOT EXISTS 상관 서브쿼리로 SQL캠프(101) 수강 기록이 없는 학생을 찾아요.",
+      "dataset": "school",
+      "sql": "SELECT s.student_id, s.student_name\nFROM students s\nWHERE NOT EXISTS (\n  SELECT 1 FROM enrollment e\n  WHERE e.student_id = s.student_id\n    AND e.course_id = 101\n)\nORDER BY s.student_id;",
+      "run": true,
+      "steps": [
+        "바깥 students에서 학생을 한 명씩 꺼내 안쪽 서브쿼리에 그 학번을 넘겨요(상관 서브쿼리).",
+        "안쪽은 그 학생의 SQL캠프(101) 수강 기록을 찾아요. SELECT 1은 값이 아니라 '있는지'만 본다는 표시예요.",
+        "기록이 하나도 없으면 NOT EXISTS가 참이 되어 라온·마루·바다가 남아요.",
+        "다온은 SQL캠프 점수가 NULL이지만 수강 기록은 있어서 빠져요. '참여 없음'과 '점수 없음'은 달라요."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "NOT EXISTS", "desc": "안쪽에서 찾은 기록이 한 건도 없을 때만 참이 돼요" },
+          { "term": "e.student_id = s.student_id", "desc": "바깥 학생의 번호를 안쪽 수강 기록과 맞춰 보는 상관 조건" },
+          { "term": "e.course_id = 101", "desc": "SQL캠프 수강 기록만 찾도록 범위를 좁혀요" }
+        ],
+        "distractor": "e.score IS NULL"
+      }
+    },
+    {
+      "id": "U12-p4",
+      "title": "분석 4단계: 캠프별 최고점 학생(동점 포함)",
+      "goal": "PARTITION BY로 캠프마다 순위를 매기고, 인라인 뷰 바깥에서 1위만 남겨요.",
+      "dataset": "school",
+      "sql": "SELECT course_name, student_name, score, rnk\nFROM (\n  SELECT c.course_name, s.student_name, e.score,\n         RANK() OVER (PARTITION BY e.course_id ORDER BY e.score DESC) AS rnk\n  FROM enrollment e\n  JOIN students s ON s.student_id = e.student_id\n  JOIN courses c ON c.course_id = e.course_id\n  WHERE e.score IS NOT NULL\n) t\nWHERE rnk = 1\nORDER BY course_name, student_name;",
+      "run": true,
+      "steps": [
+        "안쪽: 조인과 WHERE로 점수가 있는 수강 기록 5행을 만들어요(1단계와 같은 뼈대).",
+        "RANK() OVER (PARTITION BY e.course_id …)가 캠프마다 점수 높은 순으로 순위를 따로 매겨요.",
+        "윈도우 함수는 같은 쿼리의 WHERE에서 못 쓰니 인라인 뷰 t로 감싸고 바깥에서 rnk = 1만 남겨요.",
+        "SQL캠프는 가온·나래가 90점, IoT캠프는 가온·바다가 80점으로 동점이라 캠프마다 2명씩 1위예요.",
+        "Oracle은 DESC 정렬에서 NULL을 맨 앞에 둬요. NULL을 미리 빼지 않으면 NULL 점수가 1위가 될 수 있어요."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "PARTITION BY e.course_id", "desc": "캠프마다 순위를 1부터 따로 다시 매기게 나눠요" },
+          { "term": "WHERE rnk = 1", "desc": "감싼 결과의 바깥에서 1위인 행만 남겨요" },
+          { "term": "RANK()", "desc": "같은 점수에는 같은 순위를 주는 함수예요" }
+        ],
+        "distractor": "ROW_NUMBER()"
+      }
+    }
+  ]
+}

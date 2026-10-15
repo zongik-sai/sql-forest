@@ -284,6 +284,8 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
       // 실패해도(오프라인 등) 학습 상태의 초기화 표시가 남아 다음 접속 때 syncResets가 마무리한다.
       remote?.dropQueued(unitItems(u).activityIds);
       ledger.forget(unitRewardIds(u));
+      // 풀던 개념 점검(2단계) 초안도 지운다(초기화 뒤 이어 풀어 통과하지 않게)
+      removeWithPrefix(`${prefix}db:quiz:${u}`);
       const mark = stateRef.current.unitResets?.[u];
       if (remote && mark) {
         void remote.resetUnit(u, mark.at, mark.n, []).then((ok) => {
@@ -292,7 +294,7 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
       }
     }
     return out;
-  }, [commit, remote, ledger]);
+  }, [commit, remote, ledger, prefix]);
 
   const resetMyData = useCallback(async () => {
     if (remote) {

@@ -31,7 +31,7 @@ export const U02 = [
         { id: 'course', name: '강좌 courses', attributes: ['course_id (PK)', 'course_name'] },
       ],
       relations: [
-        { id: 'r1', from: 'dept', to: 'student', question: '학과 하나에 학생은 몇 명까지 연결될까요? (차수)', options: [{ id: '1:1', label: '1:1' }, { id: '1:N', label: '1:N' }, { id: 'M:N', label: 'M:N' }] },
+        { id: 'r1', from: 'dept', to: 'student', question: '학과-학생 관계의 차수는? (학과 하나에 학생 몇 명, 학생 한 명에 학과 몇 개?)', options: [{ id: '1:1', label: '1:1' }, { id: '1:N', label: '1:N' }, { id: 'M:N', label: 'M:N' }] },
         { id: 'r2', from: 'student', to: 'course', question: '학생과 강좌의 관계 차수는? (수강 표를 빼고 생각)', options: [{ id: '1:1', label: '1:1' }, { id: '1:N', label: '1:N' }, { id: 'M:N', label: 'M:N' }] },
         { id: 'r3', from: 'student', to: 'enroll', question: '학생 쪽에서 수강 행이 없어도 될까요? (선택성)', options: [{ id: 'mandatory', label: '필수: 반드시 1개 이상' }, { id: 'optional', label: '선택: 0개도 가능' }] },
         { id: 'r4', from: 'course', to: 'enroll', question: '강좌-수강 관계는? (course_id가 수강의 기본키 일부)', options: [{ id: 'identifying', label: '식별 관계' }, { id: 'non-identifying', label: '비식별 관계' }] },
@@ -53,9 +53,9 @@ export const U02 = [
       { term: '본질 식별자 / 인조 식별자', meaning: '업무에 원래 있던 식별자(예: 학년·반·번호) / 편의를 위해 시스템이 만든 식별자(예: 자동 증가 번호)' },
     ],
     mode: 'executable', datasetId: 'school',
-    prompt: '각 열(또는 열 묶음)이 어떤 키인지 고른 뒤, 실제 스키마 조회로 확인하세요.',
+    prompt: '각 열(또는 열 묶음)이 어떤 키인지 고르세요. departments.dept_name은 학과 이름이 겹칠 수 없게(UNIQUE) 정해 둔 열이에요. 다 고른 뒤 "실제 SQL로 확인하기"를 실행해 보세요. pk_order가 0이 아닌 열이 기본키(두 열이 1, 2면 복합키)예요.',
     prediction: {
-      prompt: 'enrollment 표에서 student_id 하나만으로 행을 유일하게 찾을 수 있을까요?',
+      prompt: 'enrollment 표에서 student_id 열 하나만으로 행을 하나씩 구별할 수 있을까요?',
       options: ['있다', '없다 — 같은 학생이 여러 강좌를 들어서'],
       correctIndex: 1,
       reveal: '가온(1)은 101, 102 두 강좌를 들어서 student_id만으로는 행이 하나로 정해지지 않아요.',
@@ -94,7 +94,7 @@ export const U02 = [
     mode: 'executable', datasetId: 'normal',
     prompt: 'enrollment_raw의 각 열을 어느 표로 옮겨야 할지 고르세요. 키 열(student_id, course_id)은 이미 배치돼 있어요.',
     prediction: {
-      prompt: "가온(1)의 이름을 바꾸려면 enrollment_raw에서 몇 행을 고쳐야 할까요?",
+      prompt: "가온(student_id = 1)의 이름을 바꾸려면 enrollment_raw 표에서 몇 행을 고쳐야 할까요?",
       options: ['1행', '2행', '6행'],
       correctIndex: 1,
       reveal: '가온은 두 강좌를 들어서 이름이 두 번 저장돼 있어요. 하나만 고치면 데이터가 어긋나요(갱신 이상).',
@@ -136,7 +136,7 @@ export const U02 = [
     mode: 'executable', datasetId: 'school',
     prompt: '두 SQL을 실행해 행 수를 비교하고, 학생이 사라지는 이유를 고르세요.',
     prediction: {
-      prompt: '짝이 있는 행만 남기는 첫 번째 SQL(JOIN)의 결과는 몇 행일까요?',
+      prompt: 'students와 enrollment를 student_id가 같은 행끼리 이어 붙이고, 짝이 있는 행만 남기면(JOIN) 결과는 몇 행일까요?',
       options: ['6행', '8행', '18행'],
       correctIndex: 0,
       reveal: '수강 행 6개가 각각 학생 한 명과 짝지어져 6행이에요.',

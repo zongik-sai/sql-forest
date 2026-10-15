@@ -14,7 +14,7 @@ export const U03 = [
     mode: 'executable', datasetId: 'school',
     prompt: '블록을 순서대로 눌러 "모든 학생의 이름과 학년"을 조회하는 SQL을 만들고 실행하세요.',
     prediction: {
-      prompt: '이 SQL의 결과는 몇 행일까요?',
+      prompt: 'students 표에서 모든 학생의 이름과 학년을 조회하면 결과는 몇 행일까요?',
       options: ['1행', '3행', '6행'],
       correctIndex: 2,
       reveal: '조건이 없으니 students의 모든 행(학생 6명)이 나와요.',
@@ -47,7 +47,7 @@ export const U03 = [
     mode: 'executable', datasetId: 'school',
     prompt: '먼저 결과의 열 개수를 예측한 뒤 실행하고, 계산된 열의 의미를 고르세요.',
     prediction: {
-      prompt: '아래 SQL 결과의 열은 몇 개일까요?',
+      prompt: '다음 SQL 결과의 열은 몇 개일까요? SELECT student_name AS 이름, grade, grade + 1 AS next_grade FROM students;',
       options: ['2개', '3개', '4개'],
       correctIndex: 1,
       reveal: 'SELECT 뒤에 쉼표로 나눈 항목이 3개(이름, grade, next_grade)라서 열도 3개예요.',
@@ -78,9 +78,9 @@ export const U03 = [
     explanation: '같은 학과 학생이 여러 명이면 dept_id를 조회할 때 같은 값이 여러 번 나와요. SELECT DISTINCT는 결과에서 완전히 같은 행을 하나만 남겨요. 원래 표의 데이터는 바뀌지 않아요.',
     glossary: [{ term: 'DISTINCT', meaning: '결과에서 중복된 행을 하나만 남기는 키워드' }],
     mode: 'executable', datasetId: 'school',
-    prompt: '학생들이 속한 학과 번호(dept_id)를 중복 없이 조회하세요. 먼저 지금 SQL을 실행해 중복을 확인해 보세요.',
+    prompt: '학생들이 속한 학과 번호(dept_id)를 중복 없이 조회하세요. 먼저 편집기에 들어 있는 SQL을 그대로 실행해 중복을 확인해 보세요.',
     prediction: {
-      prompt: 'DISTINCT를 붙이면 결과는 몇 행이 될까요?',
+      prompt: 'students 표의 dept_id를 DISTINCT로 중복 없이 조회하면 결과는 몇 행이 될까요?',
       options: ['6행', '4행', '3행'],
       correctIndex: 2,
       reveal: '학생들의 학과 번호는 10, 20, 30 세 가지예요. 학생이 없는 40번 학과는 나오지 않아요.',
@@ -109,7 +109,7 @@ export const U03 = [
     explanation: 'SQL은 쓰는 순서와 처리되는 순서가 달라요. DB는 표를 먼저 정하고(FROM), 행을 거르고, 묶고, 묶음을 거른 뒤에야 보여줄 열(SELECT)을 정하고 마지막에 정렬해요. 그래서 SELECT의 별칭은 ORDER BY에서는 쓸 수 있지만 WHERE에서는 쓸 수 없어요.',
     glossary: [{ term: '논리적 처리 순서', meaning: 'DB가 SELECT 문의 각 절을 해석하는 순서' }],
     mode: 'simulation', datasetId: 'school',
-    prompt: '각 절에 처리 순서 번호(1~6)를 하나씩 붙이세요.',
+    prompt: 'DB가 처리하는 순서(쓰는 순서가 아니에요)대로 각 절에 번호(1~6)를 하나씩 붙이세요.',
     hints: [
       '어느 표인지 알아야 행을 거를 수 있어요. 가장 먼저는 표를 정하는 절이에요.',
       '그룹을 만든 다음에야 그룹 조건(HAVING)을 볼 수 있어요.',

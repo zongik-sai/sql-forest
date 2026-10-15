@@ -51,7 +51,7 @@ export const U01 = [
     mode: 'executable', datasetId: 'school',
     prompt: "학생 '다온'이라는 인스턴스의 학년 속성값을 찾도록 열과 행을 고르세요.",
     prediction: {
-      prompt: 'students 표에는 인스턴스(학생)가 몇 개 있을까요?',
+      prompt: "아래 '데이터 보기'의 students 표를 보세요. 인스턴스(학생 한 명 = 행 한 줄)는 몇 개일까요?",
       options: ['4개', '6개', '8개'],
       correctIndex: 1,
       reveal: '학생 한 명이 행 하나이므로 행 수가 인스턴스 수예요.',
@@ -125,7 +125,7 @@ export const U01 = [
     mode: 'executable', datasetId: 'school',
     prompt: "새 학생 '사랑'(학번 9, AI로봇 학과, 1학년)을 추가하려는데 두 값이 도메인을 벗어났어요. 값을 고쳐 실행하세요.",
     prediction: {
-      prompt: '지금 SQL을 그대로 실행하면 어떻게 될까요?',
+      prompt: "시작 SQL INSERT INTO students VALUES (9, '사랑', 'AI로봇', 4); 를 그대로 실행하면 어떻게 될까요?",
       options: ['그대로 저장된다', '제약조건 오류로 저장되지 않는다', '학년만 자동으로 3으로 바뀐다'],
       correctIndex: 1,
       reveal: 'grade 4는 CHECK(1~3)에, 학과 이름 글자는 정수형 학과 번호(타입·FK)에 맞지 않아 거부돼요.',

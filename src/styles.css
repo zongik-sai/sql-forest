@@ -124,8 +124,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .learn-head { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
 .crumbs { color: var(--ink-soft); font-size: 0.9rem; }
 .crumbs a { color: var(--ink-soft); }
-.learn-grid { display: grid; grid-template-columns: minmax(240px, 320px) 1fr; gap: 1rem; align-items: start; }
-@media (max-width: 860px) { .learn-grid { grid-template-columns: 1fr; } }
+.learn-grid { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.learn-grid > * { min-width: 0; }
+@media (max-width: 860px) { .learn-grid { grid-template-columns: minmax(0, 1fr); } }
 .explain { position: sticky; top: 64px; }
 @media (max-width: 860px) { .explain { position: static; } }
 .explain p { font-size: 0.97rem; }
@@ -425,3 +426,68 @@ input[type='search'] { font: inherit; padding: 0.35rem 0.6rem; border: 1px solid
 .strict-warn { color: var(--bad); }
 .strict-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between; max-width: 900px; margin: 0 auto 0.75rem; padding: 0.3rem 0.4rem 0.3rem 0.8rem; font-size: 0.88rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
 .page > .strict-bar, main > .strict-bar { width: 100%; }
+
+/* ---------- 자유 실습장 ---------- */
+/* 격자·스택 안의 넓은 표가 칸을 밀어내지 않도록 min-width: 0 (넓은 표는 .table-wrap 안에서 스크롤) */
+.pg-page > *, .pg-layout > *, .pg-side > *, .pg-main > *, .pg-output > *, .pg-tools > *, .pg-builder > *, .pg-tools [role='tabpanel'] > * { min-width: 0; }
+.pg-layout { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 860px) { .pg-layout { grid-template-columns: minmax(0, 1fr); } }
+.pg-page select { max-width: 100%; }
+.pg-h2 { font-size: 1.05rem; margin: 0; }
+.pg-starters { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; }
+.pg-starters .btn { justify-content: flex-start; text-align: left; white-space: normal; padding-inline: 0.2em; }
+.pg-schema summary { cursor: pointer; }
+.pg-schema-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+.pg-schema-head { display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.pg-schema-head .btn { padding-inline: 0; font-weight: 700; overflow-wrap: anywhere; text-align: left; }
+.pg-cols { list-style: none; margin: 0; padding: 0 0 0 0.6rem; border-left: 2px solid var(--line); font-size: 0.85rem; display: grid; gap: 0.1rem; }
+.pg-cols li { overflow-wrap: anywhere; }
+.pg-cols code { font-size: 0.85rem; }
+.pg-tag { display: inline-block; margin-left: 0.35rem; font-size: 0.72rem; font-weight: 700; line-height: 1.5; border-radius: 999px; padding: 0 0.45em; border: 1px solid; }
+.pg-tag-pk { color: var(--moss-strong); border-color: var(--moss); background: var(--moss-soft); }
+.pg-tag-fk { color: var(--soil); border-color: var(--soil); background: var(--soil-soft); }
+.pg-tabs { display: flex; gap: 0.3rem; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 0.6rem; }
+.pg-tabs button { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 0.35em 0.9em; background: var(--surface); color: var(--ink); font-weight: 600; min-height: 38px; }
+.pg-tabs button.on { border-color: var(--teal); background: var(--teal); color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .pg-tabs button.on { color: #0e1a14; } }
+:root[data-theme='dark'] .pg-tabs button.on { color: #0e1a14; }
+.pg-fieldset legend { font-size: 0.95rem; }
+.pg-fieldset legend .small { font-weight: 400; }
+.pg-field input { max-width: 20rem; width: 100%; }
+.pg-colrow { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px dashed var(--line); }
+.pg-colno { font-family: var(--mono); color: var(--ink-soft); width: 1.4rem; text-align: right; }
+.pg-colname { flex: 1 1 7rem; min-width: 0; max-width: 14rem; }
+.pg-fk { flex: 1 1 11rem; min-width: 0; }
+.pg-check { display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 600; font-size: 0.9rem; }
+.pg-check input { accent-color: var(--teal); width: 1.1rem; height: 1.1rem; }
+/* 표 안의 .sr-only(절대 위치)가 스크롤 상자 밖으로 새어 나가 페이지를 넓히지 않도록 */
+.pg-builder .table-wrap { position: relative; }
+.pg-rows input[type='text'] { width: 7.5rem; font-family: var(--mono); font-size: 0.88rem; padding: 0.2em 0.4em; }
+.pg-rows th[scope='row'] { color: var(--ink-soft); }
+.pg-coltype { font-size: 0.72rem; color: var(--ink-soft); font-weight: 400; }
+.pg-preview { max-height: 16rem; overflow: auto; white-space: pre; word-break: normal; }
+.pg-errors { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+
+/* ---------- ERD (components/Erd.tsx) ---------- */
+.erd { margin: 0; display: grid; gap: 0.5rem; min-width: 0; }
+.erd-scroll { overflow: auto; max-width: 100%; max-height: 75vh; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface-2); }
+.erd-scroll svg { display: block; max-width: none; }
+.erd-box-bg { fill: var(--surface); stroke: var(--ink-soft); stroke-width: 1; }
+.erd-box-head { fill: var(--teal-soft); }
+.erd-sep { stroke: var(--line); }
+.erd-title { fill: var(--ink); font-family: var(--font); font-size: 14px; font-weight: 700; }
+.erd-count { fill: var(--ink-soft); font-size: 12px; font-weight: 400; }
+.erd-col { fill: var(--ink); font-family: var(--mono); font-size: 13px; }
+.erd-col-pk { font-weight: 700; text-decoration: underline; }
+.erd-type { fill: var(--ink-soft); font-family: var(--mono); font-size: 12px; }
+.erd-pk, .erd-fk { font-family: var(--font); font-size: 10px; font-weight: 700; }
+.erd-pk { fill: var(--moss-strong); }
+.erd-fk { fill: var(--soil); }
+.erd-line { fill: none; stroke: var(--teal); stroke-width: 1.6; }
+.erd-o { fill: var(--surface-2); stroke: var(--teal); stroke-width: 1.6; }
+.erd-legend { font-size: 0.85rem; color: var(--ink-soft); display: grid; gap: 0.1rem; }
+.erd-key-pk { color: var(--moss-strong); }
+.erd-key-fk { color: var(--soil); }
+.erd-text summary { cursor: pointer; font-size: 0.9rem; color: var(--teal); }
+.erd-text ul { margin: 0.4rem 0; padding-left: 1.2rem; font-size: 0.88rem; overflow-wrap: anywhere; }
+.stack > * { min-width: 0; }

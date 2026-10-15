@@ -48,7 +48,7 @@ test('row-filter: 괄호 위치를 바꾸며 실제 결과 미리보기', async 
 
 test('erd: 관계 차수·선택성·식별 관계', async ({ page }) => {
   await open(page, 1, '/learn/U02/U02-A01');
-  await choose(page, '학과 하나에 학생은 몇 명까지 연결될까요? (차수)', '1:N');
+  await choose(page, '학과-학생 관계의 차수는? (학과 하나에 학생 몇 명, 학생 한 명에 학과 몇 개?)', '1:N');
   await choose(page, '학생과 강좌의 관계 차수는? (수강 표를 빼고 생각)', 'M:N');
   await choose(page, '학생 쪽에서 수강 행이 없어도 될까요? (선택성)', '선택: 0개도 가능');
   await choose(page, '강좌-수강 관계는? (course_id가 수강의 기본키 일부)', '식별 관계');

@@ -3,6 +3,9 @@ import { readJson, removeRaw, writeJson } from '../../lib/storage';
 import { optionOrder } from './mock';
 import type { CgMcq } from './types';
 
+/** 객관식 문항에 필요한 최소 정보(두 과목 공통) */
+export type McqItem = Pick<CgMcq, 'id' | 'question' | 'options' | 'answer' | 'explanation'> & { tag?: string };
+
 export const MARK = ['①', '②', '③', '④', '⑤'];
 
 /**
@@ -25,11 +28,11 @@ export interface McqResult {
   orders: Record<string, number[]>;
 }
 
-export function McqRunner({ items, storageKey, onAnswer, onFinish, finishLabel = '결과 보기' }: {
-  items: CgMcq[];
+export function McqRunner<T extends McqItem>({ items, storageKey, onAnswer, onFinish, finishLabel = '결과 보기' }: {
+  items: T[];
   /** 진행 상태 저장 키(같은 문항 세트일 때만 이어 풀기) */
   storageKey: string;
-  onAnswer: (q: CgMcq, correct: boolean) => void;
+  onAnswer: (q: T, correct: boolean) => void;
   onFinish: (r: McqResult) => void;
   finishLabel?: string;
 }) {
@@ -117,7 +120,7 @@ export function McqRunner({ items, storageKey, onAnswer, onFinish, finishLabel =
 }
 
 /** 풀이 후 틀린 문항 복습 카드 */
-export function ReviewCard({ q, n, picked, order, unansweredNote = true }: { q: CgMcq; n?: number; picked: number | undefined; order?: number[]; unansweredNote?: boolean }) {
+export function ReviewCard({ q, n, picked, order, unansweredNote = true }: { q: McqItem; n?: number; picked: number | undefined; order?: number[]; unansweredNote?: boolean }) {
   const ord = order ?? q.options.map((_, i) => i);
   return (
     <details className="panel cg-review">

@@ -1,0 +1,676 @@
+{
+  "unit": "U09",
+  "cards": [
+    {
+      "id": "U09-t1",
+      "title": "윈도우 함수와 OVER: 행은 그대로",
+      "points": [
+        "윈도우 함수는 행을 줄이지 않고, 각 행 옆에 순위·합계 같은 계산 값을 붙이는 함수예요.",
+        "함수 뒤에 OVER ( )를 붙여 써요. 괄호 안에는 계산할 범위와 순서를 적고, 비워 두면 전체 행이 범위예요.",
+        "GROUP BY는 그룹마다 한 행으로 줄이지만, 윈도우 함수는 학생이 6명이면 결과도 6행이에요.",
+        "OVER 안에는 PARTITION BY(구역), ORDER BY(순서), ROWS·RANGE(프레임)를 이 순서로 필요한 것만 써요."
+      ],
+      "table": {
+        "header": [
+          "SQL (students 6행)",
+          "결과 행 수",
+          "붙는 값"
+        ],
+        "rows": [
+          [
+            "SELECT COUNT(*) FROM students",
+            "1행",
+            "6"
+          ],
+          [
+            "SELECT student_id, COUNT(*) OVER () FROM students",
+            "6행",
+            "모든 행에 6"
+          ]
+        ]
+      },
+      "tip": "윈도우 함수는 SELECT·ORDER BY 절에만 써요. WHERE에서 바로 거를 수 없어요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "윈도우 함수",
+            "desc": "행 수를 줄이지 않고 각 행 옆에 순위·합계 같은 값을 붙이는 함수"
+          },
+          {
+            "term": "OVER",
+            "desc": "함수 뒤에 붙여 괄호 안에 계산 범위와 순서를 적는 키워드"
+          },
+          {
+            "term": "GROUP BY",
+            "desc": "같은 값끼리 묶어 그룹마다 한 행으로 줄이는 절"
+          }
+        ],
+        "distractor": "HAVING"
+      }
+    },
+    {
+      "id": "U09-t2",
+      "title": "PARTITION BY와 OVER 안의 ORDER BY",
+      "points": [
+        "PARTITION BY는 행을 구역(파티션)으로 나눠, 구역마다 계산을 처음부터 다시 하게 해요.",
+        "예: RANK() OVER (PARTITION BY 반 ORDER BY 점수 DESC)는 반마다 1등부터 다시 매겨요. GROUP BY와 달리 5행이 그대로예요.",
+        "OVER 안의 ORDER BY는 구역 안에서 순위·누적을 계산할 순서를 정해요. 순위 함수에는 꼭 필요해요.",
+        "결과 표의 줄 순서는 OVER 안의 ORDER BY가 아니라 맨 끝 ORDER BY가 정해요."
+      ],
+      "table": {
+        "header": [
+          "학생",
+          "반",
+          "점수",
+          "반 안 순위"
+        ],
+        "rows": [
+          [
+            "A",
+            "1반",
+            "90",
+            "1"
+          ],
+          [
+            "B",
+            "1반",
+            "80",
+            "2"
+          ],
+          [
+            "C",
+            "1반",
+            "70",
+            "3"
+          ],
+          [
+            "D",
+            "2반",
+            "95",
+            "1"
+          ],
+          [
+            "E",
+            "2반",
+            "85",
+            "2"
+          ]
+        ]
+      },
+      "tip": "PARTITION BY는 나누기만(행 유지), GROUP BY는 묶어서 줄이기!",
+      "match": {
+        "pairs": [
+          {
+            "term": "PARTITION BY",
+            "desc": "행은 그대로 두고 구역을 나눠 구역마다 계산을 처음부터 다시 함"
+          },
+          {
+            "term": "OVER 안의 ORDER BY",
+            "desc": "구역 안에서 순위·누적을 계산할 순서를 정함"
+          },
+          {
+            "term": "맨 끝 ORDER BY",
+            "desc": "결과 표에 행이 보이는 줄 순서를 정함"
+          }
+        ],
+        "distractor": "GROUP BY"
+      }
+    },
+    {
+      "id": "U09-t3",
+      "title": "RANK·DENSE_RANK·ROW_NUMBER: 동점 처리",
+      "points": [
+        "순위 함수는 OVER (ORDER BY …) 순서대로 각 행에 등수를 붙여요. 예: 점수 높은 순 등수.",
+        "RANK는 동점에 같은 순위를 주고, 다음 순위는 동점 수만큼 건너뛰어요(1, 1, 3).",
+        "DENSE_RANK는 동점에 같은 순위를 주지만 다음 순위를 건너뛰지 않아요(1, 1, 2).",
+        "ROW_NUMBER는 동점이어도 1, 2, 3처럼 모두 다른 번호예요. 동점끼리 순서는 ORDER BY에 기준을 더해 정해요."
+      ],
+      "table": {
+        "header": [
+          "점수(높은 순)",
+          "RANK",
+          "DENSE_RANK",
+          "ROW_NUMBER"
+        ],
+        "rows": [
+          [
+            "95",
+            "1",
+            "1",
+            "1"
+          ],
+          [
+            "95",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "90",
+            "3",
+            "2",
+            "3"
+          ],
+          [
+            "85",
+            "4",
+            "3",
+            "4"
+          ]
+        ]
+      },
+      "tip": "RANK = 나보다 높은 행 수 + 1, DENSE_RANK = 나보다 높은 서로 다른 값 수 + 1",
+      "match": {
+        "pairs": [
+          {
+            "term": "RANK",
+            "desc": "동점은 같은 순위, 다음 순위는 동점 수만큼 건너뜀(1, 1, 3)"
+          },
+          {
+            "term": "DENSE_RANK",
+            "desc": "동점은 같은 순위, 다음 순위는 건너뛰지 않고 이어짐(1, 1, 2)"
+          },
+          {
+            "term": "ROW_NUMBER",
+            "desc": "동점이어도 모든 행에 서로 다른 번호를 차례로 붙임(1, 2, 3)"
+          }
+        ],
+        "distractor": "PARTITION BY"
+      }
+    },
+    {
+      "id": "U09-t4",
+      "title": "LAG·LEAD: 앞뒤 행 값 가져오기",
+      "points": [
+        "LAG는 정렬 순서에서 바로 앞(이전) 행의 값을, LEAD는 바로 뒤(다음) 행의 값을 가져와요.",
+        "예: 가온의 포인트를 event_id 순으로 놓으면 LAG(points)는 직전 포인트예요. 지난번과 비교할 때 써요.",
+        "앞이나 뒤 행이 없으면 NULL이에요. PARTITION BY로 나누면 다른 구역의 값은 가져오지 않아요.",
+        "LAG(points, 2)는 두 칸 앞 값이고, LAG(points, 1, 0)은 값이 없을 때 NULL 대신 0을 줘요."
+      ],
+      "table": {
+        "header": [
+          "event_id",
+          "points",
+          "LAG(points)",
+          "LEAD(points)"
+        ],
+        "rows": [
+          [
+            "1",
+            "10",
+            "NULL",
+            "5"
+          ],
+          [
+            "2",
+            "5",
+            "10",
+            "20"
+          ],
+          [
+            "3",
+            "20",
+            "5",
+            "NULL"
+          ]
+        ]
+      },
+      "tip": "LAG(뒤처지다)는 이전 행을, LEAD(앞서다)는 다음 행을 봐요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "LAG",
+            "desc": "정렬 순서에서 바로 앞(이전) 행의 값을 가져오는 함수"
+          },
+          {
+            "term": "LEAD",
+            "desc": "정렬 순서에서 바로 뒤(다음) 행의 값을 가져오는 함수"
+          },
+          {
+            "term": "NULL",
+            "desc": "기본값을 주지 않았을 때, 가져올 앞·뒤 행이 없으면 나오는 값"
+          }
+        ],
+        "distractor": "0"
+      }
+    },
+    {
+      "id": "U09-t5",
+      "title": "누적 집계: SUM() OVER로 쌓아 더하기",
+      "points": [
+        "누적 집계는 정렬 순서대로 첫 행부터 현재 행까지 값을 계속 더해 가는 계산이에요. 예: 날마다 쌓이는 포인트.",
+        "SUM(points) OVER (PARTITION BY student_id ORDER BY event_id)는 학생마다 event_id 순으로 쌓아 더해요. 학생이 바뀌면 처음부터 다시 해요.",
+        "ORDER BY를 빼고 SUM(points) OVER (PARTITION BY student_id)만 쓰면 누적이 아닌 구역 전체 합계가 모든 행에 똑같이 붙어요.",
+        "COUNT·AVG·MAX 같은 다른 집계 함수도 OVER를 붙이면 같은 방식으로 계산돼요."
+      ],
+      "table": {
+        "header": [
+          "가온 event_id",
+          "points",
+          "ORDER BY 있음(누적)",
+          "ORDER BY 없음(전체)"
+        ],
+        "rows": [
+          [
+            "1",
+            "10",
+            "10",
+            "35"
+          ],
+          [
+            "2",
+            "5",
+            "15",
+            "35"
+          ],
+          [
+            "3",
+            "20",
+            "35",
+            "35"
+          ]
+        ]
+      },
+      "tip": "누적합 = 집계 함수 + OVER (ORDER BY …). ORDER BY를 빼면 전체 합계예요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "누적 집계",
+            "desc": "정렬 순서대로 첫 행부터 현재 행까지 값을 계속 더해 가는 계산"
+          },
+          {
+            "term": "PARTITION BY student_id",
+            "desc": "학생이 바뀌면 쌓아 더하기를 처음부터 다시 하게 함"
+          },
+          {
+            "term": "구역 전체 합계",
+            "desc": "OVER 안에 정렬이 없을 때 모든 행에 똑같이 붙는 값"
+          }
+        ],
+        "distractor": "GROUP BY student_id"
+      }
+    },
+    {
+      "id": "U09-t6",
+      "title": "ROWS와 RANGE: 프레임 정하기",
+      "points": [
+        "프레임은 현재 행을 계산할 때 함께 쓰는 행의 범위예요. OVER 안 ORDER BY 뒤에 ROWS나 RANGE로 적어요.",
+        "ROWS는 행 개수로 세요. ROWS BETWEEN 1 PRECEDING AND CURRENT ROW는 바로 앞 1행과 현재 행이에요.",
+        "RANGE는 ORDER BY 값으로 범위를 정해요. 정렬 값이 같은 행(같은 날짜)은 한꺼번에 프레임에 들어가요.",
+        "ORDER BY만 쓰면 기본 프레임은 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW라서 같은 날짜가 한 번에 더해져요."
+      ],
+      "table": {
+        "header": [
+          "일자",
+          "값",
+          "RANGE 누적(기본)",
+          "ROWS 누적"
+        ],
+        "rows": [
+          [
+            "1일",
+            "10",
+            "30",
+            "10"
+          ],
+          [
+            "1일",
+            "20",
+            "30",
+            "30"
+          ],
+          [
+            "2일",
+            "5",
+            "35",
+            "35"
+          ]
+        ]
+      },
+      "tip": "UNBOUNDED PRECEDING=맨 첫 행, CURRENT ROW=현재 행, UNBOUNDED FOLLOWING=맨 끝 행",
+      "match": {
+        "pairs": [
+          {
+            "term": "ROWS",
+            "desc": "정렬 값이 같아도 행 개수로 세어 한 행씩 범위를 정함"
+          },
+          {
+            "term": "RANGE",
+            "desc": "정렬 값이 같은 행을 한꺼번에 묶어 범위를 정함"
+          },
+          {
+            "term": "UNBOUNDED PRECEDING",
+            "desc": "범위가 구역의 맨 첫 행부터 시작함을 뜻하는 말"
+          }
+        ],
+        "distractor": "CURRENT ROW"
+      }
+    },
+    {
+      "id": "U09-t7",
+      "title": "Top N: 상위 N개 뽑기와 DBMS별 문법",
+      "points": [
+        "Top N 쿼리는 정렬 기준으로 위에서 N개 행만 고르는 쿼리예요. 예: 점수 상위 3명.",
+        "Oracle의 ROWNUM은 ORDER BY보다 먼저 붙는 행 번호예요. 인라인 뷰 안에서 먼저 정렬하고 바깥에서 ROWNUM <= 3으로 걸러요.",
+        "SQL Server는 SELECT TOP (3), Oracle 12c 이상은 FETCH FIRST 3 ROWS ONLY를 써요. 우리 실습(SQLite)은 LIMIT 3이에요.",
+        "동점까지 넣으려면 TOP (3) WITH TIES, FETCH FIRST 3 ROWS WITH TIES를 써요. 윈도우 함수로는 RANK() <= 3이 같은 역할이에요.",
+        "ROW_NUMBER() <= 3은 정확히 3행이에요. 윈도우 함수 결과는 인라인 뷰로 감싼 뒤 바깥 WHERE에서 걸러요."
+      ],
+      "table": {
+        "header": [
+          "방법",
+          "어디서",
+          "3위 동점이 2명이면"
+        ],
+        "rows": [
+          [
+            "WHERE ROWNUM <= 3",
+            "Oracle",
+            "3행"
+          ],
+          [
+            "SELECT TOP (3)",
+            "SQL Server",
+            "3행"
+          ],
+          [
+            "FETCH FIRST 3 ROWS ONLY",
+            "Oracle 12c+·표준",
+            "3행"
+          ],
+          [
+            "LIMIT 3",
+            "SQLite(실습)",
+            "3행"
+          ],
+          [
+            "RANK() … <= 3",
+            "윈도우 함수",
+            "4행(동점 포함)"
+          ],
+          [
+            "ROW_NUMBER() … <= 3",
+            "윈도우 함수",
+            "3행"
+          ]
+        ]
+      },
+      "tip": "ROWNUM과 ROW_NUMBER()는 달라요. ROWNUM은 정렬 전에 붙어요!",
+      "match": {
+        "pairs": [
+          {
+            "term": "ROWNUM",
+            "desc": "Oracle에서 정렬보다 먼저 행마다 붙는 번호라 인라인 뷰 정렬이 필요함"
+          },
+          {
+            "term": "TOP (3)",
+            "desc": "SQL Server에서 SELECT 바로 뒤에 써서 위에서 3행을 고름"
+          },
+          {
+            "term": "WITH TIES",
+            "desc": "마지막 순위와 값이 같은 동점 행까지 함께 남기는 옵션"
+          }
+        ],
+        "distractor": "ROW_NUMBER()"
+      }
+    }
+  ],
+  "quiz": [
+    {
+      "id": "U09-c1",
+      "question": "students 표(6행)에서 SELECT student_id, COUNT(*) OVER () AS cnt FROM students; 를 실행하면 결과는 어떻게 될까요?",
+      "options": [
+        "1행, cnt = 6",
+        "6행, 모든 행의 cnt = 6",
+        "6행, cnt = 1부터 6까지",
+        "오류(GROUP BY가 필요)"
+      ],
+      "answer": 1,
+      "explanation": "윈도우 함수는 행을 줄이지 않아요. OVER ()는 괄호가 비어 전체 6행이 범위라 모든 행에 6이 붙어요. 1행으로 줄이는 것은 일반 집계(GROUP BY)예요.",
+      "tag": "OVER"
+    },
+    {
+      "id": "U09-c2",
+      "question": "SELECT 절에 RANK() OVER (ORDER BY score DESC) AS r를 붙였어요. r이 3 이하인 행만 남기는 올바른 방법은?",
+      "options": [
+        "같은 SELECT의 WHERE 절에 r <= 3을 쓴다",
+        "같은 SELECT에 HAVING r <= 3을 쓴다",
+        "GROUP BY r를 쓴 뒤 r <= 3을 고른다",
+        "인라인 뷰(FROM 안의 서브쿼리)로 감싸고 바깥 WHERE에 r <= 3을 쓴다"
+      ],
+      "answer": 3,
+      "explanation": "윈도우 함수는 WHERE·GROUP BY·HAVING보다 나중에 계산돼 그 절들에서 쓸 수 없어요. 인라인 뷰에서 r을 먼저 만든 뒤 바깥 WHERE에서 걸러요.",
+      "tag": "Top N"
+    },
+    {
+      "id": "U09-c3",
+      "question": "윈도우 함수의 OVER 안에 쓰는 PARTITION BY에 대한 설명으로 옳은 것은?",
+      "options": [
+        "행 수는 그대로 두고, 나눈 구역마다 계산을 처음부터 다시 한다",
+        "GROUP BY처럼 구역마다 한 행만 남긴다",
+        "OVER 밖의 WHERE 절에 써서 행을 거른다",
+        "PARTITION BY를 쓰면 OVER 안에 ORDER BY를 함께 쓸 수 없다"
+      ],
+      "answer": 0,
+      "explanation": "PARTITION BY는 행을 구역으로 나눠 구역마다 순위·합계를 새로 계산할 뿐 행을 줄이지 않아요. ORDER BY와 함께 써서 구역 안 순서도 정할 수 있어요.",
+      "tag": "PARTITION BY"
+    },
+    {
+      "id": "U09-c4",
+      "question": "점수가 100, 100, 100, 90일 때 높은 점수부터 순위를 매기면 90점 행의 RANK, DENSE_RANK, ROW_NUMBER 값을 순서대로 고르면?",
+      "options": [
+        "2, 2, 4",
+        "4, 4, 4",
+        "4, 2, 4",
+        "4, 2, 2"
+      ],
+      "answer": 2,
+      "explanation": "앞에 3행이 있어 RANK는 4, 더 높은 서로 다른 점수는 100 하나라 DENSE_RANK는 2, ROW_NUMBER는 네 번째 행이라 4예요.",
+      "tag": "RANK/DENSE_RANK/ROW_NUMBER"
+    },
+    {
+      "id": "U09-c5",
+      "question": "point_events 표에서 (가) SUM(points) OVER (PARTITION BY student_id)와 (나) SUM(points) OVER (PARTITION BY student_id ORDER BY event_id)의 차이로 옳은 것은?",
+      "options": [
+        "둘 다 학생별 전체 합계가 모든 행에 붙는다",
+        "(가)는 누적합, (나)는 학생별 전체 합계다",
+        "(가)는 학생별 전체 합계, (나)는 event_id 순 누적합이다",
+        "(나)는 결과 행의 줄 순서만 바뀌고 값은 (가)와 같다"
+      ],
+      "answer": 2,
+      "explanation": "OVER 안에 ORDER BY가 없으면 구역(학생) 전체 합계가 모든 행에 붙고, ORDER BY가 있으면 그 순서대로 쌓아 더한 누적합이 돼요.",
+      "tag": "누적 집계"
+    },
+    {
+      "id": "U09-c6",
+      "question": "point_events에서 WHERE student_id = 1로 가온의 행만 남기면 event_id 순 points가 10, 5, 20이에요. 이 행들에 LEAD(points) OVER (ORDER BY event_id)를 붙인 값을 위 행부터 차례로 고르면?",
+      "options": [
+        "5, 20, NULL",
+        "NULL, 10, 5",
+        "10, 5, 20",
+        "5, 20, 0"
+      ],
+      "answer": 0,
+      "explanation": "LEAD는 다음 행 값을 가져와요. 마지막 행은 다음 행이 없어 NULL이에요(기본값을 주지 않은 경우). NULL, 10, 5는 LAG의 결과예요.",
+      "tag": "LAG/LEAD"
+    },
+    {
+      "id": "U09-c7",
+      "question": "일자 순으로 값이 10, 20, 30, 40일 때 SUM(값) OVER (ORDER BY 일자 ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)의 결과를 위 행부터 차례로 고르면?",
+      "options": [
+        "10, 30, 60, 100",
+        "10, 20, 30, 40",
+        "30, 50, 70, 40",
+        "10, 30, 50, 70"
+      ],
+      "answer": 3,
+      "explanation": "프레임이 바로 앞 1행과 현재 행이라 10, 10+20, 20+30, 30+40이에요. 10, 30, 60, 100은 처음부터 더한 누적합이에요.",
+      "tag": "ROWS/RANGE"
+    },
+    {
+      "id": "U09-c8",
+      "question": "(일자, 값)이 (1일, 10), (2일, 20), (2일, 30), (3일, 40)일 때 SUM(값) OVER (ORDER BY 일자)의 결과를 위 행부터 차례로 고르면?",
+      "options": [
+        "10, 30, 60, 100",
+        "10, 60, 60, 100",
+        "100, 100, 100, 100",
+        "10, 50, 50, 100"
+      ],
+      "answer": 1,
+      "explanation": "ORDER BY만 쓰면 기본 프레임이 RANGE라서 일자가 같은 2일 두 행을 한꺼번에 더해 둘 다 60이에요. 한 행씩 더하려면 ROWS를 써요.",
+      "tag": "ROWS/RANGE"
+    },
+    {
+      "id": "U09-c9",
+      "question": "Oracle에서 표 t의 score가 높은 순으로 상위 3행을 바르게 구하는 SQL은?",
+      "options": [
+        "SELECT * FROM (SELECT * FROM t ORDER BY score DESC) WHERE ROWNUM <= 3",
+        "SELECT * FROM t WHERE ROWNUM <= 3 ORDER BY score DESC",
+        "SELECT * FROM (SELECT * FROM t ORDER BY score DESC) WHERE ROWNUM = 3",
+        "SELECT TOP (3) * FROM t ORDER BY score DESC"
+      ],
+      "answer": 0,
+      "explanation": "ROWNUM은 ORDER BY보다 먼저 붙어서, WHERE ROWNUM <= 3 뒤에 ORDER BY를 쓰면 아무 3행을 먼저 뽑은 뒤 정렬해요. 인라인 뷰에서 먼저 정렬해야 해요. ROWNUM = 3은 0행이고, TOP은 SQL Server 문법이에요.",
+      "tag": "Top N"
+    },
+    {
+      "id": "U09-c10",
+      "question": "점수 95, 90, 85, 85, 80에서 SQL Server TOP (3) WITH TIES처럼 동점까지 포함한 상위 3위(4행)를 SQLite에서 얻는 방법은?",
+      "options": [
+        "ORDER BY score DESC LIMIT 3",
+        "인라인 뷰에서 ROW_NUMBER()로 번호를 붙이고 바깥에서 번호 <= 3",
+        "인라인 뷰에서 RANK()로 순위를 붙이고 바깥에서 순위 <= 3",
+        "WHERE ROWNUM <= 3"
+      ],
+      "answer": 2,
+      "explanation": "RANK는 85점 둘에게 같은 3위를 줘 4행이 남아요. LIMIT 3과 ROW_NUMBER() <= 3은 정확히 3행만 남기고, ROWNUM은 Oracle 문법이라 SQLite에 없어요.",
+      "tag": "Top N"
+    }
+  ],
+  "practice": [
+    {
+      "id": "U09-p1",
+      "title": "학년 순위 세 가지 나란히 보기",
+      "goal": "같은 학년(동점)이 많을 때 RANK·DENSE_RANK·ROW_NUMBER 번호가 어떻게 다른지 본다.",
+      "dataset": "school",
+      "sql": "SELECT student_id, student_name, grade,\n  RANK() OVER (ORDER BY grade DESC) AS rnk,\n  DENSE_RANK() OVER (ORDER BY grade DESC) AS drnk,\n  ROW_NUMBER() OVER (ORDER BY grade DESC, student_id) AS rn\nFROM students\nORDER BY rn;",
+      "run": true,
+      "steps": [
+        "FROM students의 6행을 읽고, 세 OVER가 모두 grade DESC(학년 높은 순)로 줄을 세워요.",
+        "3학년 3명(1, 2, 4번)은 rnk와 drnk가 모두 1이에요. 행은 줄지 않고 6행 그대로예요.",
+        "2학년 2명은 rnk가 4(앞에 3명)로 건너뛰고, drnk는 2로 이어져요. 1학년은 rnk 6, drnk 3이에요.",
+        "rn은 동점이어도 1~6이 모두 달라요. 동점끼리는 OVER에 더한 student_id 작은 순으로 번호를 받아요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "RANK()",
+            "desc": "3학년 3명 다음의 2학년에게 4를 줌(건너뜀)"
+          },
+          {
+            "term": "DENSE_RANK()",
+            "desc": "3학년 3명 다음의 2학년에게 2를 줌(이어짐)"
+          },
+          {
+            "term": "ROW_NUMBER()",
+            "desc": "동점이어도 1부터 6까지 서로 다른 번호를 줌"
+          }
+        ],
+        "distractor": "ORDER BY rn"
+      }
+    },
+    {
+      "id": "U09-p2",
+      "title": "학생마다 순위 다시 매기기",
+      "goal": "PARTITION BY student_id로 학생마다 순위가 1부터 다시 시작되고 행 수는 그대로인 것을 본다.",
+      "dataset": "points",
+      "sql": "SELECT student_id, event_id, points,\n  RANK() OVER (ORDER BY points DESC) AS 전체순위,\n  RANK() OVER (PARTITION BY student_id ORDER BY points DESC) AS 학생내순위,\n  COUNT(*) OVER (PARTITION BY student_id) AS 활동수\nFROM point_events\nORDER BY student_id, 학생내순위;",
+      "run": true,
+      "steps": [
+        "전체순위는 구역 없이 8행 전체에서 포인트 높은 순이에요. 30점(event_id 6)이 1위, 10점 두 행은 공동 5위예요.",
+        "학생내순위는 PARTITION BY student_id로 학생마다 구역을 나눠, 학생이 바뀔 때마다 1위부터 다시 매겨요.",
+        "활동수는 ORDER BY 없는 COUNT(*) OVER라서 그 학생 구역의 전체 행 수가 모든 행에 붙어요. 가온(1)은 3이에요.",
+        "GROUP BY student_id였다면 학생당 1행(4행)으로 줄었겠지만, 여기서는 8행이 그대로예요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "PARTITION BY student_id",
+            "desc": "학생마다 구역을 나눠 순위를 1부터 다시 매기게 함"
+          },
+          {
+            "term": "ORDER BY points DESC",
+            "desc": "포인트가 큰 행부터 순위를 매기는 기준"
+          },
+          {
+            "term": "COUNT(*)",
+            "desc": "그 학생 구역의 전체 행 수를 각 행 옆에 붙임"
+          }
+        ],
+        "distractor": "GROUP BY student_id"
+      }
+    },
+    {
+      "id": "U09-p3",
+      "title": "누적합 두 가지와 LAG 비교",
+      "goal": "날짜가 같은 행에서 RANGE(기본)와 ROWS 누적합이 어떻게 다른지, LAG가 무엇을 가져오는지 본다.",
+      "dataset": "points",
+      "sql": "SELECT event_id, event_date, points,\n  SUM(points) OVER (ORDER BY event_date) AS range_누적,\n  SUM(points) OVER (ORDER BY event_date, event_id\n    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rows_누적,\n  LAG(points) OVER (ORDER BY event_date, event_id) AS 이전\nFROM point_events\nORDER BY event_date, event_id;",
+      "run": true,
+      "steps": [
+        "PARTITION BY가 없어 모든 학생의 기록 8행이 한 구역이에요. 날짜순으로 처음부터 더해요.",
+        "range_누적은 ORDER BY만 써서 기본 RANGE 프레임이에요. 3월 2일 세 행을 한꺼번에 더해 셋 다 30이에요.",
+        "rows_누적은 ROWS로 한 행씩 더해 10 → 15 → 30이 돼요. 날짜마다 마지막 행에서는 두 누적 값이 같아요.",
+        "이전 열은 LAG로 가져온 바로 앞 행의 points예요. 첫 행은 앞 행이 없어 NULL이에요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "OVER (ORDER BY event_date)",
+            "desc": "프레임을 안 적어서 날짜가 같은 행을 한꺼번에 더하는 누적"
+          },
+          {
+            "term": "ROWS BETWEEN",
+            "desc": "같은 날짜라도 행 하나씩 차례로 더하도록 프레임을 정함"
+          },
+          {
+            "term": "LAG(points)",
+            "desc": "바로 앞 행의 포인트를 가져옴(첫 행은 값 없음)"
+          }
+        ],
+        "distractor": "LEAD(points)"
+      }
+    },
+    {
+      "id": "U09-p4",
+      "title": "포인트 1위 뽑기: 동점 포함 vs 1명만",
+      "goal": "인라인 뷰로 순위를 만든 뒤 바깥 WHERE로 거르고, Top N에서 RANK와 ROW_NUMBER의 차이를 본다.",
+      "dataset": "points",
+      "sql": "SELECT student_id, total, r, rn\nFROM (SELECT student_id, SUM(points) AS total,\n        RANK() OVER (ORDER BY SUM(points) DESC) AS r,\n        ROW_NUMBER() OVER (ORDER BY SUM(points) DESC, student_id) AS rn\n      FROM point_events\n      GROUP BY student_id) t\nWHERE r <= 1;",
+      "run": true,
+      "steps": [
+        "안쪽 쿼리가 먼저 GROUP BY로 학생별 합계(total)를 만들어요. 1번 35, 2번 25, 3번 35, 6번 25예요.",
+        "윈도우 함수는 GROUP BY 다음에 계산돼요. 합계 높은 순으로 r(RANK)과 rn(ROW_NUMBER)을 붙여요.",
+        "r은 같은 SELECT의 WHERE에서 못 쓰므로 인라인 뷰 t로 감싸고 바깥 WHERE r <= 1로 걸러요.",
+        "35점 동점인 1번과 3번이 모두 남아요. 바깥 조건을 WHERE rn <= 1로 바꾸면 1번 한 명만 남아요(LIMIT 1도 1행만)."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "GROUP BY student_id",
+            "desc": "학생마다 한 행으로 묶어 포인트 합계를 먼저 만듦"
+          },
+          {
+            "term": "RANK()",
+            "desc": "합계가 같은 학생에게 같은 순위를 줘 동점을 모두 남김"
+          },
+          {
+            "term": "WHERE r <= 1",
+            "desc": "인라인 뷰 바깥에서 1위인 행만 남기는 조건"
+          }
+        ],
+        "distractor": "ROW_NUMBER()"
+      }
+    }
+  ]
+}

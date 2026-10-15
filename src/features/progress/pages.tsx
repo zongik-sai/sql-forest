@@ -10,7 +10,7 @@ import { QuestionCard } from '../learning/QuestionCard';
 import { useFocusGate } from '../focus/FocusContext';
 import {
   allUnitsComplete, answerQuestion, checkpointSolved, courseComplete, finalComplete, finalUnlocked, isActivityComplete, isUnitComplete,
-  nextStep, unitCheckpointScore, unitStatus, unsolvedCheckpoints, viewExplanation,
+  nextStep, unitCheckpointScore, unitStageLevel, unitStatus, unsolvedCheckpoints, viewExplanation,
 } from './model';
 import { BADGES } from './rewards';
 import { buildReport, downloadText, reportCsv } from './report';
@@ -79,7 +79,7 @@ export function Dashboard() {
                 <span className="dot" aria-hidden="true">{u.order}</span>
                 <span>
                   <b>{u.title}</b>
-                  <span className="st" style={{ display: 'block' }}>{STATUS_LABEL[st]} · 활동 {u.activityIds.filter((a) => isActivityComplete(state, a)).length}/4 · 체크 {unitCheckpointScore(state, u.id)}/3</span>
+                  <span className="st" style={{ display: 'block' }}>{STATUS_LABEL[st]} · 단계 {unitStageLevel(state, u.id)}/4 · 활동 {u.activityIds.filter((a) => isActivityComplete(state, a)).length}/4 · 체크 {unitCheckpointScore(state, u.id)}/3</span>
                 </span>
               </>
             );
@@ -140,7 +140,7 @@ export function PrePage() {
       <h1>최초 진단 (5문항)</h1>
       <p className="muted">지금 알고 있는 것을 가볍게 확인해요. 점수로 단원을 잠그지 않고 경험치도 주지 않아요. SQL이 처음이라면 바로 시작해도 돼요.</p>
       <div className="row">
-        <button className="btn" onClick={async () => { await commit((s) => ({ ...s, pre: { status: 'skipped', answers: {}, score: 0 } }), { immediate: true }); nav('/learn/U01/U01-A01'); }}>처음부터 배우기</button>
+        <button className="btn" onClick={async () => { await commit((s) => ({ ...s, pre: { status: 'skipped', answers: {}, score: 0 } }), { immediate: true }); nav('/learn/U01/stage/1'); }}>처음부터 배우기</button>
       </div>
       {PRE_DIAGNOSTIC.map((q, i) => q.body.type === 'choice' && (
         <div className="panel" key={q.id}>

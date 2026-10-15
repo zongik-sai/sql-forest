@@ -4,10 +4,11 @@ import { learnerPrefix, readJson, writeJson } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
 import { CG_UNIT_BY_ID } from '../content';
 import { McqRunner, ReviewCard, type McqResult } from '../McqRunner';
+import { CardMatch } from '../../../components/CardMatch';
 import { shuffle } from '../mock';
 import { cardsDone, isOpen, isPassed, markCard, markDone, noteAnswer, passNeed, recordScore, unitLevel } from '../model';
 import { useCg } from '../store';
-import { BLANK_RE, CG_LEVELS, CG_LEVEL_NAME, type CgCard, type CgLevel, type CgMcq, type CgTable, type CgUnit, type CgUnitId } from '../types';
+import { BLANK_RE, CG_LEVELS, CG_LEVEL_NAME, type CgCard, type CgLevel, type CgMcq, type CgUnit, type CgUnitId } from '../types';
 
 /** 목적격 조사(을/를): 받침이 있으면 '을' */
 const objParticle = (w: string) => {
@@ -20,17 +21,8 @@ function useLearnerPrefix() {
   return learnerPrefix(id ? id.learnerKey : 'guest');
 }
 
-export function Table({ t }: { t: CgTable }) {
-  return (
-    <div className="table-wrap">
-      <table className="data cg-table">
-        {t.caption && <caption>{t.caption}</caption>}
-        <thead><tr>{t.header.map((h, i) => <th scope="col" key={i}>{h}</th>)}</tr></thead>
-        <tbody>{t.rows.map((r, i) => <tr key={i}>{r.map((c, j) => (j === 0 ? <th scope="row" key={j}>{c}</th> : <td key={j}>{c}</td>))}</tr>)}</tbody>
-      </table>
-    </div>
-  );
-}
+import { InfoTable as Table } from '../../../components/InfoTable';
+export { Table };
 
 /** 줄 목록을 문단·글머리표로 */
 export function Lines({ lines }: { lines: string[] }) {
@@ -158,77 +150,6 @@ function CardBody({ c, n }: { c: CgCard; n: number }) {
   );
 }
 
-/** 카드 한 장의 개념 맞추기: 뜻마다 용어 4개(정답 3 + 헷갈리는 용어 1) 중 하나를 고른다. 모두 맞혀야 끝난다. */
-function CardMatch({ c, onDone }: { c: CgCard; onDone: () => void }) {
-  const m = c.match!;
-  const rows = useMemo(() => shuffle(m.pairs), [m]);
-  const terms = useMemo(() => shuffle([...m.pairs.map((p) => p.term), m.distractor]), [m]);
-  const [pick, setPick] = useState<Record<string, string>>({});
-  const [checked, setChecked] = useState<Record<string, boolean> | null>(null);
-  const locked = (desc: string) => checked?.[desc] === true;
-  const allOk = !!checked && rows.every((r) => checked[r.desc]);
-  const choose = (desc: string, term: string) => {
-    if (locked(desc) || allOk) return;
-    const next: Record<string, string> = {};
-    // 같은 용어는 한 뜻에만: 다른 줄에서 고른 것은 빼고 옮긴다(맞힌 줄은 그대로)
-    for (const [d, t] of Object.entries(pick)) if (t !== term || locked(d)) next[d] = t;
-    next[desc] = term;
-    setPick(next);
-    if (checked && checked[desc] === false) {
-      const ck = { ...checked };
-      delete ck[desc];
-      setChecked(ck);
-    }
-  };
-  const check = () => {
-    const res = Object.fromEntries(rows.map((r) => [r.desc, pick[r.desc] === r.term]));
-    setChecked(res);
-    if (rows.every((r) => res[r.desc])) onDone();
-  };
-  const usedByLocked = new Set(rows.filter((r) => locked(r.desc)).map((r) => pick[r.desc]));
-  const wrongN = checked ? rows.filter((r) => checked[r.desc] === false).length : 0;
-  return (
-    <section className="panel stack cg-match" aria-labelledby={`match-${c.id}`}>
-      <h3 id={`match-${c.id}`} style={{ margin: 0 }}>개념 맞추기</h3>
-      <p className="small muted" style={{ margin: 0 }}>뜻에 맞는 용어를 고르세요. 용어 {terms.length}개 중 1개는 헷갈리게 넣은 함정이에요.</p>
-      <ol className="cg-match-rows">
-        {rows.map((r) => {
-          const st = checked?.[r.desc];
-          return (
-            <li key={r.desc} className={st === true ? 'ok' : st === false ? 'bad' : ''}>
-              <p className="cg-match-desc">{r.desc}</p>
-              <div className="cg-chips" role="group" aria-label={`뜻: ${r.desc}`}>
-                {terms.map((t) => {
-                  const on = pick[r.desc] === t;
-                  const takenElsewhere = !on && usedByLocked.has(t);
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      className={`cg-chip${on ? ' on' : ''}${on && st === true ? ' ok' : ''}${on && st === false ? ' no' : ''}`}
-                      aria-pressed={on}
-                      disabled={locked(r.desc) || allOk || takenElsewhere}
-                      onClick={() => choose(r.desc, t)}
-                    >{t}</button>
-                  );
-                })}
-              </div>
-              {st === true && <span className="small cg-match-mark">✓ 맞았어요</span>}
-              {st === false && <span className="small cg-match-mark">다시 골라 보세요. 카드에서 찾아봐도 돼요.</span>}
-            </li>
-          );
-        })}
-      </ol>
-      {!allOk && (
-        <div className="row">
-          <button className="btn btn-primary" disabled={rows.some((r) => !pick[r.desc])} onClick={check}>확인</button>
-          {wrongN > 0 && <span className="small muted" aria-live="polite">{wrongN}개가 틀렸어요. 틀린 줄만 다시 고르고 확인을 누르세요.</span>}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function Theory({ u }: { u: CgUnit }) {
   const cg = useCg();
   const nav = useNavigate();
@@ -292,7 +213,7 @@ function Theory({ u }: { u: CgUnit }) {
             <summary>{String(idx + 1).padStart(2, '0')} {c.title} — 카드 다시 보기</summary>
             <div className="stack" style={{ marginTop: '0.5rem' }}><CardBody c={c} n={idx + 1} /></div>
           </details>
-          <CardMatch key={`${c.id}:${round}`} c={c} onDone={finish} />
+          <CardMatch key={`${c.id}:${round}`} id={c.id} match={c.match!} onDone={finish} />
         </>
       )}
       {justDone && (

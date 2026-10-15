@@ -15,14 +15,22 @@ export function stateWithUnits(unitIds: string[], opts: { pre?: boolean } = {}):
   return s;
 }
 
-/** 데모 상태를 주입하고 해당 경로를 연다 */
-export async function openWithState(page: Page, state: LearnerState | null, path: string) {
+/** 모든 단원의 1~3단계(이론·개념 점검·실습 설명)를 통과한 상태로(4단계 활동·체크포인트를 바로 여는 테스트용) */
+export function withStagesPassed(s: LearnerState): LearnerState {
+  const at = '2026-10-15T00:00:00.000Z';
+  const rec = { passedAt: at, lastAt: at };
+  return { ...s, stages: Object.fromEntries(UNITS.map((u) => [u.id, { s1: rec, s2: { ...rec, best: 10, total: 10 }, s3: rec }])) };
+}
+
+/** 데모 상태를 주입하고 해당 경로를 연다. 기본으로 1~3단계는 통과한 상태(stages: false면 그대로) */
+export async function openWithState(page: Page, state: LearnerState | null, path: string, opts: { stages?: boolean } = {}) {
+  const base = opts.stages === false ? state : withStagesPassed(state ?? emptyLearnerState('demo'));
   await page.goto('./');
   await page.evaluate(([k, v]) => {
     localStorage.clear();
     localStorage.setItem('sqlforest:demo-active', '1');
     if (v) localStorage.setItem(k, v);
-  }, [STATE_KEY, state ? JSON.stringify(state) : '']);
+  }, [STATE_KEY, base ? JSON.stringify(base) : '']);
   await page.goto('about:blank');
   await page.goto(`./#${path}`);
 }

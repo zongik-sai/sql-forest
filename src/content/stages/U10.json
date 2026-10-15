@@ -1,0 +1,685 @@
+{
+  "unit": "U10",
+  "cards": [
+    {
+      "id": "U10-t1",
+      "title": "소계·총계와 ROLLUP",
+      "points": [
+        "소계는 그룹 안의 중간 합계, 총계는 모든 행의 전체 합계예요. 예: 학과별 참여 인원 합은 소계, 모든 학과의 합은 총계예요.",
+        "GROUP BY ROLLUP(A, B)는 (A, B) 상세, (A) 소계, () 총계 묶음을 한 번에 만드는 GROUP BY 확장이에요.",
+        "오른쪽 열부터 하나씩 빼며 묶어요. 열이 n개면 n+1가지 묶음이 생기고, 열 순서를 바꾸면 소계도 달라져요.",
+        "소계·총계 행에서는 묶을 때 뺀 열의 칸이 NULL로 표시돼요. 예: 학과 소계 행의 month 칸은 NULL이에요."
+      ],
+      "table": {
+        "header": [
+          "dept_name",
+          "month",
+          "SUM(participants)",
+          "행 종류"
+        ],
+        "rows": [
+          [
+            "AI컴퓨터",
+            "3월",
+            "12",
+            "상세"
+          ],
+          [
+            "AI컴퓨터",
+            "4월",
+            "8",
+            "상세"
+          ],
+          [
+            "AI컴퓨터",
+            "NULL",
+            "20",
+            "학과 소계"
+          ],
+          [
+            "…",
+            "…",
+            "…",
+            "다른 학과도 같은 방식"
+          ],
+          [
+            "NULL",
+            "NULL",
+            "38",
+            "전체 총계"
+          ]
+        ]
+      },
+      "tip": "ROLLUP(A, B)에는 B만으로 묶은 소계가 없어요. '오른쪽부터 말아 올린다'로 기억해요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "소계",
+            "desc": "학과별 합처럼 그룹 안에서 구한 중간 합계"
+          },
+          {
+            "term": "총계",
+            "desc": "모든 행을 하나로 묶어 구한 전체 합계"
+          },
+          {
+            "term": "ROLLUP",
+            "desc": "오른쪽 열부터 하나씩 빼며 묶음을 만드는 GROUP BY 확장"
+          }
+        ],
+        "distractor": "CUBE"
+      }
+    },
+    {
+      "id": "U10-t2",
+      "title": "CUBE와 GROUPING SETS",
+      "points": [
+        "CUBE(A, B)는 가능한 모든 묶음 (A, B), (A), (B), ()를 만들어요. 열이 n개면 2의 n제곱 가지예요.",
+        "예: CUBE(dept_name, month)는 학과별 소계에 월별 소계까지 더해 줘서 학과×월 교차 분석에 좋아요.",
+        "GROUPING SETS는 필요한 묶음만 골라 나열해요. 예: GROUPING SETS((A), (B))는 A별·B별 소계만 만들어요.",
+        "()는 아무 열로도 나누지 않은 묶음, 곧 총계예요. GROUPING SETS 결과는 묶음별 GROUP BY를 UNION ALL한 것과 같아요."
+      ],
+      "table": {
+        "header": [
+          "문법",
+          "만드는 묶음",
+          "묶음 수"
+        ],
+        "rows": [
+          [
+            "ROLLUP(A, B)",
+            "(A, B), (A), ()",
+            "3"
+          ],
+          [
+            "CUBE(A, B)",
+            "(A, B), (A), (B), ()",
+            "4"
+          ],
+          [
+            "GROUPING SETS((A), (B))",
+            "(A), (B)",
+            "2"
+          ]
+        ]
+      },
+      "tip": "CUBE는 열 순서를 바꿔도 같은 묶음이 나와요. 순서가 결과를 바꾸는 건 ROLLUP이에요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "CUBE",
+            "desc": "가능한 모든 열 조합마다 중간 합계를 만드는 확장"
+          },
+          {
+            "term": "GROUPING SETS",
+            "desc": "필요한 묶음만 직접 골라 나열하는 확장"
+          },
+          {
+            "term": "()",
+            "desc": "아무 열로도 나누지 않은 빈 묶음, 곧 전체 합계"
+          }
+        ],
+        "distractor": "ROLLUP"
+      }
+    },
+    {
+      "id": "U10-t3",
+      "title": "GROUPING 함수와 SQLite 대안",
+      "points": [
+        "소계 행의 NULL은 '값이 없음'이 아니라 '이 열은 빼고 묶었음'이라는 표시예요. 원래 데이터의 NULL과 헷갈릴 수 있어요.",
+        "GROUPING(열)은 그 열이 소계·총계 때문에 NULL이 되었으면 1, 아니면 0을 돌려줘요.",
+        "CASE WHEN GROUPING(dept_name) = 1 THEN '전체' ELSE dept_name END처럼 써서 소계 행에 이름표를 붙여요.",
+        "SQLite에는 ROLLUP·CUBE·GROUPING SETS·GROUPING이 없어요. 묶음마다 GROUP BY를 따로 하고 UNION ALL로 이어 붙여 같은 결과를 만들어요."
+      ],
+      "table": {
+        "header": [
+          "dept_name",
+          "month",
+          "합계",
+          "GROUPING(month)"
+        ],
+        "rows": [
+          [
+            "AI로봇",
+            "3월",
+            "5",
+            "0"
+          ],
+          [
+            "AI로봇",
+            "4월",
+            "9",
+            "0"
+          ],
+          [
+            "AI로봇",
+            "NULL",
+            "14",
+            "1"
+          ]
+        ]
+      },
+      "tip": "GROUPING이 1이면 소계용 NULL, 0이면 실제 값(원래 NULL 포함)이에요. IS NULL로는 둘을 구별 못 해요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "GROUPING(열)",
+            "desc": "열이 소계 때문에 비었으면 1, 아니면 0을 돌려주는 함수"
+          },
+          {
+            "term": "CASE WHEN",
+            "desc": "함수 결과가 1인 행에 '전체' 같은 이름표를 붙이는 조건식"
+          },
+          {
+            "term": "UNION ALL",
+            "desc": "묶음별 GROUP BY 결과를 이어 붙여 SQLite에서 소계를 흉내 냄"
+          }
+        ],
+        "distractor": "HAVING"
+      }
+    },
+    {
+      "id": "U10-t4",
+      "title": "계층 데이터와 셀프조인",
+      "points": [
+        "계층형 데이터는 부모-자식으로 이어진 나무(트리) 모양 데이터예요. 예: 학생회 → 학술부 → SQL동아리 → SQL스터디A.",
+        "clubs_tree 표는 parent_id 칸에 부모 동아리의 club_id를 적어요. 맨 위 루트인 학생회는 부모가 없어 parent_id가 NULL이에요.",
+        "셀프조인은 같은 표에 별칭 두 개(c, p)를 붙여 자기 자신과 조인하는 거예요. ON c.parent_id = p.club_id로 부모 이름을 붙여요.",
+        "INNER JOIN이면 부모가 없는 학생회 행이 빠져요. 루트까지 남기려면 LEFT JOIN을 써요."
+      ],
+      "table": {
+        "header": [
+          "club_id",
+          "parent_id",
+          "club_name"
+        ],
+        "rows": [
+          [
+            "1",
+            "NULL",
+            "학생회"
+          ],
+          [
+            "2",
+            "1",
+            "학술부"
+          ],
+          [
+            "3",
+            "1",
+            "체육부"
+          ],
+          [
+            "4",
+            "2",
+            "SQL동아리"
+          ],
+          [
+            "5",
+            "2",
+            "로봇동아리"
+          ],
+          [
+            "6",
+            "4",
+            "SQL스터디A"
+          ],
+          [
+            "7",
+            "3",
+            "농구부"
+          ],
+          [
+            "8",
+            "4",
+            "SQL스터디B"
+          ]
+        ]
+      },
+      "tip": "한 표의 칸(parent_id)이 같은 표의 기본키(club_id)를 가리키면 셀프조인으로 부모를 찾아요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "셀프조인",
+            "desc": "같은 표에 별칭 두 개를 붙여 자기 자신과 조인하는 것"
+          },
+          {
+            "term": "parent_id",
+            "desc": "부모 동아리의 번호를 적어 두는 칸"
+          },
+          {
+            "term": "루트",
+            "desc": "부모가 없는 트리의 맨 위 행(예: 학생회)"
+          }
+        ],
+        "distractor": "club_name"
+      }
+    },
+    {
+      "id": "U10-t5",
+      "title": "계층형 질의: CONNECT BY와 WITH RECURSIVE",
+      "points": [
+        "계층형 질의는 시작 행에서 출발해 자식, 손자 순으로 트리를 따라가며 행을 찾는 질의예요.",
+        "Oracle은 START WITH로 시작 행을 정하고, CONNECT BY PRIOR club_id = parent_id로 부모→자식 방향 연결을 정해요.",
+        "PRIOR는 '방금 방문한 행'을 뜻해요. CONNECT BY PRIOR parent_id = club_id로 바꾸면 자식→부모(위쪽)로 올라가요.",
+        "LEVEL은 깊이를 알려 주는 가상 열이에요. 시작 행이 1, 그 자식이 2, 손자가 3이에요.",
+        "SQLite에는 CONNECT BY가 없어요. 이름 붙인 임시 결과(WITH 절)가 자기 자신을 다시 불러 반복하는 WITH RECURSIVE로 같은 트리를 만들어요."
+      ],
+      "table": {
+        "header": [
+          "역할",
+          "Oracle",
+          "SQLite"
+        ],
+        "rows": [
+          [
+            "시작 행",
+            "START WITH club_id = 2",
+            "첫 SELECT의 WHERE club_id = 2"
+          ],
+          [
+            "연결",
+            "CONNECT BY PRIOR club_id = parent_id",
+            "JOIN sub ON c.parent_id = sub.club_id"
+          ],
+          [
+            "깊이",
+            "LEVEL",
+            "lvl + 1로 직접 계산"
+          ]
+        ]
+      },
+      "tip": "START WITH로 고른 시작 행도 결과에 LEVEL 1로 포함돼요. 하위 행만 보려면 WHERE LEVEL > 1을 더해요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "START WITH",
+            "desc": "트리를 시작할 행을 정하는 Oracle 절"
+          },
+          {
+            "term": "LEVEL",
+            "desc": "시작 행이 1이고 아래로 갈수록 커지는 깊이 가상 열"
+          },
+          {
+            "term": "WITH RECURSIVE",
+            "desc": "자기 자신을 다시 불러 반복하는 SQLite의 계층 질의 대안"
+          }
+        ],
+        "distractor": "CONNECT BY"
+      }
+    },
+    {
+      "id": "U10-t6",
+      "title": "PIVOT과 UNPIVOT",
+      "points": [
+        "PIVOT은 세로로 쌓인 행의 값(3월, 4월)을 열 제목으로 펼쳐 교차표를 만들어요. UNPIVOT은 반대로 여러 열을 행으로 접어요.",
+        "Oracle: PIVOT (SUM(participants) FOR month IN ('3월', '4월')). FOR 뒤 month의 값이 새 열 제목이 돼요.",
+        "SQLite에는 PIVOT이 없어요. SUM(CASE WHEN month = '3월' THEN participants END)처럼 조건부 집계로 같은 표를 만들어요.",
+        "기록이 없는 칸은 NULL이에요. ELSE 0을 쓰면 '기록 없음'이 0명으로 바뀌니 주의해요.",
+        "UNPIVOT의 SQLite 대안은 열마다 SELECT를 만들어 UNION ALL로 이어 붙이는 거예요."
+      ],
+      "table": {
+        "header": [
+          "dept_name",
+          "3월",
+          "4월"
+        ],
+        "rows": [
+          [
+            "AI로봇",
+            "5",
+            "9"
+          ],
+          [
+            "AI컴퓨터",
+            "12",
+            "8"
+          ],
+          [
+            "AI콘텐츠디자인",
+            "NULL",
+            "4"
+          ]
+        ]
+      },
+      "tip": "PIVOT = 행→열 펼치기, UNPIVOT = 열→행 접기. 둘 다 SQLite에서는 실행되지 않아요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "PIVOT",
+            "desc": "행에 쌓인 값을 열 제목으로 펼쳐 교차표를 만드는 연산"
+          },
+          {
+            "term": "UNPIVOT",
+            "desc": "여러 열을 행으로 접어 세로로 쌓는 연산"
+          },
+          {
+            "term": "조건부 집계",
+            "desc": "CASE로 조건에 맞는 값만 골라 SUM하는 SQLite 대안"
+          }
+        ],
+        "distractor": "ROLLUP"
+      }
+    },
+    {
+      "id": "U10-t7",
+      "title": "정규표현식: 문자열 모양 패턴",
+      "points": [
+        "정규표현식은 문자열의 모양을 기호로 적은 패턴이에요. 예: 전화번호·이메일·날짜 형식이 맞는지 검사해요.",
+        "예: ^010-[0-9]{4}-[0-9]{4}$는 '010-1234-5678'과 맞고, '02-123-4567'과는 맞지 않아요.",
+        "Oracle은 WHERE REGEXP_LIKE(열, 패턴)으로 행을 거르고, REGEXP_SUBSTR·REGEXP_REPLACE로 부분을 찾거나 바꿔요.",
+        "SQLite 기본 빌드에는 REGEXP 함수가 없어 실행되지 않아요. 정규식 활동은 브라우저 정규식 엔진으로 하는 시뮬레이션이에요."
+      ],
+      "table": {
+        "header": [
+          "기호",
+          "뜻",
+          "예"
+        ],
+        "rows": [
+          [
+            "^",
+            "문자열의 시작",
+            "^SQL → SQL로 시작"
+          ],
+          [
+            "$",
+            "문자열의 끝",
+            "캠프$ → 캠프로 끝남"
+          ],
+          [
+            "[0-9]",
+            "숫자 한 개",
+            "[0-9][0-9] → 두 자리 숫자"
+          ],
+          [
+            "{n}",
+            "앞의 것이 정확히 n번",
+            "[0-9]{4} → 숫자 4개"
+          ],
+          [
+            "+",
+            "앞의 것이 1번 이상",
+            "[a-z]+ → 소문자 1개 이상"
+          ]
+        ]
+      },
+      "tip": "^와 $가 둘 다 있으면 문자열 전체가 맞아야 해요. 없으면 일부만 맞아도 참이에요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "REGEXP_LIKE",
+            "desc": "패턴에 맞는 행만 걸러 내는 Oracle 함수"
+          },
+          {
+            "term": "[0-9]",
+            "desc": "0부터 9까지 숫자 한 개와 맞는 기호"
+          },
+          {
+            "term": "$",
+            "desc": "문자열이 끝나는 위치를 뜻하는 기호"
+          }
+        ],
+        "distractor": "^"
+      }
+    }
+  ],
+  "quiz": [
+    {
+      "id": "U10-c1",
+      "question": "camp_monthly(dept_name, month, participants)에서 '학과별 소계 + 전체 총계'만 만들고, 학과·월 상세 행은 만들지 않는 GROUP BY는?",
+      "options": [
+        "GROUP BY ROLLUP(dept_name, month)",
+        "GROUP BY CUBE(dept_name, month)",
+        "GROUP BY GROUPING SETS((dept_name), ())",
+        "GROUP BY dept_name, month"
+      ],
+      "answer": 2,
+      "explanation": "GROUPING SETS는 나열한 묶음만 만들어요. (dept_name)은 학과별 소계, ()는 총계예요. ROLLUP(dept_name, month)은 상세 행까지, CUBE는 월별 소계까지 더 만들어요.",
+      "tag": "ROLLUP/CUBE/GROUPING SETS/GROUPING"
+    },
+    {
+      "id": "U10-c2",
+      "question": "camp_monthly는 학과·월 상세 5행이고 학과는 3개, 월은 2개(3월·4월)예요. GROUP BY CUBE(dept_name, month) 결과는 몇 행일까요?",
+      "options": [
+        "8행",
+        "9행",
+        "10행",
+        "11행"
+      ],
+      "answer": 3,
+      "explanation": "CUBE는 (학과, 월) 상세 5행 + 학과별 소계 3행 + 월별 소계 2행 + 총계 1행 = 11행이에요. ROLLUP이면 월별 소계 2행이 빠져 9행이에요.",
+      "tag": "ROLLUP/CUBE/GROUPING SETS/GROUPING"
+    },
+    {
+      "id": "U10-c3",
+      "question": "ROLLUP 결과에서 month 칸이 NULL인 행이 '소계 행'인지, '원래 month가 NULL인 데이터'인지 구별하려면 어떻게 할까요?",
+      "options": [
+        "GROUPING(month)가 1인지 확인한다",
+        "month IS NULL인지 확인한다",
+        "SUM 값이 0인지 확인한다",
+        "ORDER BY month로 정렬해 본다"
+      ],
+      "answer": 0,
+      "explanation": "GROUPING(열)은 소계·총계 때문에 생긴 NULL이면 1, 실제 값(원래 NULL 포함)이면 0이에요. IS NULL은 두 경우 모두 참이라 구별하지 못해요.",
+      "tag": "ROLLUP/CUBE/GROUPING SETS/GROUPING"
+    },
+    {
+      "id": "U10-c4",
+      "question": "clubs_tree(club_id, parent_id, club_name)에서 학생회만 parent_id가 NULL이에요. SELECT c.club_name, p.club_name FROM clubs_tree c JOIN clubs_tree p ON c.parent_id = p.club_id; 결과의 c.club_name에 나오지 않는 동아리는?",
+      "options": [
+        "학술부",
+        "SQL동아리",
+        "학생회",
+        "농구부"
+      ],
+      "answer": 2,
+      "explanation": "INNER JOIN 셀프조인에서는 parent_id가 NULL인 학생회와 짝이 되는 부모 행이 없어 빠져요. 학생회도 남기려면 LEFT JOIN을 써요.",
+      "tag": "계층형 질의·셀프조인"
+    },
+    {
+      "id": "U10-c5",
+      "question": "Oracle에서 학술부(club_id 2)부터 아래로 하위 동아리를 따라가려 해요. SELECT LEVEL, club_name FROM clubs_tree ㉠ club_id = 2 CONNECT BY ㉡; 에서 ㉠·㉡에 알맞은 것은?",
+      "options": [
+        "㉠ WHERE, ㉡ PRIOR club_id = parent_id",
+        "㉠ START WITH, ㉡ PRIOR club_id = parent_id",
+        "㉠ START WITH, ㉡ PRIOR parent_id = club_id",
+        "㉠ ORDER SIBLINGS BY, ㉡ club_id = parent_id"
+      ],
+      "answer": 1,
+      "explanation": "START WITH가 시작 행을 정하고, PRIOR club_id = parent_id는 '방금 방문한 행을 부모로 가진 행'을 찾아 위→아래로 내려가요. PRIOR parent_id = club_id는 아래→위 방향이에요.",
+      "tag": "계층형 질의·셀프조인"
+    },
+    {
+      "id": "U10-c6",
+      "question": "Oracle에서 START WITH club_id = 1(학생회) CONNECT BY PRIOR club_id = parent_id로 조회해요. 학생회 → 학술부 → SQL동아리 → SQL스터디A로 이어질 때 SQL스터디A의 LEVEL은?",
+      "options": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "answer": 3,
+      "explanation": "시작 행인 학생회가 LEVEL 1이고 한 단계 내려갈 때마다 1씩 커져요. 학술부 2, SQL동아리 3, SQL스터디A 4예요.",
+      "tag": "계층형 질의·셀프조인"
+    },
+    {
+      "id": "U10-c7",
+      "question": "camp_monthly에서 AI콘텐츠디자인은 4월(4명) 기록만 있어요. SUM(CASE WHEN month = '3월' THEN participants END)로 피벗하면 AI콘텐츠디자인의 3월 칸은?",
+      "options": [
+        "0",
+        "NULL",
+        "4",
+        "오류가 난다"
+      ],
+      "answer": 1,
+      "explanation": "3월 행이 없어 CASE가 NULL만 내고, NULL만 SUM하면 결과도 NULL이에요. ELSE 0을 쓰면 0이 돼요. Oracle PIVOT도 이 칸을 NULL로 보여 줘요.",
+      "tag": "PIVOT/UNPIVOT"
+    },
+    {
+      "id": "U10-c8",
+      "question": "열이 (dept_name, 3월, 4월)인 교차표를 (dept_name, month, participants) 세로 모양으로 되돌리려 해요. 시험 문법과 SQLite 대안의 짝으로 옳은 것은?",
+      "options": [
+        "UNPIVOT ↔ 월 열마다 SELECT를 만들어 UNION ALL",
+        "PIVOT ↔ SUM(CASE WHEN …) 조건부 집계",
+        "UNPIVOT ↔ SUM(CASE WHEN …) 조건부 집계",
+        "ROLLUP ↔ 묶음마다 GROUP BY 후 UNION ALL"
+      ],
+      "answer": 0,
+      "explanation": "여러 열을 행으로 접는 것은 UNPIVOT이에요. SQLite에서는 3월 열을 읽는 SELECT와 4월 열을 읽는 SELECT를 UNION ALL로 이어요. PIVOT·조건부 집계는 반대로 펼치는 쪽이에요.",
+      "tag": "PIVOT/UNPIVOT"
+    },
+    {
+      "id": "U10-c9",
+      "question": "Oracle에서 WHERE REGEXP_LIKE(course_name, '캠프$')가 참이 되는 course_name 값은?",
+      "options": [
+        "캠프안내",
+        "SQL캠프 신청",
+        "AI캠프",
+        "캠프장"
+      ],
+      "answer": 2,
+      "explanation": "$는 문자열의 끝이라 '캠프$'는 캠프로 끝나는 값만 맞아요. ^가 없으므로 앞부분은 무엇이든 괜찮아요. 'SQL캠프 신청'은 끝이 '신청'이라 맞지 않아요.",
+      "tag": "정규표현식"
+    },
+    {
+      "id": "U10-c10",
+      "question": "Oracle에서 WHERE REGEXP_LIKE(phone, '^010-[0-9]{4}-[0-9]{4}$')로 거를 때 남는 phone 값은?",
+      "options": [
+        "010-123-4567",
+        "02-1234-5678",
+        "010-1234-56789",
+        "010-1234-5678"
+      ],
+      "answer": 3,
+      "explanation": "^와 $ 때문에 문자열 전체가 010-숫자 4개-숫자 4개여야 해요. 010-1234-56789는 끝에 숫자가 하나 더 있어 맞지 않아요. SQLite 기본 빌드에는 REGEXP 함수가 없어 이 SQL은 실행되지 않아요.",
+      "tag": "정규표현식"
+    }
+  ],
+  "practice": [
+    {
+      "id": "U10-p1",
+      "title": "시험 문법: ROLLUP과 GROUPING",
+      "goal": "Oracle·SQL Server의 ROLLUP으로 소계·총계를 만들고 GROUPING으로 이름표를 붙이는 쿼리를 읽어요.",
+      "dataset": "monthly",
+      "sql": "-- 시험 문법(Oracle·SQL Server): SQLite에서는 실행되지 않아요\nSELECT CASE WHEN GROUPING(dept_name) = 1 THEN '전체'\n            ELSE dept_name END AS 학과,\n       CASE WHEN GROUPING(month) = 1 THEN '합계'\n            ELSE month END AS 월,\n       SUM(participants) AS 인원\nFROM camp_monthly\nGROUP BY ROLLUP(dept_name, month);",
+      "run": false,
+      "steps": [
+        "FROM camp_monthly에서 학과·월별 참여 인원 5행을 읽어요.",
+        "ROLLUP(dept_name, month)이 (학과, 월) 상세 5행, 학과별 소계 3행, 전체 총계 1행, 모두 9행을 만들어요.",
+        "소계 행의 month 칸은 원래 NULL이지만 GROUPING(month) = 1이라 '합계'로 바꿔 보여 줘요.",
+        "총계 행은 GROUPING(dept_name)도 1이라 '전체 | 합계 | 38'로 보여요. SQLite에서는 다음 예제의 UNION ALL로 같은 결과를 실행해요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "ROLLUP(dept_name, month)",
+            "desc": "상세·학과별 소계·총계만 만들고 월별 소계는 만들지 않는 묶음"
+          },
+          {
+            "term": "GROUPING(dept_name) = 1",
+            "desc": "학과 칸이 총계 때문에 비었는지 확인하는 조건"
+          },
+          {
+            "term": "SUM(participants)",
+            "desc": "각 묶음에 속한 행의 참여 인원을 더하는 집계"
+          }
+        ],
+        "distractor": "CUBE(dept_name, month)"
+      }
+    },
+    {
+      "id": "U10-p2",
+      "title": "SQLite 대안: UNION ALL로 소계 만들기",
+      "goal": "묶음마다 GROUP BY를 따로 하고 UNION ALL로 이어 붙여, ROLLUP과 같은 9행을 SQLite에서 실행해요.",
+      "dataset": "monthly",
+      "sql": "SELECT * FROM (\n  SELECT dept_name AS 학과, month AS 월, SUM(participants) AS 인원\n  FROM camp_monthly GROUP BY dept_name, month\n  UNION ALL\n  SELECT dept_name, '합계', SUM(participants)\n  FROM camp_monthly GROUP BY dept_name\n  UNION ALL\n  SELECT '전체', '합계', SUM(participants) FROM camp_monthly\n)\nORDER BY 학과 = '전체', 학과, 월 = '합계', 월;",
+      "run": true,
+      "steps": [
+        "첫 SELECT는 학과·월별로 묶어 상세 5행을 만들어요. ROLLUP의 (dept_name, month) 묶음이에요.",
+        "둘째 SELECT는 학과별로 묶고 월 칸에 '합계'를 넣어 학과별 소계 3행을 만들어요.",
+        "셋째 SELECT는 GROUP BY 없이 전체를 더해 총계 1행(38)을 만들어요. '전체', '합계' 글자가 GROUPING 이름표 역할을 해요.",
+        "UNION ALL로 세 결과를 이어 붙이고, 바깥 ORDER BY로 학과마다 소계가 상세 뒤에, 총계가 맨 끝에 오게 정렬해요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "GROUP BY dept_name, month",
+            "desc": "학과·월마다 한 줄씩 상세 합계를 만드는 묶음"
+          },
+          {
+            "term": "UNION ALL",
+            "desc": "따로 구한 세 결과를 중복 제거 없이 위아래로 이어 붙임"
+          },
+          {
+            "term": "'전체', '합계'",
+            "desc": "총계 행의 빈 칸에 넣는 이름표로 GROUPING 역할을 대신함"
+          }
+        ],
+        "distractor": "GROUP BY month"
+      }
+    },
+    {
+      "id": "U10-p3",
+      "title": "WITH RECURSIVE로 하위 동아리 찾기",
+      "goal": "Oracle CONNECT BY와 같은 행을 WITH RECURSIVE로 실행해 학술부 아래 트리와 깊이를 확인해요.",
+      "dataset": "clubs",
+      "sql": "-- Oracle(SQLite 실행 안 됨): SELECT LEVEL, club_name FROM clubs_tree\n--   START WITH club_id = 2 CONNECT BY PRIOR club_id = parent_id;\nWITH RECURSIVE sub(club_id, club_name, lvl) AS (\n  SELECT club_id, club_name, 1 FROM clubs_tree WHERE club_id = 2\n  UNION ALL\n  SELECT c.club_id, c.club_name, sub.lvl + 1\n  FROM clubs_tree c JOIN sub ON c.parent_id = sub.club_id\n)\nSELECT lvl, club_name FROM sub;",
+      "run": true,
+      "steps": [
+        "주석 두 줄은 Oracle 문법이라 실행되지 않아요. 아래 WITH RECURSIVE가 sub라는 이름의 임시 결과를 만들며 실제로 실행돼요.",
+        "첫 SELECT가 학술부(club_id 2) 한 행을 lvl 1로 sub에 넣어요. Oracle의 START WITH 역할이에요.",
+        "재귀 SELECT가 sub에 있는 행의 자식(parent_id가 그 행의 club_id인 행)을 찾아 lvl을 1 늘려 붙여요.",
+        "SQL동아리·로봇동아리(lvl 2), SQL스터디A·B(lvl 3)가 차례로 붙고, 더 찾을 자식이 없으면 멈춰요.",
+        "결과는 학술부를 포함한 5행이에요. Oracle은 깊이 우선(학술부→SQL동아리→SQL스터디A·B→로봇동아리)으로 보여 주고, 이 쿼리는 ORDER BY가 없어 줄 순서가 다를 수 있어요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "WHERE club_id = 2",
+            "desc": "트리를 시작할 행을 고르는 부분으로 START WITH 역할"
+          },
+          {
+            "term": "c.parent_id = sub.club_id",
+            "desc": "이미 찾은 행의 자식을 찾아 잇는 조건으로 CONNECT BY PRIOR 역할"
+          },
+          {
+            "term": "sub.lvl + 1",
+            "desc": "한 단계 내려갈 때마다 깊이를 1씩 늘리는 LEVEL 역할"
+          }
+        ],
+        "distractor": "ORDER SIBLINGS BY"
+      }
+    },
+    {
+      "id": "U10-p4",
+      "title": "CASE 조건부 집계로 PIVOT 만들기",
+      "goal": "Oracle PIVOT과 같은 학과×월 교차표를 SUM(CASE …) 조건부 집계로 SQLite에서 실행해요.",
+      "dataset": "monthly",
+      "sql": "-- Oracle(SQLite 실행 안 됨): SELECT * FROM camp_monthly\n--   PIVOT (SUM(participants) FOR month IN ('3월' AS \"3월\", '4월' AS \"4월\"));\nSELECT dept_name,\n  SUM(CASE WHEN month = '3월' THEN participants END) AS \"3월\",\n  SUM(CASE WHEN month = '4월' THEN participants END) AS \"4월\"\nFROM camp_monthly\nGROUP BY dept_name\nORDER BY dept_name;",
+      "run": true,
+      "steps": [
+        "GROUP BY dept_name으로 학과마다 한 행을 만들어요. 이 행들이 교차표의 행이 돼요.",
+        "CASE WHEN month = '3월'은 3월 행이면 인원을, 아니면 NULL을 내요. SUM이 그 값만 더해 3월 칸을 채워요.",
+        "4월 열도 같은 방식이에요. AI콘텐츠디자인은 3월 기록이 없어 3월 칸이 NULL이에요(0이 아니에요).",
+        "Oracle에서는 주석의 PIVOT 절이 같은 교차표를 만들어요. FOR month IN 목록의 값이 열 제목이 돼요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "WHEN month = '3월'",
+            "desc": "3월 기록일 때만 인원을 남기고 나머지는 NULL로 두는 조건"
+          },
+          {
+            "term": "AS \"3월\"",
+            "desc": "새로 만든 열에 3월이라는 열 제목을 붙임"
+          },
+          {
+            "term": "GROUP BY dept_name",
+            "desc": "학과마다 한 줄로 묶어 교차표의 행을 만듦"
+          }
+        ],
+        "distractor": "ELSE 0"
+      }
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import { useFocusGate } from '../features/focus/FocusContext';
 
 export function ModeBadge({ mode }: { mode: ExecMode }) {
   if (mode === 'executable') return <span className="badge badge-exec" title="SQLite 엔진에서 실제로 실행합니다">실제 실행</span>;
-  if (mode === 'simulation') return <span className="badge badge-sim" title="제한된 예제로 개념을 시뮬레이션합니다(임의 SQL 실행기 아님)">개념 시뮬레이션</span>;
+  if (mode === 'simulation') return <span className="badge badge-sim" title="정해진 예제로 원리를 직접 해 보는 활동이에요(SQL 실행기가 아님)">원리 체험</span>;
   return <span className="badge badge-dialect" title="SQLite에 없는 시험 문법을 같은 결과의 대안 SQL과 비교합니다">문법 비교</span>;
 }
 

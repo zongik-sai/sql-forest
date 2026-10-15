@@ -8,7 +8,7 @@ export const U12 = [
     explanation: '여러 캠프를 들은 학생은 수강 행이 여러 개라 그냥 조인하면 이름이 반복돼요. EXISTS로 "참여 기록이 있는지"만 확인하거나 DISTINCT로 중복을 없애요. 학과명은 departments와 조인해 가져와요.',
     glossary: [{ term: '통합 미션', meaning: '모델·조회·조인·서브쿼리를 함께 써서 하나의 질문에 답하는 과제' }],
     mode: 'executable', datasetId: 'school',
-    prompt: '캠프(강좌)를 하나 이상 수강한 학생의 이름과 학과명을 학생 이름 순으로 조회하세요. 학생은 한 번씩만 나와야 해요.',
+    prompt: '캠프(강좌)를 하나 이상 수강한 학생(enrollment 표에 기록이 있는 학생)의 이름과 학과명을 학생 이름 순으로 조회하세요. 학생은 한 번씩만 나와야 해요.',
     hints: [
       '학생-학과는 dept_id로, 학생-수강은 student_id로 연결돼요.',
       '수강이 여러 개인 학생(가온)이 두 번 나오지 않게 EXISTS나 DISTINCT를 쓰세요.',
@@ -31,7 +31,7 @@ export const U12 = [
     explanation: '"없는 것"을 찾을 때는 NOT EXISTS나 LEFT JOIN … IS NULL을 써요. NOT IN은 비교 목록에 NULL이 섞이면 결과가 비어 버릴 수 있어 주의해요. 어떤 방법이든 결과가 같으면 정답이에요.',
     glossary: [{ term: '안티 조인', meaning: '상대 표에 짝이 없는 행만 남기는 패턴. NOT EXISTS, LEFT JOIN + IS NULL' }],
     mode: 'executable', datasetId: 'school',
-    prompt: '어떤 캠프에도 참여하지 않은 학생의 student_id와 이름을 학번 순으로 조회하세요.',
+    prompt: '어떤 캠프에도 참여하지 않은 학생(enrollment 표에 기록이 하나도 없는 학생)의 student_id와 이름을 학번(student_id) 순으로 조회하세요.',
     hints: [
       '수강 행이 하나도 없는 학생을 찾아요.',
       'LEFT JOIN 후 e.student_id IS NULL, 또는 NOT EXISTS를 쓰세요.',
@@ -54,7 +54,7 @@ export const U12 = [
     explanation: '참여 0명인 학과도 보이려면 학과를 기준으로 LEFT JOIN해요. 한 학생이 여러 캠프를 들으면 행이 늘어나니 인원은 COUNT(DISTINCT 학생)로 세요. 평균 점수는 AVG가 NULL을 빼고 계산해요.',
     glossary: [{ term: 'COUNT(DISTINCT 열)', meaning: '중복을 뺀 서로 다른 값의 개수' }],
     mode: 'executable', datasetId: 'school',
-    prompt: '모든 학과(참여 0명 포함)의 학과명, 참여 학생 수(서로 다른 학생), 평균 점수를 학과명 순으로 조회하세요.',
+    prompt: '모든 학과(참여 0명 포함)의 학과명, 참여 학생 수(캠프를 수강한 서로 다른 학생 수), 평균 점수(그 학과 수강 기록의 score 평균)를 학과명 순으로 조회하세요.',
     hints: [
       'departments → students → enrollment 순서로 LEFT JOIN 하세요.',
       '참여 학생 수는 COUNT(DISTINCT e.student_id)예요(NULL은 세지 않음).',
@@ -74,10 +74,10 @@ export const U12 = [
     id: 'U12-A04', unitId: 'U12', title: '미션 4: 동점 순위와 상위 학생',
     objective: '집계·윈도우 함수·인라인 뷰를 연결해 상위 학생을 찾는다.',
     estimatedMinutes: 4,
-    explanation: '학생별 평균을 GROUP BY로 구한 뒤, 그 결과에 RANK를 붙이면 동점도 같은 순위가 돼요. 순위 조건은 인라인 뷰로 감싼 바깥에서 WHERE로 걸러요. 이름은 students와 조인해 가져와요.',
+    explanation: '학생별 평균을 GROUP BY로 구한 뒤, 그 결과에 RANK를 붙이면 동점도 같은 순위가 돼요. 순위 조건은 인라인 뷰(FROM 안에 넣은 서브쿼리)로 감싼 바깥에서 WHERE로 걸러요. 이름은 students와 조인해 가져와요.',
     glossary: [{ term: '집계 + 윈도우', meaning: 'GROUP BY 결과에 다시 RANK() OVER (ORDER BY AVG(…))를 붙일 수 있어요' }],
     mode: 'executable', datasetId: 'school',
-    prompt: '학생별 평균 점수(NULL 제외)로 RANK를 매겨 2위 이내(동점 포함) 학생의 이름, 평균, 순위를 순위·이름 순으로 조회하세요.',
+    prompt: '학생별 평균 점수(NULL 제외, 높을수록 1위)로 RANK를 매겨 2위 이내(동점 포함) 학생의 이름, 평균, 순위를 순위·이름 순으로 조회하세요.',
     hints: [
       '안쪽: SELECT student_id, AVG(score), RANK() OVER (ORDER BY AVG(score) DESC) FROM enrollment WHERE score IS NOT NULL GROUP BY student_id',
       '바깥에서 순위 <= 2 조건을 걸고 students와 조인해 이름을 가져와요.',

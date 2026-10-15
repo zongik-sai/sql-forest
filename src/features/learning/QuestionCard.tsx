@@ -5,6 +5,7 @@ import type { SqlError } from '../../sql/engine';
 import { describeDiff, type ResultSet } from '../../sql/grader/compare';
 import { outcomeMessage, sqlClient } from '../../sql/worker/sqlClient';
 import { useFocusGate } from '../focus/FocusContext';
+import { DataPanel } from '../../components/DataPanel';
 
 export interface Graded {
   correct: boolean;
@@ -61,6 +62,7 @@ export function QuestionCard({ q, onGraded, locked, title, draft, onDraft }: {
       {title && <p className="step-label">{title}</p>}
       <p style={{ fontWeight: 600, margin: 0 }}>{q.prompt}</p>
       {q.code && <pre className="codeblock">{q.code}</pre>}
+      {(b.type === 'sql' ? b.datasetId : q.verify?.datasetId) && <DataPanel dataset={(b.type === 'sql' ? b.datasetId : q.verify!.datasetId)} />}
       {b.type === 'choice' && <ChoiceGroup legend={<span className="sr-only">답 고르기</span>} options={b.options} value={choice} onChange={setChoice} disabled={locked} name={q.id} />}
       {b.type === 'number' && (
         <label>값 입력 <input type="number" value={num} onChange={(e) => setNum(e.target.value)} disabled={locked} /></label>

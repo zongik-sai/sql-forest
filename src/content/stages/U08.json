@@ -1,0 +1,630 @@
+{
+  "unit": "U08",
+  "cards": [
+    {
+      "id": "U08-t1",
+      "title": "서브쿼리와 단일행 서브쿼리",
+      "points": [
+        "서브쿼리는 SQL 문 안에 괄호로 넣은 또 하나의 SELECT 문이에요. 서브쿼리를 품고 있는 바깥쪽 SQL은 메인쿼리라고 해요.",
+        "보통 안쪽 서브쿼리가 먼저 실행되고, 메인쿼리는 그 결과를 조건 값처럼 받아 써요.",
+        "결과가 한 행, 값 하나인 서브쿼리를 단일행 서브쿼리라고 해요. =, >, < 같은 비교 연산자와 함께 써요.",
+        "예: 가온(1)과 같은 학과 학생 → WHERE dept_id = (SELECT dept_id FROM students WHERE student_id = 1). 안쪽 결과는 10 하나예요."
+      ],
+      "table": {
+        "header": [
+          "결과 모양",
+          "이름",
+          "함께 쓰는 연산자"
+        ],
+        "rows": [
+          [
+            "1행 (값 하나)",
+            "단일행 서브쿼리",
+            "=, <>, >, >=, <, <="
+          ],
+          [
+            "여러 행",
+            "다중행 서브쿼리",
+            "IN, ANY, ALL, EXISTS"
+          ]
+        ]
+      },
+      "tip": "WHERE 절에는 MAX, AVG 같은 집계 함수를 바로 쓸 수 없어요. 서브쿼리로 값을 먼저 구해요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "메인쿼리",
+            "desc": "괄호 속 SELECT를 품고 있는 바깥쪽 SQL 문"
+          },
+          {
+            "term": "단일행 서브쿼리",
+            "desc": "결과가 한 행, 값 하나뿐인 괄호 속 SELECT 문"
+          },
+          {
+            "term": "비교 연산자",
+            "desc": "=, >, < 처럼 두 값의 크기나 같음을 견주는 기호"
+          }
+        ],
+        "distractor": "다중행 서브쿼리"
+      }
+    },
+    {
+      "id": "U08-t2",
+      "title": "다중행 서브쿼리와 IN·NOT IN",
+      "points": [
+        "다중행 서브쿼리는 결과가 여러 행인 서브쿼리예요. 값이 여러 개라 =로 비교하면 Oracle·SQL Server는 오류를 내요.",
+        "SQLite는 이때 오류 없이 첫 값만 써요. 틀린 결과가 조용히 나올 수 있어 더 조심해야 해요.",
+        "IN (서브쿼리)는 돌려받은 목록 중 하나와 같으면 참이에요. 예: 3학년이 있는 학과 → dept_id IN (SELECT dept_id FROM students WHERE grade = 3) → 10, 20",
+        "NOT IN은 목록의 어떤 값과도 같지 않으면 참이에요. 같은 목록으로 거르면 3학년이 없는 학과 30, 40이 남아요.",
+        "함정: 목록에 NULL이 하나라도 있으면 NOT IN은 아무 행도 남기지 않아요. 없는 것 찾기는 NOT EXISTS가 안전해요."
+      ],
+      "table": {
+        "header": [
+          "학과",
+          "목록 (10, 10, 20)에",
+          "IN",
+          "NOT IN"
+        ],
+        "rows": [
+          [
+            "10 AI컴퓨터",
+            "있음",
+            "참",
+            "거짓"
+          ],
+          [
+            "20 AI로봇",
+            "있음",
+            "참",
+            "거짓"
+          ],
+          [
+            "30 AI콘텐츠디자인",
+            "없음",
+            "거짓",
+            "참"
+          ],
+          [
+            "40 전기에너지",
+            "없음",
+            "거짓",
+            "참"
+          ]
+        ]
+      },
+      "tip": "=는 값 하나, IN은 값 목록과 비교해요. 결과가 여러 행일 수 있으면 IN을 써요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "IN",
+            "desc": "서브쿼리가 돌려준 값 목록 중 하나와 같으면 참인 연산자"
+          },
+          {
+            "term": "NOT IN",
+            "desc": "목록의 어느 값과도 같지 않으면 참, 목록에 NULL이 있으면 0행"
+          },
+          {
+            "term": "다중행 서브쿼리",
+            "desc": "결과가 여러 행이라 = 대신 목록용 연산자로 비교해야 하는 SELECT"
+          }
+        ],
+        "distractor": "단일행 서브쿼리"
+      }
+    },
+    {
+      "id": "U08-t3",
+      "title": "ANY와 ALL: 목록과 크기 비교",
+      "points": [
+        "ANY는 목록 값 중 '하나라도' 조건을 만족하면 참, ALL은 목록의 '모든 값'에 대해 만족해야 참이에요.",
+        "> ANY (2, 3)은 가장 작은 2보다만 크면 참이고, > ALL (2, 3)은 가장 큰 3보다도 커야 참이에요.",
+        "예: IoT캠프(102) 점수 목록이 (80, 70, 80)이면 score > ANY(…)는 70 초과일 때, score > ALL(…)은 80 초과일 때 참이에요.",
+        "= ANY는 IN과 같은 뜻이고, SOME은 ANY와 같은 연산자예요(Oracle·SQL Server).",
+        "SQLite에는 ANY/ALL 연산자가 없어요. 같은 뜻의 MIN/MAX 서브쿼리 비교로 바꿔 실행해요."
+      ],
+      "table": {
+        "header": [
+          "조건",
+          "같은 뜻 (MIN/MAX)"
+        ],
+        "rows": [
+          [
+            "> ANY (목록)",
+            "> 최솟값"
+          ],
+          [
+            "> ALL (목록)",
+            "> 최댓값"
+          ],
+          [
+            "< ANY (목록)",
+            "< 최댓값"
+          ],
+          [
+            "< ALL (목록)",
+            "< 최솟값"
+          ]
+        ]
+      },
+      "tip": "> ANY는 제일 작은 값만 넘으면 OK, > ALL은 제일 큰 값까지 넘어야 OK예요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "> ANY",
+            "desc": "목록의 최솟값보다 크기만 하면 참이 되는 비교"
+          },
+          {
+            "term": "> ALL",
+            "desc": "목록의 최댓값보다도 커야 참이 되는 비교"
+          },
+          {
+            "term": "< ALL",
+            "desc": "목록의 최솟값보다도 작아야 참이 되는 비교"
+          }
+        ],
+        "distractor": "< ANY"
+      }
+    },
+    {
+      "id": "U08-t4",
+      "title": "상관 서브쿼리와 EXISTS",
+      "points": [
+        "상관 서브쿼리는 안에서 메인쿼리의 열(예: s.student_id)을 참조하는 서브쿼리예요. 바깥 행마다 다시 실행돼요.",
+        "EXISTS (서브쿼리)는 결과 행이 하나라도 있으면 참이에요. 값은 보지 않으므로 보통 SELECT 1로 써요.",
+        "예: SQL캠프(101)를 들은 학생 찾기 → 학생 한 명마다 '이 학생의 101 수강 행이 있나?'를 확인해요.",
+        "NOT EXISTS는 결과 행이 하나도 없을 때 참이에요. 수강 기록이 없는 학생처럼 '없는 것'을 찾을 때 써요."
+      ],
+      "table": {
+        "header": [
+          "바깥 행 (학생)",
+          "안쪽 결과 (101 수강 행)",
+          "EXISTS"
+        ],
+        "rows": [
+          [
+            "1 가온",
+            "1행",
+            "참"
+          ],
+          [
+            "3 다온",
+            "1행 (점수 NULL)",
+            "참"
+          ],
+          [
+            "4 라온",
+            "0행",
+            "거짓"
+          ]
+        ]
+      },
+      "tip": "EXISTS는 행이 있는지만 봐요. 점수가 NULL인 행도 '있음'이라 참이에요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "상관 서브쿼리",
+            "desc": "바깥 행의 값을 받아 그 행마다 다시 실행되는 안쪽 SELECT"
+          },
+          {
+            "term": "EXISTS",
+            "desc": "안쪽 결과가 한 행이라도 있으면 참이 되는 연산자"
+          },
+          {
+            "term": "NOT EXISTS",
+            "desc": "안쪽 결과 행이 하나도 없어야 참이 되는 연산자"
+          }
+        ],
+        "distractor": "인라인 뷰"
+      }
+    },
+    {
+      "id": "U08-t5",
+      "title": "자리별 이름: 스칼라 서브쿼리·인라인 뷰",
+      "points": [
+        "서브쿼리는 쓰인 자리에 따라 이름이 달라요. SELECT 절은 스칼라 서브쿼리, FROM 절은 인라인 뷰, WHERE 절은 중첩 서브쿼리예요.",
+        "스칼라 서브쿼리는 값 하나(1행 1열)만 돌려줘요. 예: 학생마다 수강 건수를 (SELECT COUNT(*) …)로 구해 열로 붙여요.",
+        "스칼라 서브쿼리 결과가 0행이면 NULL이 되고, 2행 이상이면 Oracle은 오류를 내요(SQLite는 첫 행만 써요).",
+        "인라인 뷰는 FROM 절에서 임시 표처럼 쓰는 서브쿼리예요. 예: 강좌별 평균 표를 먼저 만들고 바깥에서 80점 이상만 골라요."
+      ],
+      "table": {
+        "header": [
+          "쓰인 자리",
+          "이름",
+          "모양"
+        ],
+        "rows": [
+          [
+            "SELECT 절",
+            "스칼라 서브쿼리",
+            "(SELECT COUNT(*) …) AS cnt"
+          ],
+          [
+            "FROM 절",
+            "인라인 뷰",
+            "FROM (SELECT …) t"
+          ],
+          [
+            "WHERE 절",
+            "중첩 서브쿼리",
+            "WHERE score > (SELECT …)"
+          ]
+        ]
+      },
+      "tip": "인라인 뷰에 별칭(t)을 붙이면 바깥에서 t.열이름으로 불러요. SQL Server는 별칭이 필수예요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "스칼라 서브쿼리",
+            "desc": "SELECT 절에서 값 하나(1행 1열)처럼 쓰이는 서브쿼리"
+          },
+          {
+            "term": "인라인 뷰",
+            "desc": "FROM 절에서 임시 표처럼 쓰이는 서브쿼리"
+          },
+          {
+            "term": "중첩 서브쿼리",
+            "desc": "WHERE 절의 조건 안에 들어간 서브쿼리"
+          }
+        ],
+        "distractor": "메인쿼리"
+      }
+    },
+    {
+      "id": "U08-t6",
+      "title": "집합 연산자: UNION과 UNION ALL",
+      "points": [
+        "집합 연산자는 두 SELECT 결과를 위아래로 합치거나 빼는 연산자예요. 조인이 표를 옆으로 붙인다면 집합 연산은 아래로 쌓아요.",
+        "두 SELECT의 열 개수가 같고, 같은 자리 열끼리 자료형이 맞아야 해요. 결과 열 이름은 첫 SELECT를 따라요.",
+        "UNION은 합친 뒤 중복 행을 한 번만 남기고, UNION ALL은 중복까지 그대로 남겨요. 중복 제거가 없어 UNION ALL이 보통 더 빨라요.",
+        "UNION은 한쪽 안에 있던 중복도 없애요. 예: A {1, 2, 2} UNION B {2, 3} → 1, 2, 3 (3행)"
+      ],
+      "table": {
+        "header": [
+          "연산",
+          "A = {1, 2, 2}, B = {2, 3}일 때",
+          "행 수"
+        ],
+        "rows": [
+          [
+            "A UNION B",
+            "1, 2, 3",
+            "3"
+          ],
+          [
+            "A UNION ALL B",
+            "1, 2, 2, 2, 3",
+            "5"
+          ]
+        ]
+      },
+      "tip": "ORDER BY는 맨 마지막 SELECT 뒤에 한 번만 써서 합친 전체를 정렬해요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "UNION",
+            "desc": "두 결과를 합친 뒤 중복 행을 한 번만 남기는 연산자"
+          },
+          {
+            "term": "UNION ALL",
+            "desc": "두 결과를 중복까지 모두 그대로 이어 붙이는 연산자"
+          },
+          {
+            "term": "ORDER BY",
+            "desc": "합친 전체 결과를 정렬하려고 맨 끝에 한 번만 쓰는 절"
+          }
+        ],
+        "distractor": "INTERSECT"
+      }
+    },
+    {
+      "id": "U08-t7",
+      "title": "INTERSECT와 EXCEPT(MINUS)",
+      "points": [
+        "INTERSECT는 두 결과에 모두 있는 행(교집합)만 남겨요. 예: A {1, 2, 3} INTERSECT B {2, 3, 4} → 2, 3",
+        "EXCEPT는 첫 결과에만 있고 둘째 결과에는 없는 행(차집합)을 남겨요. 예: A EXCEPT B → 1",
+        "Oracle은 차집합을 MINUS라고 써요. SQL Server와 SQLite는 EXCEPT를 써요. 뜻은 같아요.",
+        "EXCEPT는 위아래 순서를 바꾸면 결과가 달라져요. 예: B EXCEPT A → 4",
+        "INTERSECT·EXCEPT도 UNION처럼 결과의 중복 행을 없애요."
+      ],
+      "table": {
+        "header": [
+          "연산",
+          "뜻",
+          "A {1, 2, 3}, B {2, 3, 4}"
+        ],
+        "rows": [
+          [
+            "A INTERSECT B",
+            "교집합",
+            "2, 3"
+          ],
+          [
+            "A EXCEPT B (Oracle: A MINUS B)",
+            "차집합",
+            "1"
+          ],
+          [
+            "B EXCEPT A",
+            "차집합(순서 바꿈)",
+            "4"
+          ]
+        ]
+      },
+      "tip": "MINUS는 Oracle 이름, EXCEPT는 표준·SQL Server·SQLite 이름이에요. 둘 다 차집합이에요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "INTERSECT",
+            "desc": "두 결과에 모두 들어 있는 행만 남기는 교집합 연산자"
+          },
+          {
+            "term": "EXCEPT",
+            "desc": "SQL Server·SQLite에서 쓰는 차집합 연산자 이름"
+          },
+          {
+            "term": "MINUS",
+            "desc": "Oracle에서 쓰는 차집합 연산자 이름"
+          }
+        ],
+        "distractor": "UNION ALL"
+      }
+    }
+  ],
+  "quiz": [
+    {
+      "id": "U08-c1",
+      "question": "students 표에서 학년(grade)이 가장 높은 학생을 찾으려고 해요. 올바른 WHERE 절은?",
+      "options": [
+        "WHERE grade = MAX(grade)",
+        "WHERE grade = (SELECT MAX(grade) FROM students)",
+        "WHERE grade = (MAX(grade))",
+        "WHERE grade = SELECT MAX(grade) FROM students"
+      ],
+      "answer": 1,
+      "explanation": "WHERE 절에는 MAX 같은 집계 함수를 바로 쓸 수 없어요. 괄호로 감싼 서브쿼리로 최고 학년(3)을 먼저 구해 비교해요. 서브쿼리는 반드시 괄호 안에 써요.",
+      "tag": "단일행 서브쿼리"
+    },
+    {
+      "id": "U08-c2",
+      "question": "Oracle에서 다음 SQL을 실행하면 어떻게 될까요? (SQL캠프 101 수강생은 1, 2, 3번)\nSELECT student_name FROM students\nWHERE student_id = (SELECT student_id FROM enrollment WHERE course_id = 101);",
+      "options": [
+        "가온 1명이 나온다",
+        "가온, 나래, 다온 3명이 나온다",
+        "서브쿼리가 여러 행을 돌려줘서 오류가 난다",
+        "0행이 나온다"
+      ],
+      "answer": 2,
+      "explanation": "=는 값 하나와 비교하는 단일행 연산자인데 서브쿼리가 3행을 돌려줘 Oracle은 오류를 내요. IN으로 바꿔야 3명이 나와요. SQLite는 오류 없이 첫 값만 써서 1명이 나올 수 있어 주의해요.",
+      "tag": "다중행 서브쿼리"
+    },
+    {
+      "id": "U08-c3",
+      "question": "서브쿼리 결과가 (1, 2, NULL)일 때, students 표(1~6번 학생)에 WHERE student_id NOT IN (서브쿼리)를 걸면 몇 명이 남을까요?",
+      "options": [
+        "0명",
+        "3명",
+        "4명",
+        "6명"
+      ],
+      "answer": 0,
+      "explanation": "NOT IN은 목록의 모든 값과 '같지 않음'이 참이어야 해요. NULL과의 비교는 참도 거짓도 아닌 UNKNOWN이라 어떤 행도 남지 않아요. 이럴 땐 NOT EXISTS를 써요.",
+      "tag": "IN/EXISTS/ANY/ALL"
+    },
+    {
+      "id": "U08-c4",
+      "question": "AI로봇(20) 학생 학년은 2, 3이에요. WHERE grade < ANY (SELECT grade FROM students WHERE dept_id = 20)와 같은 뜻의 조건은?",
+      "options": [
+        "grade < 2",
+        "grade > 2",
+        "grade > 3",
+        "grade < 3"
+      ],
+      "answer": 3,
+      "explanation": "< ANY는 목록 중 하나보다라도 작으면 참이에요. 가장 큰 값 3보다만 작으면 되므로 grade < 3과 같아요.",
+      "tag": "IN/EXISTS/ANY/ALL"
+    },
+    {
+      "id": "U08-c5",
+      "question": "SQLite에는 ANY/ALL이 없어요. WHERE grade > ALL (SELECT grade FROM students WHERE dept_id = 10)과 같은 결과를 내는 SQLite 식은? (서브쿼리 결과는 비어 있지 않고 NULL이 없어요)",
+      "options": [
+        "grade > (SELECT MIN(grade) FROM students WHERE dept_id = 10)",
+        "grade > (SELECT MAX(grade) FROM students WHERE dept_id = 10)",
+        "grade IN (SELECT grade FROM students WHERE dept_id = 10)",
+        "grade > (SELECT AVG(grade) FROM students WHERE dept_id = 10)"
+      ],
+      "answer": 1,
+      "explanation": "> ALL은 목록의 모든 값보다 커야 하므로 가장 큰 값보다 크면 돼요. 그래서 > (SELECT MAX(…))로 바꿔요. > (SELECT MIN(…))은 > ANY와 같은 뜻이에요.",
+      "tag": "IN/EXISTS/ANY/ALL"
+    },
+    {
+      "id": "U08-c6",
+      "question": "바깥 표가 students s일 때, 다음 중 상관 서브쿼리가 쓰인 조건은?",
+      "options": [
+        "WHERE EXISTS (SELECT 1 FROM enrollment e WHERE e.student_id = s.student_id)",
+        "WHERE grade = (SELECT MAX(grade) FROM students)",
+        "WHERE student_id IN (SELECT student_id FROM enrollment)",
+        "WHERE grade > (SELECT MIN(grade) FROM students WHERE dept_id = 10)"
+      ],
+      "answer": 0,
+      "explanation": "안쪽에서 바깥 표의 열 s.student_id를 참조하므로 학생 행마다 다시 실행되는 상관 서브쿼리예요. 나머지는 바깥 값을 쓰지 않아 한 번 구한 결과를 그대로 써요.",
+      "tag": "상관 서브쿼리"
+    },
+    {
+      "id": "U08-c7",
+      "question": "다음 SQL의 괄호 안 서브쿼리에 대한 설명으로 옳은 것은?\nSELECT s.student_name,\n  (SELECT COUNT(*) FROM enrollment e WHERE e.student_id = s.student_id) AS cnt\nFROM students s;",
+      "options": [
+        "FROM 절의 인라인 뷰라서 임시 표를 만든다",
+        "결과가 여러 행이어도 오류 없이 모두 표시된다",
+        "바깥 행과 상관없이 딱 한 번만 실행된다",
+        "SELECT 절에서 값 하나를 돌려주는 스칼라 서브쿼리다"
+      ],
+      "answer": 3,
+      "explanation": "SELECT 절에 쓰여 학생마다 수강 건수 값 하나를 돌려주는 스칼라 서브쿼리예요. 바깥 s.student_id를 참조하는 상관 서브쿼리이기도 해서 학생 행마다 다시 실행돼요.",
+      "tag": "스칼라·인라인뷰"
+    },
+    {
+      "id": "U08-c8",
+      "question": "결과는 몇 행일까요? (101 점수 90, 90, NULL / 102 점수 80, 70, 80 / 103 수강 행 없음)\nSELECT t.course_id FROM (SELECT course_id, AVG(score) AS avg_s FROM enrollment GROUP BY course_id) t WHERE t.avg_s >= 80;",
+      "options": [
+        "0행",
+        "1행",
+        "2행",
+        "3행"
+      ],
+      "answer": 1,
+      "explanation": "FROM 절의 인라인 뷰가 강좌별 평균 표(101: 90, 102: 약 76.7)를 먼저 만들어요. AVG는 NULL을 빼고 계산해요. 바깥 WHERE가 80 이상인 101만 남겨 1행이에요.",
+      "tag": "스칼라·인라인뷰"
+    },
+    {
+      "id": "U08-c9",
+      "question": "A의 결과가 {2, 4, 6}, B의 결과가 {4, 5}일 때 'A (연산자) B'의 결과가 5행이 되는 집합 연산자는?",
+      "options": [
+        "UNION",
+        "INTERSECT",
+        "UNION ALL",
+        "EXCEPT"
+      ],
+      "answer": 2,
+      "explanation": "UNION ALL은 중복(4)을 그대로 남겨 3 + 2 = 5행이에요. UNION은 4를 한 번만 남겨 4행, INTERSECT는 {4} 1행, EXCEPT는 {2, 6} 2행이에요.",
+      "tag": "UNION/UNION ALL"
+    },
+    {
+      "id": "U08-c10",
+      "question": "Oracle의 'A MINUS B'와 같은 결과를 SQLite에서 얻는 식과 그 결과는? (A의 결과 {5, 6, 7}, B의 결과 {6, 8})",
+      "options": [
+        "A EXCEPT B → 5, 7",
+        "B EXCEPT A → 5, 7",
+        "A INTERSECT B → 6",
+        "A EXCEPT B → 8"
+      ],
+      "answer": 0,
+      "explanation": "MINUS는 Oracle의 차집합 이름이고 SQLite·SQL Server는 EXCEPT를 써요. A에만 있는 5, 7이 남아요. 순서를 바꾼 B EXCEPT A는 8이에요.",
+      "tag": "EXCEPT(MINUS)"
+    }
+  ],
+  "practice": [
+    {
+      "id": "U08-p1",
+      "title": "최고점을 받은 수강 행 찾기",
+      "goal": "최고점처럼 값 하나를 돌려주는 서브쿼리를 WHERE 비교와 SELECT 절(스칼라)에 넣어 본다.",
+      "dataset": "school",
+      "sql": "SELECT e.student_id,\n       (SELECT s.student_name FROM students s\n         WHERE s.student_id = e.student_id) AS name,\n       e.course_id, e.score\nFROM enrollment e\nWHERE e.score = (SELECT MAX(score) FROM enrollment);",
+      "run": true,
+      "steps": [
+        "WHERE의 안쪽 SELECT MAX(score) FROM enrollment가 먼저 실행돼요. NULL을 뺀 가장 높은 점수는 90이에요.",
+        "바깥 WHERE는 e.score = 90처럼 동작해요. 서브쿼리 결과가 값 하나라 =로 바로 비교할 수 있어요(단일행 서브쿼리).",
+        "SELECT 절의 서브쿼리는 남은 수강 행마다 students에서 이름 하나를 찾아 붙이는 스칼라 서브쿼리예요.",
+        "90점을 받은 가온(1)·나래(2)의 SQL캠프 행 2개가 남아요. 최고점이 바뀌어도 SQL을 고칠 필요가 없어요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "MAX(score)",
+            "desc": "NULL을 빼고 가장 높은 점수 90을 구하는 집계 함수"
+          },
+          {
+            "term": "WHERE e.score =",
+            "desc": "각 수강 행의 점수가 안쪽에서 구한 최고점과 같은지 따지는 조건"
+          },
+          {
+            "term": "AS name",
+            "desc": "스칼라 서브쿼리가 찾아온 학생 이름을 담는 열 이름"
+          }
+        ],
+        "distractor": "ORDER BY e.score"
+      }
+    },
+    {
+      "id": "U08-p2",
+      "title": "EXISTS로 SQL캠프 수강생 찾기",
+      "goal": "바깥 학생마다 다시 실행되는 상관 서브쿼리와 EXISTS의 동작을 따라간다.",
+      "dataset": "school",
+      "sql": "SELECT s.student_id, s.student_name\nFROM students s\nWHERE EXISTS (SELECT 1 FROM enrollment e\n              WHERE e.student_id = s.student_id\n                AND e.course_id = 101);",
+      "run": true,
+      "steps": [
+        "바깥 students s에서 학생을 한 명씩 꺼내요. 그 학생 번호가 안쪽 조건 e.student_id = s.student_id로 넘어가요.",
+        "안쪽은 그 학생의 SQL캠프(101) 수강 행을 찾아요. 학생마다 다시 실행되는 상관 서브쿼리예요.",
+        "찾은 행이 하나라도 있으면 EXISTS가 참이라 학생이 남아요. 다온(3)은 점수가 NULL이어도 수강 행이 있어 남아요.",
+        "결과는 가온(1)·나래(2)·다온(3)이에요. 라온·마루·바다는 101 수강 행이 없어 빠져요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "EXISTS",
+            "desc": "안쪽 결과가 한 행이라도 있으면 그 학생을 남기는 연산자"
+          },
+          {
+            "term": "e.student_id = s.student_id",
+            "desc": "바깥 학생 행의 번호를 안쪽 조건으로 넘겨받는 연결 부분"
+          },
+          {
+            "term": "SELECT 1",
+            "desc": "값은 쓰지 않고 행이 있는지만 보려고 아무 상수나 고른 부분"
+          }
+        ],
+        "distractor": "NOT EXISTS"
+      }
+    },
+    {
+      "id": "U08-p3",
+      "title": "> ANY를 SQLite에서 MIN으로 바꾸기",
+      "goal": "SQLite에 없는 > ANY를 MIN 비교로 바꿔 다중행 비교의 뜻을 확인한다.",
+      "dataset": "school",
+      "sql": "-- Oracle: WHERE score > ANY (SELECT score FROM enrollment WHERE course_id = 102)\nSELECT student_id, course_id, score\nFROM enrollment\nWHERE score > (SELECT MIN(score) FROM enrollment WHERE course_id = 102);",
+      "run": true,
+      "steps": [
+        "첫 줄은 Oracle 문법을 보여 주는 주석이라 실행되지 않아요. SQLite에는 ANY/ALL 연산자가 없어요.",
+        "안쪽 목록은 IoT캠프(102) 점수 80, 70, 80이에요. > ANY는 하나보다라도 크면 참이라 가장 작은 70보다 크면 참이에요.",
+        "그래서 SQLite에서는 > (SELECT MIN(score) …)로 바꿔 같은 결과를 내요. (> ALL을 MAX로 바꿀 땐 목록이 비거나 NULL이 있으면 결과가 달라져요.)",
+        "70점보다 높은 4행(90, 80, 90, 80)이 남아요. 70점 행과 점수가 NULL인 행은 빠져요. > ALL이었다면 80 초과인 90점 2행만 남아요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "> ANY",
+            "desc": "Oracle에서 목록 값 중 하나보다라도 크면 참인 비교"
+          },
+          {
+            "term": "SELECT MIN(score)",
+            "desc": "SQLite에서 목록의 가장 낮은 점수를 구해 같은 뜻을 만드는 부분"
+          },
+          {
+            "term": "course_id = 102",
+            "desc": "비교할 점수 목록을 IoT캠프 수강 행으로 좁히는 조건"
+          }
+        ],
+        "distractor": "> ALL"
+      }
+    },
+    {
+      "id": "U08-p4",
+      "title": "EXCEPT로 빠진 학생 찾기",
+      "goal": "EXCEPT(Oracle MINUS)로 'AI컴퓨터 학생 중 IoT캠프를 듣지 않은 학생'을 찾는다.",
+      "dataset": "school",
+      "sql": "SELECT student_id FROM students WHERE dept_id = 10\nEXCEPT\nSELECT student_id FROM enrollment WHERE course_id = 102;",
+      "run": true,
+      "steps": [
+        "위 SELECT는 AI컴퓨터(10) 학과 학생 번호 1, 2, 6을 만들어요.",
+        "아래 SELECT는 IoT캠프(102) 수강생 번호 1, 3, 6을 만들어요. 위아래 SELECT의 열 개수(1개)가 같아야 해요.",
+        "EXCEPT는 위 결과에서 아래에도 있는 1, 6을 빼서 2(나래)만 남겨요. Oracle에서는 같은 자리에 MINUS를 써요.",
+        "위아래를 바꾸면 IoT캠프 수강생 중 AI컴퓨터가 아닌 3(다온)이 남아요. 차집합은 순서가 중요해요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "EXCEPT",
+            "desc": "위 결과에서 아래 결과에도 있는 행을 빼는 차집합 연산자"
+          },
+          {
+            "term": "dept_id = 10",
+            "desc": "위쪽 목록을 AI컴퓨터 학과 학생 번호로 정하는 조건"
+          },
+          {
+            "term": "course_id = 102",
+            "desc": "빼낼 아래쪽 목록을 IoT캠프 수강생 번호로 정하는 조건"
+          }
+        ],
+        "distractor": "INTERSECT"
+      }
+    }
+  ]
+}

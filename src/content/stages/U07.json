@@ -1,0 +1,588 @@
+{
+  "unit": "U07",
+  "cards": [
+    {
+      "id": "U07-t1",
+      "title": "JOIN과 INNER JOIN: 같은 키로 잇기",
+      "points": [
+        "JOIN(조인)은 두 표의 행을 같은 키 값으로 이어 붙여 한 줄로 보는 방법이에요. 예: 학생의 dept_id와 학과의 dept_id가 같으면 연결해요.",
+        "INNER JOIN(내부조인)은 양쪽 모두 짝이 있는 행만 결과에 남겨요. INNER를 빼고 JOIN이라고만 써도 INNER JOIN이에요.",
+        "짝이 없는 행은 결과에서 빠져요. 학생이 한 명도 없는 전기에너지(40) 학과는 INNER JOIN 결과에 나오지 않아요.",
+        "students s처럼 표 이름 뒤에 붙인 짧은 이름을 테이블 별칭이라고 해요. s.dept_id, d.dept_id로 어느 표의 열인지 구분해요."
+      ],
+      "table": {
+        "header": [
+          "students (학생)",
+          "dept_id",
+          "departments (학과)"
+        ],
+        "rows": [
+          [
+            "가온",
+            "10",
+            "AI컴퓨터"
+          ],
+          [
+            "다온",
+            "20",
+            "AI로봇"
+          ],
+          [
+            "마루",
+            "30",
+            "AI콘텐츠디자인"
+          ],
+          [
+            "(짝 없음)",
+            "40",
+            "전기에너지 → 결과에서 빠짐"
+          ]
+        ]
+      },
+      "tip": "INNER JOIN 결과에는 양쪽에 같은 키가 있는 짝만 남아요. 학과 하나에 학생 여럿이 붙을 수도 있어요(1:N).",
+      "match": {
+        "pairs": [
+          {
+            "term": "INNER JOIN",
+            "desc": "양쪽 표 모두에 짝이 있는 행만 결과로 남기는 조인"
+          },
+          {
+            "term": "테이블 별칭",
+            "desc": "표 이름 뒤에 붙여 열이 어느 표 것인지 구분하는 짧은 이름"
+          },
+          {
+            "term": "dept_id",
+            "desc": "두 표에 모두 있어 학생과 학과를 이어 주는 키 열"
+          }
+        ],
+        "distractor": "LEFT JOIN"
+      }
+    },
+    {
+      "id": "U07-t2",
+      "title": "조인 조건 쓰기: ON · USING · NATURAL JOIN",
+      "points": [
+        "ON은 연결 조건을 식으로 직접 써요. 예: ON s.dept_id = d.dept_id. 두 열의 이름이 달라도 쓸 수 있어 가장 많이 써요.",
+        "USING (dept_id)는 두 표에 이름이 같은 열을 괄호 안에 적어, 그 열 값이 같은 행끼리 연결해요.",
+        "NATURAL JOIN(자연 조인)은 조건을 쓰지 않아도 이름이 같은 모든 열로 자동 연결해요. 같은 이름 열이 여럿이면 모두 같아야 짝이 돼요.",
+        "Oracle에서는 USING·NATURAL JOIN에 쓴 열에 s.dept_id처럼 별칭을 붙이면 오류예요. SQLite는 허용하고, SQL Server는 두 문법이 없어요.",
+        "= 로 잇는 조인을 등가 조인, BETWEEN이나 > 같은 조건으로 잇는 조인을 비등가 조인이라고 해요. 둘 다 ON에 조건으로 써요."
+      ],
+      "table": {
+        "header": [
+          "방법",
+          "쓰는 예",
+          "연결 기준"
+        ],
+        "rows": [
+          [
+            "ON",
+            "ON s.dept_id = d.dept_id",
+            "직접 쓴 비교식"
+          ],
+          [
+            "USING",
+            "JOIN departments USING (dept_id)",
+            "괄호에 고른 같은 이름 열"
+          ],
+          [
+            "NATURAL JOIN",
+            "students NATURAL JOIN departments",
+            "이름이 같은 모든 열"
+          ]
+        ]
+      },
+      "tip": "NATURAL JOIN은 이름만 같으면 의도하지 않은 열(예: name)까지 연결 조건에 넣어요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "ON",
+            "desc": "연결 조건을 비교식으로 직접 적는 곳(두 열 이름이 달라도 됨)"
+          },
+          {
+            "term": "USING",
+            "desc": "이름이 같은 열 중 연결에 쓸 열을 괄호 안에 골라 적는 방법"
+          },
+          {
+            "term": "NATURAL JOIN",
+            "desc": "이름이 같은 열을 모두 찾아 자동으로 짝짓는 조인"
+          }
+        ],
+        "distractor": "CROSS JOIN"
+      }
+    },
+    {
+      "id": "U07-t3",
+      "title": "외부조인: LEFT · RIGHT · FULL OUTER JOIN",
+      "points": [
+        "외부조인(OUTER JOIN)은 짝이 없는 행도 버리지 않고 남겨요. 비어 있는 상대편 열은 NULL로 채워요.",
+        "LEFT JOIN은 왼쪽 표의 행을 모두 남겨요. 예: 학과 LEFT JOIN 학생이면 학생이 없는 전기에너지도 NULL과 함께 나와요.",
+        "RIGHT JOIN은 오른쪽 표의 행을 모두 남겨요. A RIGHT JOIN B는 표 순서를 바꾼 B LEFT JOIN A와 같은 행을 돌려줘요.",
+        "FULL OUTER JOIN은 양쪽 표의 짝 없는 행을 모두 남겨요. RIGHT·FULL은 SQLite 3.39부터 실행돼요(이 앱은 3.49).",
+        "Oracle 옛 문법은 WHERE a.id = b.id(+)처럼 NULL이 채워질 쪽에 (+)를 붙여요. 이 문법은 SQLite에서 실행되지 않아요."
+      ],
+      "table": {
+        "header": [
+          "조인 종류",
+          "A(id 1, 2) · B(id 2, 3) 결과 (A.id, B.id)",
+          "행 수"
+        ],
+        "rows": [
+          [
+            "INNER JOIN",
+            "(2, 2)",
+            "1"
+          ],
+          [
+            "LEFT JOIN",
+            "(1, NULL) (2, 2)",
+            "2"
+          ],
+          [
+            "RIGHT JOIN",
+            "(2, 2) (NULL, 3)",
+            "2"
+          ],
+          [
+            "FULL OUTER JOIN",
+            "(1, NULL) (2, 2) (NULL, 3)",
+            "3"
+          ]
+        ]
+      },
+      "tip": "OUTER는 생략 가능(LEFT OUTER JOIN = LEFT JOIN). 기준 쪽은 모두 남고 반대편 빈칸이 NULL!",
+      "match": {
+        "pairs": [
+          {
+            "term": "LEFT JOIN",
+            "desc": "왼쪽 표 행만 모두 보장하고 오른쪽 빈칸은 NULL로 채우는 조인"
+          },
+          {
+            "term": "RIGHT JOIN",
+            "desc": "오른쪽 표 행만 모두 보장하는 외부조인"
+          },
+          {
+            "term": "FULL OUTER JOIN",
+            "desc": "양쪽 표에서 짝 없는 행을 하나도 버리지 않는 조인"
+          }
+        ],
+        "distractor": "INNER JOIN"
+      }
+    },
+    {
+      "id": "U07-t4",
+      "title": "CROSS JOIN: 모든 조합 만들기",
+      "points": [
+        "CROSS JOIN(교차 조인)은 조건 없이 왼쪽 행 하나하나를 오른쪽 모든 행과 짝지어요. 결과 행 수는 두 표 행 수의 곱이에요.",
+        "이런 모든 조합을 카티션 곱(곱집합)이라고 해요. 학생 6명 × 강좌 3개면 18행이고, 아래 표는 그중 학생 2명 × 3개 = 6행이에요.",
+        "FROM students, courses처럼 표를 쉼표로 나열하고 WHERE 연결 조건을 빠뜨려도 카티션 곱이 생겨요.",
+        "모든 학생 × 모든 강좌 출석부처럼 조합표가 필요할 때 일부러 쓰지만, 실수로 생기면 행 수가 크게 불어나요."
+      ],
+      "table": {
+        "header": [
+          "student_name",
+          "course_name"
+        ],
+        "rows": [
+          [
+            "가온",
+            "SQL캠프"
+          ],
+          [
+            "가온",
+            "IoT캠프"
+          ],
+          [
+            "가온",
+            "AI캠프"
+          ],
+          [
+            "나래",
+            "SQL캠프"
+          ],
+          [
+            "나래",
+            "IoT캠프"
+          ],
+          [
+            "나래",
+            "AI캠프"
+          ]
+        ]
+      },
+      "tip": "CROSS JOIN 행 수 = 왼쪽 행 수 × 오른쪽 행 수. 연결 조건(ON)을 쓰지 않아요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "CROSS JOIN",
+            "desc": "모든 조합을 만들겠다고 FROM 절에 명시하는 조인 키워드"
+          },
+          {
+            "term": "카티션 곱",
+            "desc": "두 집합의 원소를 빠짐없이 짝지은 모든 조합을 뜻하는 수학 용어"
+          },
+          {
+            "term": "FROM students, courses",
+            "desc": "표를 쉼표로만 나열한 형태로, 연결 조건을 빠뜨리면 모든 조합이 생김"
+          }
+        ],
+        "distractor": "NATURAL JOIN"
+      }
+    },
+    {
+      "id": "U07-t5",
+      "title": "다중 테이블과 다대다 중간 테이블",
+      "points": [
+        "다대다(M:N)는 양쪽 모두 여러 개와 연결되는 관계예요. 한 학생은 강좌 여러 개를 듣고, 한 강좌도 학생 여러 명이 들어요.",
+        "M:N은 두 표만으로 바로 잇기 어려워 중간 테이블을 둬요. enrollment(student_id, course_id)가 1:N 관계 두 개로 풀어 줘요.",
+        "세 표 이상을 잇는 다중 테이블 조인은 JOIN … ON을 이어서 써요. 표가 N개면 연결 조건은 최소 N-1개가 필요해요.",
+        "결과 행 수는 보통 중간 테이블 행 수를 따라가요. 그래서 학생 이름이나 학과명처럼 1 쪽 값은 연결된 행마다 반복돼 보여요."
+      ],
+      "table": {
+        "header": [
+          "students",
+          "enrollment",
+          "courses"
+        ],
+        "rows": [
+          [
+            "가온(1)",
+            "1 · 101",
+            "SQL캠프(101)"
+          ],
+          [
+            "가온(1)",
+            "1 · 102",
+            "IoT캠프(102)"
+          ],
+          [
+            "나래(2)",
+            "2 · 101",
+            "SQL캠프(101)"
+          ]
+        ]
+      },
+      "tip": "표 3개면 조인 조건 2개! 값이 반복돼 보이는 건 오류가 아니라 짝이 여러 개라서예요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "다대다(M:N)",
+            "desc": "양쪽 모두 상대 표의 여러 행과 연결될 수 있는 관계"
+          },
+          {
+            "term": "중간 테이블",
+            "desc": "두 표의 키를 함께 담아 관계를 1:N 두 개로 풀어 주는 표"
+          },
+          {
+            "term": "N-1개",
+            "desc": "표 여러 개를 빠짐없이 잇는 데 필요한 최소 연결 조건 수"
+          }
+        ],
+        "distractor": "일대일(1:1)"
+      }
+    },
+    {
+      "id": "U07-t6",
+      "title": "외부조인 조건 위치: ON과 WHERE",
+      "points": [
+        "LEFT JOIN에서 ON 조건은 '어떤 행과 짝지을지'를 정해요. 짝이 없어도 왼쪽 행은 NULL과 함께 남아요.",
+        "WHERE는 조인이 끝난 결과에서 행을 걸러요. 오른쪽 표 조건을 WHERE에 쓰면 NULL 행이 지워져 사실상 INNER JOIN이 돼요.",
+        "예: 모든 학생 + IoT캠프 점수는 ON s.student_id = e.student_id AND e.course_id = 102로 써야 6명이 모두 남아요.",
+        "반대로 짝이 없는 행만 찾을 때는 LEFT JOIN 뒤에 WHERE e.student_id IS NULL처럼 비어 있는 칸을 확인해요.",
+        "INNER JOIN에서는 조건을 ON에 두든 WHERE에 두든 결과가 같아요. 위치 차이는 외부조인에서만 생겨요."
+      ],
+      "table": {
+        "header": [
+          "조건 위치 (students LEFT JOIN enrollment)",
+          "결과"
+        ],
+        "rows": [
+          [
+            "ON … AND e.course_id = 102",
+            "6행 (IoT캠프를 안 들은 학생은 score가 NULL)"
+          ],
+          [
+            "WHERE e.course_id = 102",
+            "3행 (IoT캠프 수강생만 남음)"
+          ]
+        ]
+      },
+      "tip": "외부조인에서 오른쪽 표 조건은 ON에! WHERE에 두면 NULL로 남긴 행이 사라져요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "ON",
+            "desc": "짝지을 오른쪽 행을 고르는 조건을 두는 곳(왼쪽 행은 그대로 남음)"
+          },
+          {
+            "term": "WHERE",
+            "desc": "조인이 끝난 뒤 결과 행을 거르는 곳이라 NULL 행도 지워질 수 있음"
+          },
+          {
+            "term": "IS NULL",
+            "desc": "짝이 없어 비어 있는 칸인지 확인하는 조건"
+          }
+        ],
+        "distractor": "ORDER BY"
+      }
+    }
+  ],
+  "quiz": [
+    {
+      "id": "U07-c1",
+      "question": "표 A의 id가 1, 2, 3이고 표 B의 id가 2, 3, 3, 4예요. SELECT * FROM A INNER JOIN B ON A.id = B.id; 의 결과는 몇 행일까요?",
+      "options": [
+        "2행",
+        "3행",
+        "4행",
+        "12행"
+      ],
+      "answer": 1,
+      "explanation": "A의 2는 B의 2와 1번, A의 3은 B의 3 두 개와 각각 짝지어 1 + 2 = 3행이에요. 짝이 없는 A의 1과 B의 4는 빠져요.",
+      "tag": "INNER JOIN"
+    },
+    {
+      "id": "U07-c2",
+      "question": "departments의 dept_id는 10, 20, 30, 40이고 students 6명의 dept_id는 10, 10, 20, 20, 30, 10이에요. departments d LEFT JOIN students s ON s.dept_id = d.dept_id 결과는 몇 행일까요?",
+      "options": [
+        "4행",
+        "6행",
+        "7행",
+        "24행"
+      ],
+      "answer": 2,
+      "explanation": "짝이 있는 6행에, 학생이 없는 40번 학과가 학생 열이 NULL인 1행으로 더해져 7행이에요.",
+      "tag": "LEFT JOIN"
+    },
+    {
+      "id": "U07-c3",
+      "question": "열 순서는 무시할 때, A RIGHT JOIN B ON A.id = B.id와 항상 같은 행을 돌려주는 것은?",
+      "options": [
+        "B LEFT JOIN A ON A.id = B.id",
+        "A LEFT JOIN B ON A.id = B.id",
+        "A FULL OUTER JOIN B ON A.id = B.id",
+        "A INNER JOIN B ON A.id = B.id"
+      ],
+      "answer": 0,
+      "explanation": "RIGHT JOIN은 오른쪽 표 B의 행을 모두 남겨요. 표 순서를 바꿔 B를 왼쪽에 두고 LEFT JOIN하면 같은 행이 나와요.",
+      "tag": "RIGHT JOIN"
+    },
+    {
+      "id": "U07-c4",
+      "question": "표 A의 id가 1, 2, 3이고 표 B의 id가 3, 4예요. A FULL OUTER JOIN B ON A.id = B.id의 결과는 몇 행일까요?",
+      "options": [
+        "1행",
+        "2행",
+        "3행",
+        "4행"
+      ],
+      "answer": 3,
+      "explanation": "짝이 있는 (3, 3) 1행 + A에만 있는 1, 2 두 행 + B에만 있는 4 한 행 = 4행이에요. 1행은 INNER, 3행은 LEFT, 2행은 RIGHT 결과예요.",
+      "tag": "FULL OUTER JOIN"
+    },
+    {
+      "id": "U07-c5",
+      "question": "표 A가 5행, 표 B가 4행일 때 SELECT * FROM A, B; 처럼 WHERE 연결 조건 없이 조회했어요. 결과 행 수와 이런 결과를 부르는 이름으로 옳은 것은?",
+      "options": [
+        "9행 — 카티션 곱",
+        "20행 — 자연 조인",
+        "5행 — 외부조인",
+        "20행 — 카티션 곱"
+      ],
+      "answer": 3,
+      "explanation": "연결 조건이 없으면 모든 조합이 만들어져 5 × 4 = 20행이에요. 이를 카티션 곱이라 하고 CROSS JOIN 결과와 같아요.",
+      "tag": "CROSS JOIN"
+    },
+    {
+      "id": "U07-c6",
+      "question": "students(student_id, student_name, dept_id)와 departments(dept_id, dept_name)를 dept_id로 연결할 때, 문법이 옳은 FROM 절은?",
+      "options": [
+        "FROM students JOIN departments USING (dept_id)",
+        "FROM students JOIN departments USING (s.dept_id)",
+        "FROM students JOIN departments ON (dept_id)",
+        "FROM students JOIN departments USING dept_id = dept_id"
+      ],
+      "answer": 0,
+      "explanation": "USING은 이름이 같은 열을 괄호 안에 열 이름만 적어요. 별칭을 붙이거나 비교식을 쓰면 안 되고, 비교식은 ON에 s.dept_id = d.dept_id처럼 써요.",
+      "tag": "ON/USING"
+    },
+    {
+      "id": "U07-c7",
+      "question": "표 A(id, name, dept_id)와 표 B(dept_id, name)를 A NATURAL JOIN B로 조인하면, 두 행이 짝이 되는 조건은?",
+      "options": [
+        "dept_id만 같으면 된다",
+        "dept_id와 name이 모두 같아야 한다",
+        "name만 같으면 된다",
+        "조건 없이 모든 행이 짝이 된다"
+      ],
+      "answer": 1,
+      "explanation": "NATURAL JOIN은 이름이 같은 모든 열(dept_id, name)을 자동으로 연결 조건에 넣어요. 의도하지 않은 열이 섞일 수 있어 주의해요.",
+      "tag": "자연 조인"
+    },
+    {
+      "id": "U07-c8",
+      "question": "한 학생은 여러 강좌를 듣고, 한 강좌는 여러 학생이 들어요. 이 관계를 표로 저장하는 가장 알맞은 방법은?",
+      "options": [
+        "students에 course_id1, course_id2 열을 계속 추가한다",
+        "courses에 student_id 열 하나를 추가한다",
+        "student_id와 course_id를 함께 담는 중간 테이블(enrollment)을 만든다",
+        "students와 courses를 CROSS JOIN한 결과를 저장한다"
+      ],
+      "answer": 2,
+      "explanation": "다대다(M:N) 관계는 두 키를 함께 담는 중간 테이블로 1:N 관계 두 개로 풀어요. 수강 기록 하나가 한 행이 돼요.",
+      "tag": "다대다 중간 테이블"
+    },
+    {
+      "id": "U07-c9",
+      "question": "departments, students, enrollment, courses 4개 표를 INNER JOIN으로 빠짐없이 연결하려면 조인 조건은 최소 몇 개가 필요할까요?",
+      "options": [
+        "2개",
+        "3개",
+        "4개",
+        "6개"
+      ],
+      "answer": 1,
+      "explanation": "표 N개를 사슬처럼 이으려면 최소 N-1개의 연결 조건이 필요해요. 표가 4개면 3개예요.",
+      "tag": "다중 테이블"
+    },
+    {
+      "id": "U07-c10",
+      "question": "모든 학과를 남기고 3학년 학생만 붙이려 해요. FROM departments d LEFT JOIN students s ON s.dept_id = d.dept_id 바로 뒤에 이어 쓸 것으로 알맞은 것은?",
+      "options": [
+        "WHERE s.grade = 3",
+        "WHERE s.grade IS NULL",
+        "WHERE d.dept_id = 3",
+        "AND s.grade = 3"
+      ],
+      "answer": 3,
+      "explanation": "오른쪽 표 조건을 ON에 AND로 붙여야 3학년이 없는 학과도 NULL과 함께 남아요. WHERE에 두면 NULL 행이 지워져 INNER JOIN처럼 돼요.",
+      "tag": "외부조인 조건 위치"
+    }
+  ],
+  "practice": [
+    {
+      "id": "U07-p1",
+      "title": "INNER JOIN으로 학생과 학과 잇기",
+      "goal": "같은 dept_id를 가진 학생 행과 학과 행이 한 줄로 이어지는 모습을 확인해요.",
+      "dataset": "school",
+      "sql": "SELECT s.student_name, s.dept_id, d.dept_name\nFROM students s\nINNER JOIN departments d ON s.dept_id = d.dept_id\nORDER BY s.student_id;",
+      "run": true,
+      "steps": [
+        "FROM students s: 학생 표에 별칭 s를, 학과 표에 별칭 d를 붙여 s.dept_id와 d.dept_id를 구분해요.",
+        "ON s.dept_id = d.dept_id: 학생 행마다 dept_id 값이 같은 학과 행을 찾아 짝지어요.",
+        "INNER JOIN이라 짝이 있는 6행만 나와요. AI컴퓨터처럼 학생이 여럿인 학과는 학생 수만큼 반복돼요.",
+        "같은 결과를 JOIN departments USING (dept_id)나 NATURAL JOIN으로도 얻을 수 있어요. 단 Oracle에서는 SELECT의 s.dept_id를 접두어 없이 dept_id로 써야 해요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "INNER JOIN",
+            "desc": "양쪽에 짝이 있는 행만 결과에 남기는 연결 방식"
+          },
+          {
+            "term": "ON s.dept_id = d.dept_id",
+            "desc": "학생과 학과를 같은 학과 번호로 잇는 연결 조건"
+          },
+          {
+            "term": "students s",
+            "desc": "학생 표에 짧은 별칭을 붙인 부분"
+          }
+        ],
+        "distractor": "ORDER BY s.student_id"
+      }
+    },
+    {
+      "id": "U07-p2",
+      "title": "조인 종류별 결과 행 수 비교",
+      "goal": "같은 두 표를 INNER·LEFT·RIGHT·FULL·CROSS로 조인해 남는 행 수가 어떻게 다른지 비교해요.",
+      "dataset": "school",
+      "sql": "SELECT 'INNER' AS 조인, COUNT(*) AS 행수 FROM departments d INNER JOIN students s ON s.dept_id = d.dept_id\nUNION ALL SELECT 'LEFT', COUNT(*) FROM departments d LEFT JOIN students s ON s.dept_id = d.dept_id\nUNION ALL SELECT 'RIGHT', COUNT(*) FROM departments d RIGHT JOIN students s ON s.dept_id = d.dept_id\nUNION ALL SELECT 'FULL', COUNT(*) FROM departments d FULL OUTER JOIN students s ON s.dept_id = d.dept_id\nUNION ALL SELECT 'CROSS', COUNT(*) FROM departments d CROSS JOIN students s;",
+      "run": true,
+      "steps": [
+        "각 줄은 departments(4행)와 students(6행)를 다른 조인으로 잇고 COUNT(*)로 행 수만 세요. UNION ALL은 다섯 결과를 아래로 이어 붙여요(8단원).",
+        "INNER 6: 짝 있는 학생-학과 쌍만 남아요. LEFT 7: 학생이 없는 전기에너지(40)가 학생 열 NULL로 1행 더해져요.",
+        "RIGHT 6: 오른쪽 학생은 모두 학과가 있어 INNER와 같아요. FULL 7: 양쪽 짝 없는 행을 모두 남겨 여기서는 LEFT와 같아요.",
+        "CROSS 24: 조건 없이 4 × 6 모든 조합이에요. RIGHT·FULL JOIN은 SQLite 3.39부터 실행되고, 이 앱은 3.49라 실제로 실행돼요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "LEFT JOIN",
+            "desc": "왼쪽 학과 쪽만 모두 남기고 오른쪽 빈칸은 NULL로 채우는 연결"
+          },
+          {
+            "term": "FULL OUTER JOIN",
+            "desc": "양쪽 표에서 짝 없는 행을 모두 남기는 연결"
+          },
+          {
+            "term": "CROSS JOIN",
+            "desc": "조건 없이 4×6 모든 조합을 만드는 연결"
+          }
+        ],
+        "distractor": "INNER JOIN"
+      }
+    },
+    {
+      "id": "U07-p3",
+      "title": "중간 테이블을 거쳐 네 표 잇기",
+      "goal": "enrollment를 가운데 두고 학생·강좌·학과를 이어 SQL캠프 수강생의 학과를 찾아요.",
+      "dataset": "school",
+      "sql": "SELECT s.student_name, d.dept_name, c.course_name\nFROM enrollment e\nJOIN students s ON s.student_id = e.student_id\nJOIN courses c ON c.course_id = e.course_id\nJOIN departments d ON d.dept_id = s.dept_id\nWHERE c.course_name = 'SQL캠프'\nORDER BY s.student_id;",
+      "run": true,
+      "steps": [
+        "FROM enrollment e: 학생과 강좌의 다대다 관계를 담은 중간 테이블에서 출발해요.",
+        "JOIN … ON을 세 번 이어 써요. 표가 4개라 연결 조건이 3개(N-1개) 필요해요.",
+        "WHERE로 SQL캠프 수강 행만 남겨요. 수강 행 하나가 결과 한 행이 돼서 3행이 나와요.",
+        "가온·나래가 모두 AI컴퓨터라 학과명이 두 번 보여요. 오류가 아니라 수강 행마다 학과가 짝지어진 결과예요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "FROM enrollment e",
+            "desc": "학생과 강좌를 잇는 중간 표에서 출발하는 부분"
+          },
+          {
+            "term": "ON d.dept_id = s.dept_id",
+            "desc": "학생의 학과 번호로 학과 표를 붙이는 연결 조건"
+          },
+          {
+            "term": "WHERE c.course_name = 'SQL캠프'",
+            "desc": "조인이 끝난 행 중 특정 강좌 수강 행만 거르는 조건"
+          }
+        ],
+        "distractor": "ON c.course_id = e.course_id"
+      }
+    },
+    {
+      "id": "U07-p4",
+      "title": "LEFT JOIN 조건을 ON에 두기",
+      "goal": "모든 학생을 남긴 채 IoT캠프(102) 점수만 붙이려면 조건을 어디에 둬야 하는지 확인해요.",
+      "dataset": "school",
+      "sql": "SELECT s.student_id, s.student_name, e.score\nFROM students s\nLEFT JOIN enrollment e\n  ON s.student_id = e.student_id AND e.course_id = 102\nORDER BY s.student_id;",
+      "run": true,
+      "steps": [
+        "LEFT JOIN이라 students 6명은 짝이 없어도 모두 남아요.",
+        "ON 안의 AND e.course_id = 102는 IoT캠프 수강 행하고만 짝짓게 해요.",
+        "IoT캠프를 듣지 않은 나래·라온·마루는 score가 NULL로 남아 결과는 6행이에요.",
+        "같은 조건을 WHERE e.course_id = 102로 옮기면 NULL 행이 걸러져 가온·다온·바다 3행만 남아요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "LEFT JOIN",
+            "desc": "짝 없는 학생도 지우지 않고 모두 남기는 연결"
+          },
+          {
+            "term": "ON s.student_id = e.student_id",
+            "desc": "학생과 수강 행을 학번으로 잇는 기본 연결 조건"
+          },
+          {
+            "term": "AND e.course_id = 102",
+            "desc": "짝지을 수강 행만 한 강좌로 좁히고 학생은 모두 남기는 조건"
+          }
+        ],
+        "distractor": "WHERE e.course_id = 102"
+      }
+    }
+  ]
+}

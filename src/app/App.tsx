@@ -16,6 +16,8 @@ import { LAST_SUBJECT_KEY, SubjectHome, subjectOfPath } from './SubjectHome';
 import { writeRaw } from '../lib/storage';
 // 컴퓨터 일반은 문제은행이 커서 들어갈 때만 내려받는다
 const ComputerRoutes = lazy(() => import('../features/computer/ComputerApp'));
+// 데이터베이스 단원 단계 콘텐츠(이론 카드·개념 점검·실습 예제)도 단계 화면을 열 때만 내려받는다
+const StagePage = lazy(() => import('../features/learning/stages').then((m) => ({ default: m.StagePage })));
 
 function SaveStatus() {
   const L = useLearner();
@@ -286,6 +288,7 @@ export function App() {
           <Route element={<LearningLayout />}>
             <Route path="/learn/:unitId" element={<UnitPage />} />
             <Route path="/learn/:unitId/checkpoint" element={<CheckpointPage />} />
+            <Route path="/learn/:unitId/stage/:stage" element={<Suspense fallback={<div className="page" role="status">불러오는 중…</div>}><StagePage /></Suspense>} />
             <Route path="/learn/:unitId/:activityId" element={<ActivityPage />} />
             <Route path="/challenge/:challengeId" element={<ChallengePage />} />
             <Route path="/final" element={<FinalPage />} />

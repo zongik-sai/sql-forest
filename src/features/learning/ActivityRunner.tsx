@@ -10,6 +10,7 @@ import { ClassifyTask, ErdTask, NormalizeTask, PredictResultTask, RowFilterTask 
 import { GroupTask, HierarchyTask, JoinTask, PivotTask, TransactionTask, WindowTask } from './tasks/DataTasks';
 import { SqlBlocksTask, SqlEditorTask } from './tasks/SqlTask';
 import type { TaskProps, TaskResult } from './tasks/types';
+import { DataPanel } from '../../components/DataPanel';
 
 function TaskView(p: TaskProps) {
   const c = p.config;
@@ -166,6 +167,7 @@ export function ActivityRunner({ activity, challenge = false, onNext, nextLabel 
           <h1 id={`t-${activity.id}`} style={{ fontSize: '1.4rem' }}>{activity.title}</h1>
           <p className="task-prompt">{activity.prompt}</p>
         </div>
+        <DataPanel dataset={activity.datasetId} />
 
         {activity.prediction && (() => {
           const p = activity.prediction;

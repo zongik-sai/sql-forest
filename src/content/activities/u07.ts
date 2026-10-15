@@ -14,7 +14,7 @@ export const U07 = [
     mode: 'executable', datasetId: 'school',
     prompt: '왼쪽 학생을 고른 뒤, 같은 dept_id를 가진 오른쪽 학과를 눌러 모든 짝을 연결하세요.',
     prediction: {
-      prompt: '전기에너지(40) 학과는 INNER JOIN 결과에 나올까요?',
+      prompt: 'students와 departments를 dept_id로 INNER JOIN하면 전기에너지(40) 학과는 결과에 나올까요?',
       options: ['나온다', '나오지 않는다 — 짝이 되는 학생이 없어서'],
       correctIndex: 1,
       reveal: '40번 학과 학생이 없어 짝이 없으므로 INNER JOIN 결과에서 빠져요.',
@@ -52,9 +52,9 @@ export const U07 = [
       { term: 'CROSS JOIN', meaning: '두 표 행의 모든 조합(곱)' },
     ],
     mode: 'executable', datasetId: 'school',
-    prompt: '학생을 수강 행과 LEFT JOIN으로 연결하세요. 짝이 없는 학생은 "NULL로 남기기"를 누르세요.',
+    prompt: '왼쪽 학생을 고른 뒤 같은 student_id를 가진 오른쪽 수강(enrollment) 행을 눌러 LEFT JOIN의 짝을 모두 연결하세요. 수강 행이 없는 학생은 고른 뒤 "선택한 행을 NULL로 남기기"를 누르세요.',
     prediction: {
-      prompt: 'students LEFT JOIN enrollment 결과는 몇 행일까요?',
+      prompt: 'students를 왼쪽에 두고 enrollment와 student_id로 LEFT JOIN하면 결과는 몇 행일까요?',
       options: ['6행', '8행', '36행'],
       correctIndex: 1,
       reveal: '수강 6행 + 수강 없는 학생(라온, 마루) 2행 = 8행이에요.',
@@ -95,9 +95,9 @@ export const U07 = [
       { term: '중간 테이블', meaning: 'M:N을 1:N 두 개로 풀어 주는 표. 예: enrollment' },
     ],
     mode: 'executable', datasetId: 'school',
-    prompt: '두 SQL을 실행해 결과 행 수를 확인하고, 학과명이 반복되는 이유를 고르세요.',
+    prompt: '두 SQL을 실행해 결과 행 수를 확인한 뒤, 두 번째 SQL(학과명만 조회)에서 \'AI컴퓨터\'가 몇 번 나오는지 고르세요.',
     prediction: {
-      prompt: '학생-수강-강좌 세 표를 조인한 첫 번째 SQL의 결과는 몇 행일까요?',
+      prompt: 'students·enrollment·courses 세 표를 키로 조인해 수강 기록마다 학생 이름과 강좌 이름을 보면 결과는 몇 행일까요?',
       options: ['3행', '6행', '18행'],
       correctIndex: 1,
       reveal: '수강 행 하나가 학생 하나, 강좌 하나와 짝지어지므로 수강 행 수(6)만큼 나와요.',
@@ -116,7 +116,7 @@ export const U07 = [
       sql: 'SELECT s.student_name, c.course_name\nFROM students s\nJOIN enrollment e ON s.student_id = e.student_id\nJOIN courses c ON c.course_id = e.course_id\nORDER BY s.student_id, c.course_id;',
       compareSql: [{ label: '학과명만 조회', sql: 'SELECT d.dept_name\nFROM departments d\nJOIN students s ON s.dept_id = d.dept_id\nJOIN enrollment e ON e.student_id = s.student_id;' }],
       check: {
-        prompt: "두 번째 SQL에서 'AI컴퓨터'는 몇 번 나올까요?",
+        prompt: "두 번째 SQL(학과명만 조회) 결과에서 'AI컴퓨터'는 몇 번 나올까요?",
         options: ['1번', '3번', '4번'],
         correctIndex: 2,
         reveal: '가온 2개 + 나래 1개 + 바다 1개 = 수강 행 4개와 연결돼 4번 나와요.',
@@ -131,9 +131,9 @@ export const U07 = [
     explanation: 'LEFT JOIN에서 ON 조건은 "어떤 행과 짝지을지"를 정하고, WHERE는 조인이 끝난 결과에서 행을 걸러요. 오른쪽 표 조건을 WHERE에 쓰면 NULL로 남긴 행이 걸러져 사실상 INNER JOIN이 돼요.',
     glossary: [{ term: '외부조인 조건 위치', meaning: '오른쪽 표 조건은 ON에 두어야 짝 없는 왼쪽 행이 남아요' }],
     mode: 'executable', datasetId: 'school',
-    prompt: '모든 학생을 남기고 SQL캠프(101) 점수만 붙이세요. SQL캠프를 듣지 않은 학생도 NULL로 남아야 해요(학번 순).',
+    prompt: '주어진 SQL을 고쳐 모든 학생을 남기고 SQL캠프(101) 점수만 붙이세요. SQL캠프를 듣지 않은 학생도 score가 NULL로 남아야 해요(학번 순).',
     prediction: {
-      prompt: '지금 SQL(WHERE e.course_id = 101)의 결과는 몇 행일까요?',
+      prompt: 'students s LEFT JOIN enrollment e ON s.student_id = e.student_id 뒤에 WHERE e.course_id = 101을 붙인 주어진 SQL은 몇 행을 돌려줄까요?',
       options: ['3행', '6행', '8행'],
       correctIndex: 0,
       reveal: 'WHERE가 course_id가 NULL이거나 101이 아닌 행을 걸러 SQL캠프 수강생 3명만 남아요.',

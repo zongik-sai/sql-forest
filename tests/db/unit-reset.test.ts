@@ -39,8 +39,10 @@ beforeAll(async () => {
   await db.exec(readFileSync('tests/db/supabase-shim.sql', 'utf8'));
   await db.exec(readFileSync('supabase/migrations/20261001000000_sql_forest_v2.sql', 'utf8'));
   const m = readFileSync('supabase/migrations/20261015000000_unit_reset.sql', 'utf8');
+  const m2 = readFileSync('supabase/migrations/20261016000000_unit_reset_stages.sql', 'utf8');
   await db.exec(m);
-  await db.exec(m); // 다시 적용해도 안전(멱등)
+  await db.exec(m2);
+  await db.exec(m2); // 다시 적용해도 안전(멱등)
   await db.query(`insert into auth.users(id, email) values ($1, 'a@example.com'), ($2, 'b@example.com')`, [A, B]);
   await completeUnit(A, 'U01');
   await completeUnit(A, 'U02');
@@ -51,6 +53,7 @@ beforeAll(async () => {
     questions: { 'U01-Q01': { correct: true }, 'U01-Q01V': {}, 'U02-Q01': { correct: true } },
     challenges: { 'CH-U01': { status: 'solved' }, 'CH-U02': { status: 'solved' } },
     celebratedUnits: ['U01', 'U02'], unitLocks: { U01: ['a', 'b', 'c', 'd'] }, wrongLog: [{ itemId: 'U01-Q01' }],
+    stages: { U01: { s1: { passedAt: 'x' } }, U02: { s1: { passedAt: 'x' } } }, stageItems: { 'U01-t1': 'x', 'U01-p2': 'x', 'U02-t1': 'x', 'U10-t1': 'x' },
   };
   await as(A, (tx) => tx.query('select public.save_learner_state($1::jsonb)', [JSON.stringify(st)]));
 }, 60000);
@@ -79,6 +82,8 @@ describe('reset_db_unit: 단원 초기화(본인·그 단원만)', () => {
     expect(st.unitLocks).toEqual({});
     expect((st.unitResets as Record<string, { n: number }>).U01.n).toBe(1);
     expect(st.wrongLog).toHaveLength(1);
+    expect(Object.keys(st.stages as object)).toEqual(['U02']);
+    expect(Object.keys(st.stageItems as object).sort()).toEqual(['U02-t1', 'U10-t1']);
   });
   it('이미 초기화를 아는 스냅샷은 건드리지 않는다(초기화 뒤 새로 한 공부 보존)', async () => {
     const at = '2026-10-15T01:00:00.000Z';

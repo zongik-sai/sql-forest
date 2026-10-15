@@ -1,0 +1,364 @@
+{
+  "unit": "U11",
+  "cards": [
+    {
+      "id": "U11-t1",
+      "title": "DML: 행을 넣고·바꾸고·지우기",
+      "points": [
+        "DML(데이터 조작어)은 표 안의 행을 넣고, 바꾸고, 지우는 명령이에요. 표의 모양(열)은 그대로 두고 내용만 바꿔요.",
+        "INSERT INTO 표(열, …) VALUES (값, …)는 새 행을 넣어요. 예: 마루의 SQL캠프 신청을 camp_signup에 한 줄 추가해요.",
+        "UPDATE 표 SET 열 = 값 WHERE 조건은 조건에 맞는 행의 값만 바꿔요. 예: status가 '신청'인 행을 '확정'으로 바꿔요.",
+        "DELETE FROM 표 WHERE 조건은 조건에 맞는 행을 지워요. 명령이 실제로 바꾼 행의 개수를 영향 행 수라고 해요."
+      ],
+      "table": {
+        "header": ["명령", "하는 일", "예(camp_signup)"],
+        "rows": [
+          ["INSERT", "새 행 추가", "마루의 신청 1행 넣기"],
+          ["UPDATE", "있는 행의 값 바꾸기", "'신청' → '확정'"],
+          ["DELETE", "행 지우기", "'취소'인 행 지우기"]
+        ]
+      },
+      "tip": "UPDATE·DELETE에서 WHERE를 빼면 모든 행이 바뀌거나 지워져요. 먼저 SELECT로 대상 행을 확인해요.",
+      "match": {
+        "pairs": [
+          { "term": "UPDATE", "desc": "이미 있는 행의 값을 새 값으로 바꾸는 명령" },
+          { "term": "DELETE", "desc": "조건에 맞는 행을 표에서 없애는 명령" },
+          { "term": "영향 행 수", "desc": "DML 명령이 실제로 바꾼 행의 개수" }
+        ],
+        "distractor": "INSERT"
+      }
+    },
+    {
+      "id": "U11-t2",
+      "title": "MERGE: 있으면 바꾸고 없으면 넣기",
+      "points": [
+        "MERGE는 대상 표와 원본 자료를 비교해, 짝이 있으면 UPDATE하고 없으면 INSERT하는 DML이에요.",
+        "예: 새 신청 명단을 camp_signup에 합칠 때, 이미 있는 학생·캠프는 상태만 바꾸고 처음 보는 신청은 새 행으로 넣어요.",
+        "형식: MERGE INTO 대상 USING 원본 ON (비교 조건) WHEN MATCHED THEN UPDATE … WHEN NOT MATCHED THEN INSERT …",
+        "Oracle·SQL Server 등에서 쓰는 문법이에요. SQLite에는 MERGE가 없어 INSERT … ON CONFLICT DO UPDATE로 비슷한 일을 해요."
+      ],
+      "table": {
+        "header": ["원본 행", "대상에 같은 학생·캠프?", "MERGE 동작"],
+        "rows": [
+          ["나래·SQL캠프", "있음", "UPDATE(상태 변경)"],
+          ["라온·AI캠프", "없음", "INSERT(새 행)"]
+        ]
+      },
+      "tip": "MATCHED(짝 있음) → UPDATE, NOT MATCHED(짝 없음) → INSERT로 기억해요.",
+      "match": {
+        "pairs": [
+          { "term": "USING", "desc": "대상과 비교할 원본 자료를 지정하는 부분" },
+          { "term": "WHEN MATCHED", "desc": "비교 조건에 맞는 행이 대상에 있을 때 실행할 부분" },
+          { "term": "WHEN NOT MATCHED", "desc": "비교 조건에 맞는 행이 대상에 없을 때 실행할 부분" }
+        ],
+        "distractor": "INTO"
+      }
+    },
+    {
+      "id": "U11-t3",
+      "title": "트랜잭션: COMMIT·ROLLBACK·SAVEPOINT",
+      "points": [
+        "트랜잭션은 함께 성공하거나 함께 취소돼야 하는 작업 묶음이에요. 예: 캠프 신청 추가와 남은 자리 줄이기는 한 묶음이에요.",
+        "COMMIT은 지금까지의 변경을 확정하고, ROLLBACK은 확정 전의 변경을 모두 취소해요. 둘 다 트랜잭션을 끝내요.",
+        "SAVEPOINT 이름은 중간 저장점을 만들고, ROLLBACK TO 이름은 그 저장점 뒤의 변경만 취소해요. 트랜잭션은 계속 열려 있어요.",
+        "이런 명령을 TCL이라고 해요. Oracle은 첫 DML에서 트랜잭션이 저절로 시작되고, SQLite는 BEGIN으로 시작해요."
+      ],
+      "table": {
+        "header": ["순서", "실행한 명령", "ROLLBACK TO sp1 뒤"],
+        "rows": [
+          ["1", "UPDATE(다온 확정)", "남음"],
+          ["2", "SAVEPOINT sp1", "저장점"],
+          ["3", "DELETE(나래 행 삭제)", "취소됨"]
+        ]
+      },
+      "tip": "ROLLBACK은 전부 취소, ROLLBACK TO는 저장점 뒤만 취소! 그 뒤에도 COMMIT해야 확정돼요.",
+      "match": {
+        "pairs": [
+          { "term": "COMMIT", "desc": "지금까지의 변경을 확정하고 트랜잭션을 끝내는 명령" },
+          { "term": "SAVEPOINT", "desc": "트랜잭션 중간에 만들어 두는 되돌아갈 지점" },
+          { "term": "ROLLBACK TO", "desc": "저장점 뒤의 변경만 골라 취소하는 명령" }
+        ],
+        "distractor": "ROLLBACK"
+      }
+    },
+    {
+      "id": "U11-t4",
+      "title": "ACID: 트랜잭션의 네 가지 성질",
+      "points": [
+        "원자성(Atomicity): 묶음 안의 작업은 모두 반영되거나 하나도 반영되지 않아요. 예: 신청만 추가되고 자리 줄이기가 빠지면 안 돼요.",
+        "일관성(Consistency): 트랜잭션 전후에 데이터가 규칙을 지켜요. 예: status는 언제나 신청·확정·취소 중 하나예요.",
+        "고립성(Isolation, 격리성): 동시에 실행되는 트랜잭션은 서로의 중간 결과에 끼어들지 않아요. 예: 내가 확정하기 전의 변경을 친구가 보지 못해요.",
+        "지속성(Durability): COMMIT된 결과는 장애가 나도 사라지지 않아요. 예: 확정된 신청은 서버를 다시 켜도 남아요."
+      ],
+      "tip": "ACID = 원자성·일관성·고립성·지속성. '전부 아니면 전무'는 원자성이에요.",
+      "match": {
+        "pairs": [
+          { "term": "원자성", "desc": "작업이 모두 반영되거나 하나도 반영되지 않는 성질" },
+          { "term": "고립성", "desc": "동시에 도는 트랜잭션끼리 중간 결과에 간섭하지 않는 성질" },
+          { "term": "지속성", "desc": "확정된 결과가 장애 뒤에도 그대로 남는 성질" }
+        ],
+        "distractor": "일관성"
+      }
+    },
+    {
+      "id": "U11-t5",
+      "title": "DDL과 제약조건",
+      "points": [
+        "DDL(데이터 정의어)은 표의 구조를 다루는 명령이에요. CREATE는 만들기, ALTER는 바꾸기(열 추가 등), DROP은 없애기예요.",
+        "제약조건은 잘못된 값이 들어오지 않게 막는 규칙이에요. 규칙을 어기는 INSERT·UPDATE는 오류가 나고 반영되지 않아요.",
+        "PRIMARY KEY는 중복·NULL이 없는 대표 열, UNIQUE는 중복 금지, NOT NULL은 빈 값 금지예요. DEFAULT는 값을 안 넣을 때의 기본값이에요.",
+        "FOREIGN KEY는 다른 표에 있는 값만 허용하고(students에 없는 학생 번호 불가), CHECK는 조건에 맞는 값만 허용해요.",
+        "Oracle은 DDL을 실행하면 그 전의 변경까지 자동으로 COMMIT해요. SQL Server·SQLite는 트랜잭션 안의 DDL도 되돌릴 수 있어요."
+      ],
+      "table": {
+        "header": ["camp_signup 열", "제약조건", "막히는 값 예"],
+        "rows": [
+          ["signup_id", "PRIMARY KEY", "이미 있는 번호"],
+          ["student_id", "FOREIGN KEY", "students에 없는 9"],
+          ["status", "CHECK(신청/확정/취소)", "'대기'"],
+          ["student_id+camp_name", "UNIQUE", "같은 학생의 같은 캠프 두 번"]
+        ]
+      },
+      "tip": "제약조건 오류가 나면 메시지에서 어떤 규칙(FOREIGN KEY, CHECK 등)을 어겼는지 먼저 읽어요.",
+      "match": {
+        "pairs": [
+          { "term": "PRIMARY KEY", "desc": "중복도 NULL도 없이 행 하나하나를 구별하는 열 규칙" },
+          { "term": "FOREIGN KEY", "desc": "다른 표에 실제로 있는 값만 넣게 하는 규칙" },
+          { "term": "CHECK", "desc": "status IN (…)처럼 직접 적어 둔 조건에 맞는 값만 허용하는 규칙" }
+        ],
+        "distractor": "UNIQUE"
+      }
+    },
+    {
+      "id": "U11-t6",
+      "title": "DCL: GRANT·REVOKE와 명령 네 갈래",
+      "points": [
+        "DCL(데이터 제어어)은 누가 어떤 표에 무엇을 할 수 있는지, 권한을 주고 빼앗는 명령이에요.",
+        "GRANT 권한 ON 표 TO 사용자는 권한을 줘요. 예: GRANT SELECT ON camp_signup TO teacher는 선생님에게 조회 권한을 줘요.",
+        "REVOKE 권한 ON 표 FROM 사용자는 준 권한을 회수해요. 주기는 TO, 회수는 FROM을 써요.",
+        "ROLE(역할)은 여러 권한을 묶은 꾸러미예요. 역할에 권한을 모아 사용자에게 주면 관리가 쉬워요. SQLite에는 권한 기능이 없어요."
+      ],
+      "table": {
+        "header": ["분류", "다루는 것", "대표 명령"],
+        "rows": [
+          ["DDL", "표 구조", "CREATE, ALTER, DROP, TRUNCATE"],
+          ["DML", "표 안의 데이터", "INSERT, UPDATE, DELETE, MERGE"],
+          ["TCL", "트랜잭션", "COMMIT, ROLLBACK, SAVEPOINT"],
+          ["DCL", "권한", "GRANT, REVOKE"]
+        ]
+      },
+      "tip": "구조는 DDL, 데이터는 DML, 확정·취소는 TCL, 권한은 DCL!",
+      "match": {
+        "pairs": [
+          { "term": "GRANT", "desc": "사용자에게 표를 다룰 권한을 주는 명령" },
+          { "term": "REVOKE", "desc": "이미 준 권한을 다시 거두어들이는 명령" },
+          { "term": "ROLE", "desc": "여러 권한을 하나로 묶어 둔 꾸러미" }
+        ],
+        "distractor": "COMMIT"
+      }
+    },
+    {
+      "id": "U11-t7",
+      "title": "DELETE·TRUNCATE·DROP 비교",
+      "points": [
+        "셋 다 무언가를 지우지만 범위가 달라요. DELETE는 고른 행, TRUNCATE는 모든 행, DROP은 표 자체를 지워요.",
+        "DELETE는 DML이라 WHERE로 일부 행만 지울 수 있고, COMMIT 전이면 ROLLBACK으로 되돌릴 수 있어요.",
+        "TRUNCATE는 표 구조는 남기고 모든 행을 한 번에 비우는 DDL이에요. WHERE를 쓸 수 없고 Oracle에서는 되돌릴 수 없어요.",
+        "DROP TABLE은 표의 구조와 데이터를 모두 없애요. 다시 쓰려면 CREATE TABLE부터 해야 해요.",
+        "SQLite에는 TRUNCATE가 없어서 WHERE 없는 DELETE FROM 표로 모든 행을 지워요."
+      ],
+      "table": {
+        "header": ["명령", "분류", "지우는 범위", "ROLLBACK(Oracle)"],
+        "rows": [
+          ["DELETE", "DML", "WHERE로 고른 행(없으면 전체)", "가능(COMMIT 전)"],
+          ["TRUNCATE", "DDL", "모든 행, 구조는 남음", "불가"],
+          ["DROP", "DDL", "표 구조+데이터", "불가"]
+        ]
+      },
+      "tip": "TRUNCATE는 행을 지우지만 DML이 아니라 DDL이에요. 시험 단골 함정!",
+      "match": {
+        "pairs": [
+          { "term": "DELETE", "desc": "WHERE로 일부 행만 골라 지울 수 있는 명령" },
+          { "term": "TRUNCATE", "desc": "구조는 남기고 모든 행을 한꺼번에 비우는 DDL" },
+          { "term": "DROP", "desc": "표의 구조와 데이터를 통째로 없애는 명령" }
+        ],
+        "distractor": "ALTER"
+      }
+    }
+  ],
+  "quiz": [
+    {
+      "id": "U11-c1",
+      "question": "camp_signup 표에 4행이 있고 status는 '확정' 1행, '신청' 2행, '취소' 1행이에요. UPDATE camp_signup SET status = '확정'; 을 실행하면 status가 '확정'인 행은 모두 몇 개가 될까요?",
+      "options": ["1개", "4개", "3개", "2개"],
+      "answer": 1,
+      "explanation": "WHERE가 없는 UPDATE는 표의 모든 행을 바꿔요. 그래서 4행 모두 '확정'이 돼요. 일부만 바꾸려면 WHERE 조건이 꼭 필요해요.",
+      "tag": "INSERT/UPDATE/DELETE/MERGE"
+    },
+    {
+      "id": "U11-c2",
+      "question": "MERGE INTO camp_signup t USING new_list s ON (t.student_id = s.student_id) WHEN MATCHED THEN UPDATE … WHEN NOT MATCHED THEN INSERT … 에서, new_list의 학생과 짝이 되는 행이 camp_signup에 없으면 어떻게 될까요?",
+      "options": ["오류가 나고 MERGE 전체가 멈춘다", "아무 일도 일어나지 않는다", "camp_signup의 모든 행이 지워진다", "WHEN NOT MATCHED 부분이 실행되어 새 행이 INSERT된다"],
+      "answer": 3,
+      "explanation": "ON 조건에 맞는 짝이 대상에 없으면 WHEN NOT MATCHED THEN INSERT가 실행돼 새 행이 들어가요. 짝이 있으면 WHEN MATCHED의 UPDATE가 실행돼요.",
+      "tag": "INSERT/UPDATE/DELETE/MERGE"
+    },
+    {
+      "id": "U11-c3",
+      "question": "Oracle에서 INSERT(라온 신청) → COMMIT → UPDATE(가온 취소) → ROLLBACK 순서로 실행했어요. 최종적으로 DB에 남는 변경은?",
+      "options": ["라온 신청만 남는다", "둘 다 남는다", "둘 다 사라진다", "가온 취소만 남는다"],
+      "answer": 0,
+      "explanation": "COMMIT으로 INSERT는 이미 확정됐어요. ROLLBACK은 마지막 COMMIT 뒤의 변경, 즉 UPDATE만 취소해요.",
+      "tag": "COMMIT/ROLLBACK/SAVEPOINT"
+    },
+    {
+      "id": "U11-c4",
+      "question": "BEGIN → INSERT A → SAVEPOINT sp1 → UPDATE B → SAVEPOINT sp2 → DELETE C → ROLLBACK TO sp1 → COMMIT 순서로 실행했어요. 최종 반영되는 변경은?",
+      "options": ["A, B, C 모두", "A와 B", "A만", "아무것도 반영되지 않는다"],
+      "answer": 2,
+      "explanation": "ROLLBACK TO sp1은 sp1 뒤의 B와 C를 모두 취소해요(sp2도 함께 사라져요). 남은 A만 COMMIT으로 확정돼요.",
+      "tag": "COMMIT/ROLLBACK/SAVEPOINT"
+    },
+    {
+      "id": "U11-c5",
+      "question": "캠프 신청을 추가하고 남은 자리를 1 줄이는 트랜잭션이 있어요. 신청 추가 직후 장애가 나자 DBMS가 신청 추가까지 취소했어요. 이처럼 묶음이 '모두 반영 또는 모두 취소'되도록 보장하는 ACID 성질은?",
+      "options": ["지속성(Durability)", "원자성(Atomicity)", "고립성(Isolation)", "일관성(Consistency)"],
+      "answer": 1,
+      "explanation": "트랜잭션의 작업이 모두 반영되거나 하나도 반영되지 않게 하는 성질이 원자성이에요. 그래서 반쪽 결과가 남지 않아요.",
+      "tag": "ACID"
+    },
+    {
+      "id": "U11-c6",
+      "question": "두 학생이 동시에 같은 캠프의 마지막 자리를 신청하고 있어요. 한 트랜잭션이 아직 확정하지 않은 중간 결과를 다른 트랜잭션이 보거나 끼어들지 못하게 하는 ACID 성질은?",
+      "options": ["고립성(Isolation)", "원자성(Atomicity)", "지속성(Durability)", "일관성(Consistency)"],
+      "answer": 0,
+      "explanation": "동시에 실행되는 트랜잭션이 서로의 중간 결과에 간섭하지 않게 하는 성질이 고립성(격리성)이에요.",
+      "tag": "ACID"
+    },
+    {
+      "id": "U11-c7",
+      "question": "camp_signup(student_id, camp_name, status)에서 student_id는 students(1~6번만 있음)를 참조하는 FOREIGN KEY이고, status는 CHECK(status IN ('신청','확정','취소'))예요. 오류 없이 들어가는 INSERT의 VALUES는?",
+      "options": ["(9, 'SQL캠프', '신청')", "(5, 'SQL캠프', '대기')", "(7, 'AI캠프', '취소')", "(5, 'AI캠프', '확정')"],
+      "answer": 3,
+      "explanation": "9와 7은 students에 없어 FOREIGN KEY를, '대기'는 CHECK를 어겨요. (5, 'AI캠프', '확정')만 두 규칙을 모두 지켜요.",
+      "tag": "DDL·제약조건"
+    },
+    {
+      "id": "U11-c8",
+      "question": "Oracle에서 INSERT를 실행한 뒤 COMMIT하지 않고 CREATE TABLE을 실행했어요. 그다음 ROLLBACK하면 앞의 INSERT는 어떻게 될까요?",
+      "options": ["INSERT만 취소된다", "INSERT와 CREATE TABLE이 모두 취소된다", "DDL을 실행할 때 자동 COMMIT되어 INSERT가 남는다", "CREATE TABLE만 취소되고 INSERT는 남는다"],
+      "answer": 2,
+      "explanation": "Oracle은 DDL을 실행하면 그 전의 변경까지 자동으로 COMMIT해요. 그래서 INSERT는 이미 확정돼 ROLLBACK으로 되돌릴 수 없고, 만든 표도 남아요. SQL Server·SQLite는 트랜잭션 안의 DDL도 되돌릴 수 있어요.",
+      "tag": "DDL·제약조건"
+    },
+    {
+      "id": "U11-c9",
+      "question": "선생님 계정 teacher에게 주었던 camp_signup 조회 권한을 회수하는 DCL 문장은?",
+      "options": ["GRANT SELECT ON camp_signup TO teacher", "REVOKE SELECT ON camp_signup FROM teacher", "REVOKE SELECT ON camp_signup TO teacher", "DELETE SELECT ON camp_signup FROM teacher"],
+      "answer": 1,
+      "explanation": "권한 회수는 REVOKE 권한 ON 객체 FROM 사용자 형식이에요. 주는 GRANT는 TO, 회수하는 REVOKE는 FROM을 써요.",
+      "tag": "DCL"
+    },
+    {
+      "id": "U11-c10",
+      "question": "camp_signup의 구조는 그대로 두고 모든 행을 지우되, 실수하면 COMMIT 전에 ROLLBACK으로 되돌릴 수 있어야 해요(Oracle 기준). 알맞은 명령은?",
+      "options": ["DELETE FROM camp_signup", "TRUNCATE TABLE camp_signup", "DROP TABLE camp_signup", "ALTER TABLE camp_signup"],
+      "answer": 0,
+      "explanation": "DELETE는 DML이라 COMMIT 전에 ROLLBACK할 수 있어요. TRUNCATE는 구조를 남기지만 Oracle에서 되돌릴 수 없고, DROP은 구조까지 없애요.",
+      "tag": "DELETE/TRUNCATE/DROP"
+    }
+  ],
+  "practice": [
+    {
+      "id": "U11-p1",
+      "title": "INSERT·UPDATE·DELETE로 신청 명단 바꾸기",
+      "goal": "INSERT·UPDATE·DELETE가 각각 어떤 행을 바꾸는지 마지막 SELECT 결과로 확인해요.",
+      "dataset": "sandbox",
+      "sql": "INSERT INTO camp_signup(student_id, camp_name, status) VALUES (5, 'AI캠프', '신청');\nUPDATE camp_signup SET status = '확정' WHERE student_id = 2;\nDELETE FROM camp_signup WHERE status = '취소';\nSELECT signup_id, student_id, camp_name, status FROM camp_signup ORDER BY signup_id;",
+      "run": true,
+      "steps": [
+        "INSERT가 마루(5)의 AI캠프 신청을 새 행으로 넣어요. signup_id를 비워 두면 SQLite가 다음 번호 5를 붙여요.",
+        "UPDATE는 WHERE student_id = 2에 맞는 나래의 행 1개만 '확정'으로 바꿔요(영향 행 수 1).",
+        "DELETE는 status가 '취소'인 바다의 행(signup_id 4)을 지워요.",
+        "마지막 SELECT 결과에 4행이 보여요. 4번 행이 사라지고 5번 행이 생겼으며, 나래는 '확정'이 됐어요."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "VALUES (5, 'AI캠프', '신청')", "desc": "새로 넣을 행의 값을 열 순서에 맞춰 적은 부분" },
+          { "term": "SET status = '확정'", "desc": "바꿀 열과 그 열에 넣을 새 값을 정하는 부분" },
+          { "term": "WHERE status = '취소'", "desc": "지울 행을 고르는 조건" }
+        ],
+        "distractor": "ORDER BY signup_id"
+      }
+    },
+    {
+      "id": "U11-p2",
+      "title": "SAVEPOINT로 일부 변경만 되돌리기",
+      "goal": "SAVEPOINT와 ROLLBACK TO로 저장점 뒤의 변경만 취소하고 나머지를 COMMIT해요.",
+      "dataset": "sandbox",
+      "sql": "BEGIN;\nUPDATE camp_signup SET status = '확정' WHERE student_id = 3;\nSAVEPOINT sp1;\nDELETE FROM camp_signup WHERE student_id = 2;\nROLLBACK TO sp1;\nCOMMIT;\nSELECT signup_id, student_id, camp_name, status FROM camp_signup ORDER BY signup_id;",
+      "run": true,
+      "steps": [
+        "BEGIN으로 트랜잭션을 시작하고, 다온(3)의 신청을 '확정'으로 바꿔요.",
+        "SAVEPOINT sp1로 저장점을 만든 뒤 나래(2)의 행을 DELETE해요.",
+        "ROLLBACK TO sp1은 저장점 뒤의 DELETE만 취소해요. 다온의 UPDATE는 남고 트랜잭션도 아직 열려 있어요.",
+        "COMMIT으로 남은 변경을 확정해요. SELECT 결과에서 나래의 행은 그대로 있고 다온은 '확정'이에요.",
+        "Oracle은 BEGIN 없이 첫 DML에서 트랜잭션이 시작되고, SQL Server는 SAVE TRAN으로 저장점을 만들어요."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "SAVEPOINT sp1", "desc": "나중에 되돌아올 중간 저장점을 만드는 부분" },
+          { "term": "ROLLBACK TO sp1", "desc": "저장점 뒤에 한 삭제만 취소하는 부분" },
+          { "term": "COMMIT", "desc": "남은 변경을 확정하고 트랜잭션을 끝내는 부분" }
+        ],
+        "distractor": "ROLLBACK"
+      }
+    },
+    {
+      "id": "U11-p3",
+      "title": "DDL로 표를 만들고 제약조건 확인하기",
+      "goal": "CREATE·ALTER로 표 구조를 만들고, 제약조건과 DEFAULT가 값을 어떻게 지키는지 봐요.",
+      "dataset": "sandbox",
+      "sql": "CREATE TABLE camp_review (\n  review_id INTEGER PRIMARY KEY,\n  student_id INTEGER NOT NULL,\n  stars INTEGER CHECK (stars BETWEEN 1 AND 5),\n  memo TEXT DEFAULT '없음',\n  FOREIGN KEY (student_id) REFERENCES students(student_id)\n);\nINSERT INTO camp_review (review_id, student_id, stars) VALUES (1, 5, 4);\nALTER TABLE camp_review ADD camp_name TEXT;\nSELECT * FROM camp_review;",
+      "run": true,
+      "steps": [
+        "CREATE TABLE이 캠프 후기 표 camp_review를 만들어요. 열마다 자료형과 제약조건을 함께 적어요.",
+        "INSERT에서 memo를 빼먹었지만 DEFAULT 덕분에 '없음'이 들어가요. stars를 7로 넣으면 CHECK 오류가 나요.",
+        "student_id 5는 students에 있어 FOREIGN KEY를 통과해요. 9처럼 없는 번호면 오류가 나요.",
+        "ALTER TABLE … ADD로 camp_name 열을 나중에 추가했어요. 이미 있던 행의 새 열 값은 NULL이에요.",
+        "Oracle에서는 TEXT 대신 VARCHAR2 같은 자료형을 쓰고, DDL을 실행하면 자동으로 COMMIT돼요."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "CHECK (stars BETWEEN 1 AND 5)", "desc": "별점이 1~5 범위를 벗어나면 막는 규칙" },
+          { "term": "DEFAULT '없음'", "desc": "값을 넣지 않은 열을 대신 채우는 기본값" },
+          { "term": "FOREIGN KEY (student_id)", "desc": "students에 실제로 있는 학생 번호만 받는 규칙" }
+        ],
+        "distractor": "NOT NULL"
+      }
+    },
+    {
+      "id": "U11-p4",
+      "title": "Oracle 문법: MERGE·GRANT·REVOKE·TRUNCATE",
+      "goal": "SQLite에 없는 MERGE·GRANT/REVOKE·TRUNCATE의 Oracle 문법을 읽고 각 부분의 역할을 구분해요.",
+      "dataset": "sandbox",
+      "sql": "MERGE INTO camp_signup t\nUSING (SELECT 4 AS student_id, 'AI캠프' AS camp_name FROM dual) s\nON (t.student_id = s.student_id AND t.camp_name = s.camp_name)\nWHEN MATCHED THEN UPDATE SET t.status = '확정'\nWHEN NOT MATCHED THEN INSERT (signup_id, student_id, camp_name, status)\n  VALUES (5, s.student_id, s.camp_name, '신청');\nGRANT SELECT ON camp_signup TO teacher;\nREVOKE SELECT ON camp_signup FROM teacher;\nTRUNCATE TABLE camp_signup;",
+      "run": false,
+      "steps": [
+        "MERGE는 USING의 원본(라온·AI캠프)을 ON 조건으로 camp_signup과 비교해요. FROM dual은 Oracle의 1행짜리 연습용 표예요.",
+        "camp_signup에는 라온(4)의 AI캠프 행이 없으니 WHEN NOT MATCHED 쪽이 실행돼 새 행이 들어가요. 있었다면 UPDATE가 실행돼요.",
+        "GRANT … TO는 teacher에게 조회 권한을 주고, REVOKE … FROM은 그 권한을 회수해요(DCL).",
+        "TRUNCATE TABLE은 구조만 남기고 모든 행을 비우는 DDL이에요. Oracle에서는 ROLLBACK할 수 없어요.",
+        "SQLite에는 네 명령이 모두 없어 실행하지 않아요. 비슷한 일은 INSERT … ON CONFLICT DO UPDATE, WHERE 없는 DELETE로 해요."
+      ],
+      "match": {
+        "pairs": [
+          { "term": "WHEN NOT MATCHED THEN INSERT", "desc": "같은 학생·캠프 행이 대상에 없을 때 새 행을 넣는 부분" },
+          { "term": "GRANT SELECT ON camp_signup", "desc": "teacher에게 신청 표 조회 권한을 주는 부분" },
+          { "term": "TRUNCATE TABLE camp_signup", "desc": "구조는 남기고 모든 행을 한 번에 비우는 부분" }
+        ],
+        "distractor": "REVOKE SELECT ON camp_signup"
+      }
+    }
+  ]
+}

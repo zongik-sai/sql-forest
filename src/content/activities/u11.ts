@@ -14,9 +14,9 @@ export const U11 = [
       { term: 'MERGE', meaning: '있으면 UPDATE, 없으면 INSERT를 한 문장으로 하는 명령(Oracle 등)' },
     ],
     mode: 'executable', datasetId: 'sandbox',
-    prompt: "camp_signup에서 status가 '신청'인 행을 모두 '확정'으로 바꾸세요. 먼저 탐색으로 바꾸기 전 상태를 보세요.",
+    prompt: "camp_signup 표에서 status가 '신청'인 행을 모두 '확정'으로 바꾸는 UPDATE를 쓰고 실행하세요. 바꾸기 전 상태는 '탐색용 SQL 실행해 보기'에서 먼저 볼 수 있어요.",
     prediction: {
-      prompt: '이 UPDATE의 영향 행 수는 몇 개일까요?',
+      prompt: "camp_signup 표에서 status가 '신청'인 행을 '확정'으로 바꾸면 영향 행 수(실제로 바뀌는 행)는 몇 개일까요?",
       options: ['1개', '2개', '4개'],
       correctIndex: 1,
       reveal: "'신청' 상태는 나래(SQL캠프)와 다온(IoT캠프) 2행이에요.",
@@ -55,7 +55,7 @@ export const U11 = [
     mode: 'executable', datasetId: 'sandbox',
     prompt: '라온의 AI캠프 신청(INSERT)은 남기고, 가온을 취소한 UPDATE만 되돌린 뒤 트랜잭션을 확정하세요. 실수하면 "처음 상태로"를 누르세요.',
     prediction: {
-      prompt: '지금 ROLLBACK(저장점 없이)을 누르면 라온의 신청은 어떻게 될까요?',
+      prompt: '실행 기록이 BEGIN → INSERT(라온의 AI캠프 신청) → SAVEPOINT sp1 → UPDATE(가온 취소)일 때, 저장점 없이 ROLLBACK을 누르면 라온의 신청은 어떻게 될까요?',
       options: ['남는다', '함께 취소된다'],
       correctIndex: 1,
       reveal: 'ROLLBACK은 BEGIN 이후 모든 변경을 취소해서 라온의 INSERT도 사라져요.',
@@ -98,9 +98,9 @@ export const U11 = [
       { term: '제약조건', meaning: '열에 들어갈 값을 제한하는 규칙. 예: CHECK(status IN (…))' },
     ],
     mode: 'executable', datasetId: 'sandbox',
-    prompt: "마루(student_id 5)를 SQL캠프에 '신청' 상태로 추가하려 해요. 지금 INSERT의 오류를 읽고 고쳐 실행하세요.",
+    prompt: "마루(student_id 5)를 SQL캠프에 '신청' 상태로 추가하려 해요. 편집기에 미리 적힌 INSERT를 실행해 오류 메시지를 읽고, 값을 고쳐 다시 실행하세요.",
     prediction: {
-      prompt: '지금 INSERT에서 문제가 되는 값은 무엇일까요?',
+      prompt: "편집기에 적힌 INSERT … VALUES (9, 'SQL캠프', '대기')에서 문제가 되는 값은 무엇일까요? (students 표의 학생 번호와 camp_signup 표의 status 값을 참고하세요)",
       options: ["student_id 9와 status '대기'", "camp_name 'SQL캠프'", '문제가 없다'],
       correctIndex: 0,
       reveal: "학생 9는 students에 없고(FK), '대기'는 CHECK(신청/확정/취소)에 없어요.",

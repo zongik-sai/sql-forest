@@ -1,6 +1,7 @@
 import type { DatasetId, StatementType } from '../../content/types';
-import type { ExecOutput, GradeOutput, GradeRequest } from '../engine';
+import type { ExecOutput, GradeOutput, GradeRequest, SessionBase } from '../engine';
 import type { ResultSet } from '../grader/compare';
+import type { DbSchema } from '../schema';
 import type { SessionExecData, WorkerData, WorkerOp, WorkerRequest, WorkerResponse } from './protocol';
 
 /**
@@ -157,9 +158,38 @@ export class SqlClient {
     return r.status === 'ok' && r.data.op === 'grade' ? { status: 'ok', data: r.data.output } : (r as Outcome<never>);
   }
 
-  async sessionExec(sessionId: string, dataset: DatasetId, log: string[], sql: string, allow: StatementType[]): Promise<Outcome<SessionExecData>> {
+  async sessionExec(sessionId: string, dataset: SessionBase, log: string[], sql: string, allow: StatementType[]): Promise<Outcome<SessionExecData>> {
     const r = await this.send({ op: 'session-exec', sessionId, dataset, log, sql, allow });
     return r.status === 'ok' && r.data.op === 'session-exec' ? { status: 'ok', data: r.data.data } : (r as Outcome<never>);
+  }
+
+  /** 스키마 읽기: session을 주면 그 세션 DB의 현재 상태, 아니면 시작 데이터(학습 데이터셋·예시) 그대로 */
+  async schema(base: SessionBase, session?: { id: string; log: string[] }): Promise<Outcome<DbSchema>> {
+    const r = await this.send({ op: 'schema', base, session });
+    return r.status === 'ok' && r.data.op === 'schema' ? { status: 'ok', data: r.data.schema } : (r as Outcome<never>);
+  }
+
+  /** 더 쓰지 않는 세션 DB를 Worker에서 닫는다(결과를 기다리지 않아도 된다). */
+  async closeSession(sessionId: string): Promise<void> {
+    if (!this.worker) return;
+    await this.send({ op: 'session-close', sessionId });
+  }
+}
+
+/** 스키마를 읽을 대상: 학습 데이터셋 id·'preset:<id>' 또는 실습장 세션 DB */
+export type SchemaSource = SessionBase | { base: SessionBase; sessionId: string; log: string[] };
+
+/**
+ * DB 구조(표·열·PK·FK)를 읽는다. ERD·스키마 목록에서 쓴다.
+ * 예: loadSchema('school'), loadSchema({ base: 'preset:student-scores', sessionId, log })
+ * 일시정지 등으로 결과가 버려지면(stale/interrupted) 몇 번 다시 시도한다.
+ */
+export async function loadSchema(source: SchemaSource, client: SqlClient = sqlClient()): Promise<DbSchema> {
+  for (let attempt = 0; ; attempt++) {
+    const o = typeof source === 'string' ? await client.schema(source) : await client.schema(source.base, { id: source.sessionId, log: source.log });
+    if (o.status === 'ok') return o.data;
+    if ((o.status === 'stale' || o.status === 'interrupted') && attempt < 5) continue;
+    throw new Error(outcomeMessage(o) ?? '데이터 구조를 불러오지 못했어요.');
   }
 }
 

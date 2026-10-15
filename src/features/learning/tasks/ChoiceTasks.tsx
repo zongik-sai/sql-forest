@@ -172,7 +172,7 @@ export function ClassifyTask(props: TaskProps<ClassifyConfig>) {
       </div>
       {c.patterns && checked && (
         <div className="panel stack">
-          <p className="step-label">브라우저 정규식 엔진으로 패턴 적용 결과(시뮬레이션)</p>
+          <p className="step-label">패턴 적용 결과(브라우저 정규식으로 확인, SQLite 실행 아님)</p>
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th scope="col">문자열</th>{c.patterns.map((p) => <th scope="col" key={p.optionId}>{c.options.find((o) => o.id === p.optionId)?.label}</th>)}</tr></thead>
@@ -207,7 +207,7 @@ export function ErdTask(props: TaskProps<ErdConfig>) {
           const labels = c.relations.filter((x) => x.from === r.from && x.to === r.to).map((x) => lineLabel(x.id)).join(' / ');
           return (
             <g key={r.id}>
-              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--soil)" strokeWidth="2" strokeDasharray={r.id === 'r2' ? '6 4' : undefined} />
+              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={r.id === 'r2' ? 'var(--ink-soft)' : 'var(--soil)'} strokeWidth={r.id === 'r2' ? 1.5 : 2} strokeDasharray={r.id === 'r2' ? '2 5' : undefined} />
               <text x={(a.x + b.x) / 2 + 6} y={(a.y + b.y) / 2 - 6} fontSize="12" fill="var(--ink)">{labels}</text>
             </g>
           );
@@ -220,6 +220,7 @@ export function ErdTask(props: TaskProps<ErdConfig>) {
           </g>
         ))}
       </svg>
+      <p className="small muted" style={{ margin: 0 }}>가는 회색 점선은 수강 표를 빼고 생각한 학생-강좌 관계예요(실제 외래키 선이 아니에요). 식별·비식별 관계 표기는 직접 골라 보세요.</p>
       <div className="panel stack">
         {c.relations.map((r) => (
           <fieldset key={r.id}>

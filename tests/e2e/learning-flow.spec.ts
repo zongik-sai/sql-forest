@@ -10,9 +10,14 @@ test('데모: 시작 → 최초 진단 건너뛰기 → U01 활동 4개(실제 �
   await page.getByRole('button', { name: '개발 데모로 시작' }).click();
   await expect(page.getByRole('heading', { name: '최초 진단 (5문항)' })).toBeVisible();
   await page.getByRole('button', { name: '처음부터 배우기' }).click();
-  // 단원 학습은 전체화면 집중 학습 시작 화면부터
+  // 단원 학습은 전체화면 집중 학습 시작 화면부터, 새 단원은 1단계(이론·개념 맞추기)부터
   await expect(page.getByTestId('focus-overlay')).toContainText('1단원 집중 학습');
   await resumeIfPaused(page);
+  await expect(page.getByRole('heading', { name: '1단계 이론·개념 맞추기' })).toBeVisible();
+  // (이 테스트는 4단계 실습 활동을 검증하므로 그래도 풀어보기로 바로 들어간다. 단계 흐름은 stages.spec)
+  await page.goto('./#/learn/U01/U01-A01');
+  await expect(page.getByText('실습 점검 문제는 1~3단계')).toBeVisible();
+  await page.getByRole('button', { name: '그래도 풀어보기' }).click();
 
   // U01-A01 분류
   await expect(page.getByRole('heading', { name: '엔터티·속성·값 나누기' })).toBeVisible();

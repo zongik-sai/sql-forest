@@ -17,7 +17,7 @@ export const U04 = [
     mode: 'executable', datasetId: 'school',
     prompt: '연산자와 값을 바꿔 "2학년 이상" 학생만 남기세요.',
     prediction: {
-      prompt: '2학년 이상인 학생은 몇 명일까요?',
+      prompt: 'students 표에서 2학년 이상인 학생은 몇 명일까요?',
       options: ['3명', '5명', '6명'],
       correctIndex: 1,
       reveal: '1학년인 마루만 빠지고 5명이 남아요.',
@@ -55,7 +55,7 @@ export const U04 = [
     mode: 'executable', datasetId: 'school',
     prompt: '"AI컴퓨터(10) 또는 AI로봇(20) 학과이면서 3학년"인 학생만 남도록 괄호 위치를 고르세요.',
     prediction: {
-      prompt: '괄호 없이 dept_id = 10 OR dept_id = 20 AND grade = 3 을 실행하면 몇 명이 나올까요?',
+      prompt: 'students 표에 괄호 없이 WHERE dept_id = 10 OR dept_id = 20 AND grade = 3 을 실행하면 몇 명이 나올까요?',
       options: ['3명', '4명', '5명'],
       correctIndex: 1,
       reveal: 'AND를 먼저 계산해 "10번 학과 전체 또는 (20번 학과 3학년)"이 되어 바다(10번, 2학년)까지 4명이 나와요.',
@@ -122,7 +122,7 @@ export const U04 = [
     id: 'U04-A04', unitId: 'U04', title: 'NULL과 NOT IN 함정 고치기',
     objective: 'NULL이 포함된 NOT IN과 NOT EXISTS의 차이를 이해한다.',
     estimatedMinutes: 7,
-    explanation: 'NULL은 값이 없거나 알려지지 않았다는 뜻이에요. NULL과 비교한 결과는 TRUE나 FALSE가 아닌 UNKNOWN이 될 수 있어요. WHERE는 TRUE인 행만 남겨요.',
+    explanation: 'NULL은 값이 없거나 알려지지 않았다는 뜻이에요. NULL과 비교한 결과는 TRUE나 FALSE가 아닌 UNKNOWN이 될 수 있어요. WHERE는 TRUE인 행만 남겨요. 그래서 NOT IN 목록에 NULL이 섞이면 0행이 될 수 있어, 이 활동에서는 NOT EXISTS(괄호 안 SELECT 결과가 한 행도 없으면 참)로 찾아요.',
     glossary: [
       { term: 'NULL', meaning: '값이 없거나 알 수 없음. 0이나 빈 문자열과 달라요' },
       { term: '3값 논리', meaning: 'TRUE, FALSE, UNKNOWN 세 가지 결과로 조건을 판단하는 규칙' },
@@ -130,7 +130,7 @@ export const U04 = [
       { term: 'NOT EXISTS', meaning: '서브쿼리 결과 행이 하나도 없으면 참' },
     ],
     mode: 'executable', datasetId: 'school',
-    prompt: '수강 기록이 없는 학생의 student_id를 NOT EXISTS로 찾아 학번 순으로 조회하세요. 먼저 탐색 SQL로 NOT IN (1, NULL) 결과를 확인해 보세요.',
+    prompt: '수강 기록(enrollment 표의 행)이 하나도 없는 학생의 student_id를 NOT EXISTS로 찾아 학번 순으로 조회하세요. 먼저 편집기 위 \'탐색용 SQL 실행해 보기\'를 열어 NOT IN (1, NULL) 결과를 확인해 보세요.',
     prediction: {
       prompt: 'SELECT student_id FROM students WHERE student_id NOT IN (1, NULL); 의 결과는?',
       options: ['2~6번 다섯 행', '0행', '오류'],
@@ -140,7 +140,7 @@ export const U04 = [
     },
     hints: [
       "'해당 학생의 수강 행이 없는 경우'를 찾으면 돼요.",
-      '서브쿼리에서 바깥 학생의 student_id와 enrollment.student_id를 연결하세요.',
+      '빈칸(...)에 바깥 학생의 s.student_id와 수강 행의 e.student_id가 같다는 조건을 쓰세요. s는 students, e는 enrollment의 별칭이에요.',
       'SELECT s.student_id FROM students s WHERE NOT EXISTS (SELECT 1 FROM enrollment e WHERE e.student_id = s.student_id) ORDER BY ...',
     ],
     solution: {

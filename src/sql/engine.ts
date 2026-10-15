@@ -1,6 +1,10 @@
 import type { Database, SqlJsStatic, SqlValue } from 'sql.js';
 import type { DatasetId, StatementType } from '../content/types';
 import { seedSql, type SeedId } from './datasets';
+import { PRESET_BY_ID } from '../features/playground/presets';
+import { presetOfBase, type SessionBase } from './sessionBase';
+
+export type { SessionBase } from './sessionBase';
 import { classifyTokens, guardSql, tokenize } from './guard';
 import { compareResults, type Cell, type CompareResult, type ResultSet } from './grader/compare';
 
@@ -234,9 +238,20 @@ export function limitForDisplay(r: ResultSet | undefined): ResultSet | undefined
  * 세션 DB: 자유 실습장·트랜잭션 활동용. 상태는 '성공한 문장 기록(log)'으로 재현한다.
  * Worker가 종료되어도 같은 seed + log를 다시 실행하면 같은 상태가 된다.
  */
-export function openSessionDb(SQL: SqlJsStatic, dataset: DatasetId, log: string[]): Database {
-  const db = openDb(SQL, dataset, 'main', { readOnly: false });
+export function openSessionDb(SQL: SqlJsStatic, base: SessionBase, log: string[]): Database {
+  const db = openBaseDb(SQL, base);
   for (const s of log) db.exec(s);
+  return db;
+}
+
+/** 쓰기 가능한 새 DB를 시작 데이터로 만든다(외래키 검사 켬). */
+export function openBaseDb(SQL: SqlJsStatic, base: SessionBase): Database {
+  if (!base.startsWith('preset:')) return openDb(SQL, base as DatasetId, 'main', { readOnly: false });
+  const id = presetOfBase(base);
+  if (!id) throw new Error(`알 수 없는 예시 데이터예요: ${base}`);
+  const db = new SQL.Database();
+  db.exec('PRAGMA foreign_keys = ON;');
+  db.exec(PRESET_BY_ID[id].seedSql);
   return db;
 }
 

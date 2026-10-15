@@ -1,0 +1,643 @@
+{
+  "unit": "U02",
+  "cards": [
+    {
+      "id": "U02-t1",
+      "title": "관계와 ERD",
+      "points": [
+        "관계는 엔터티(표)와 엔터티 사이의 연결이에요. 예: 학생은 학과에 소속되고, 학생은 강좌를 수강해요.",
+        "ERD는 엔터티를 상자로, 관계를 선으로 그린 데이터 설계도예요.",
+        "존재에 의한 관계는 소속처럼 그냥 이어져 있는 관계예요. 예: 학과-학생",
+        "행위에 의한 관계는 어떤 행동이 일어나야 생기는 관계예요. 예: 학생이 강좌를 수강 신청해서 생기는 학생-수강",
+        "실제 표에서는 같은 키 값으로 이어져요. students의 dept_id 10은 departments의 10번 학과(AI컴퓨터)를 뜻해요."
+      ],
+      "table": {
+        "header": [
+          "student_name",
+          "dept_id",
+          "dept_name (학과 표)"
+        ],
+        "rows": [
+          [
+            "가온",
+            "10",
+            "AI컴퓨터"
+          ],
+          [
+            "다온",
+            "20",
+            "AI로봇"
+          ],
+          [
+            "마루",
+            "30",
+            "AI콘텐츠디자인"
+          ]
+        ]
+      },
+      "tip": "ERD 관계 표기 3요소: 관계명(이름)·관계차수(몇 개)·관계선택사양(꼭 있어야 하나)",
+      "match": {
+        "pairs": [
+          {
+            "term": "ERD",
+            "desc": "엔터티는 상자, 연결은 선으로 그린 데이터 설계도"
+          },
+          {
+            "term": "존재에 의한 관계",
+            "desc": "학과-학생처럼 소속되어 늘 이어져 있는 연결"
+          },
+          {
+            "term": "행위에 의한 관계",
+            "desc": "수강 신청처럼 어떤 행동이 일어나야 생기는 연결"
+          }
+        ],
+        "distractor": "관계명"
+      }
+    },
+    {
+      "id": "U02-t2",
+      "title": "차수와 선택성",
+      "points": [
+        "차수(Cardinality)는 한쪽 하나에 상대가 몇 개까지 연결되는지예요. 1:1, 1:N, M:N이 있어요.",
+        "학과 하나에 학생 여럿, 학생 한 명은 학과 하나 → 학과-학생은 1:N이에요.",
+        "학생 한 명은 강좌 여럿, 강좌 하나에 학생 여럿 → 학생-강좌는 M:N이에요. 가운데 수강(enrollment) 표를 두어 1:N 두 개로 풀어요.",
+        "선택성(Optionality)은 연결이 꼭 있어야 하는지(필수), 0개여도 되는지(선택)예요. 수강 행이 없는 학생(라온·마루)이 있으니 학생→수강은 선택이에요."
+      ],
+      "table": {
+        "header": [
+          "차수",
+          "뜻",
+          "학교 예"
+        ],
+        "rows": [
+          [
+            "1:1",
+            "하나 ↔ 하나",
+            "학생 ↔ 학생증"
+          ],
+          [
+            "1:N",
+            "하나 ↔ 여러 개",
+            "학과 ↔ 학생"
+          ],
+          [
+            "M:N",
+            "여러 개 ↔ 여러 개",
+            "학생 ↔ 강좌"
+          ]
+        ]
+      },
+      "tip": "M:N은 표 두 개만으로 바로 만들 수 없어요. 중간 표(수강)가 꼭 필요해요!",
+      "match": {
+        "pairs": [
+          {
+            "term": "1:N",
+            "desc": "한쪽 하나에 상대 여러 개, 반대쪽은 하나만 이어지는 연결 (학과-학생)"
+          },
+          {
+            "term": "M:N",
+            "desc": "양쪽 모두 여러 개와 이어져 중간 표로 풀어야 하는 연결 (학생-강좌)"
+          },
+          {
+            "term": "선택성",
+            "desc": "상대가 0개여도 되는지, 반드시 있어야 하는지를 나타냄"
+          }
+        ],
+        "distractor": "1:1"
+      }
+    },
+    {
+      "id": "U02-t3",
+      "title": "PK·FK와 본질/인조 식별자",
+      "points": [
+        "기본키(PK)는 행 하나를 유일하게 구별하는 열이에요. 같은 값도, NULL도 안 돼요. 예: students의 student_id",
+        "외래키(FK)는 다른 표의 기본키 값을 가리키는 열이에요. 예: students.dept_id → departments.dept_id",
+        "열 두 개 이상을 묶어 기본키로 쓰면 복합키예요. 예: enrollment의 (student_id, course_id)",
+        "본질 식별자는 업무에 원래 있던 값(학년·반·번호), 인조 식별자는 시스템이 편의상 만든 값(자동 증가 번호)이에요."
+      ],
+      "table": {
+        "header": [
+          "키",
+          "뜻",
+          "학교 예"
+        ],
+        "rows": [
+          [
+            "기본키(PK)",
+            "행을 유일하게 구별",
+            "students.student_id"
+          ],
+          [
+            "외래키(FK)",
+            "다른 표의 PK를 가리킴",
+            "students.dept_id"
+          ],
+          [
+            "복합키",
+            "열 여러 개를 묶은 PK",
+            "(student_id, course_id)"
+          ],
+          [
+            "대체키",
+            "유일하지만 PK로 안 뽑힌 키",
+            "departments.dept_name"
+          ]
+        ]
+      },
+      "tip": "인조 식별자는 편하지만, 같은 학생을 두 번 넣어도 번호만 달라져 중복을 막기 어려워요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "외래키(FK)",
+            "desc": "다른 표의 기본키 값을 가리키며 두 표를 잇는 열"
+          },
+          {
+            "term": "복합키",
+            "desc": "열 두 개 이상을 묶어 만든 기본키 (예: 학번+강좌번호)"
+          },
+          {
+            "term": "인조 식별자",
+            "desc": "업무에는 원래 없고 시스템이 편의상 만들어 붙인 번호"
+          }
+        ],
+        "distractor": "본질 식별자"
+      }
+    },
+    {
+      "id": "U02-t4",
+      "title": "식별 관계와 비식별 관계",
+      "points": [
+        "관계에서 자기 기본키를 내주는 쪽을 부모 엔터티, 그 키를 받는 쪽을 자식 엔터티라고 해요. 예: 학과(부모) → 학생(자식)",
+        "부모의 기본키가 자식 기본키의 일부가 되면 식별 관계예요. 예: student_id가 enrollment의 PK (student_id, course_id) 안에 있어요.",
+        "부모의 기본키가 자식의 일반 열(외래키)로만 쓰이면 비식별 관계예요. 예: students.dept_id는 FK지만 students의 PK가 아니에요.",
+        "IE 표기법 ERD에서는 식별 관계를 실선, 비식별 관계를 점선으로 그려요. 식별 관계만 이어지면 자식의 기본키 열이 점점 많아져요."
+      ],
+      "table": {
+        "header": [
+          "관계",
+          "부모 키가 자식에서",
+          "학교 예"
+        ],
+        "rows": [
+          [
+            "식별 관계",
+            "기본키의 일부",
+            "학생 → 수강"
+          ],
+          [
+            "비식별 관계",
+            "일반 열(외래키)",
+            "학과 → 학생"
+          ]
+        ]
+      },
+      "tip": "판단법: 자식의 기본키를 보세요. 부모 키가 그 안에 있으면 식별, 밖에 있으면 비식별!",
+      "match": {
+        "pairs": [
+          {
+            "term": "부모 엔터티",
+            "desc": "자기 기본키를 다른 엔터티에 내주는 쪽 (예: 학과)"
+          },
+          {
+            "term": "식별 관계",
+            "desc": "부모의 키가 자식 기본키의 일부로 들어간 연결 (예: 학생→수강)"
+          },
+          {
+            "term": "비식별 관계",
+            "desc": "부모의 키가 자식의 일반 열(외래키)로만 쓰이는 연결 (예: 학과→학생)"
+          }
+        ],
+        "distractor": "자식 엔터티"
+      }
+    },
+    {
+      "id": "U02-t5",
+      "title": "함수종속과 이상현상",
+      "points": [
+        "함수종속은 A 값이 정해지면 B 값이 하나로 정해지는 관계예요. A → B로 쓰고, A를 결정자라고 해요.",
+        "예: student_id → student_name. 학번이 1이면 이름은 늘 가온이에요. course_id → course_name도 마찬가지예요.",
+        "여러 주제가 한 표에 섞이면 같은 값이 반복돼 이상현상(입력·수정·삭제 때 생기는 문제)이 생겨요.",
+        "갱신 이상: 가온의 이름을 바꾸려면 2행을 고쳐야 해요. 삽입 이상: 수강생 없는 AI캠프는 넣을 수 없어요. 삭제 이상: 나래의 수강을 지우면 나래 정보도 사라져요.",
+        "정규화는 이상현상을 없애려고 함수종속에 따라 표를 나누는 과정이에요."
+      ],
+      "table": {
+        "header": [
+          "student_id",
+          "student_name",
+          "course_id",
+          "course_name",
+          "score"
+        ],
+        "rows": [
+          [
+            "1",
+            "가온",
+            "101",
+            "SQL캠프",
+            "90"
+          ],
+          [
+            "1",
+            "가온",
+            "102",
+            "IoT캠프",
+            "80"
+          ],
+          [
+            "2",
+            "나래",
+            "101",
+            "SQL캠프",
+            "90"
+          ]
+        ]
+      },
+      "tip": "이상현상 3종: 삽입 이상·갱신 이상·삭제 이상. 원인은 '같은 값이 여러 번 저장'이에요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "함수종속",
+            "desc": "A 값이 정해지면 B 값이 하나로 정해지는 관계 (A → B)"
+          },
+          {
+            "term": "결정자",
+            "desc": "A → B에서 B를 하나로 정해 주는 왼쪽의 A"
+          },
+          {
+            "term": "갱신 이상",
+            "desc": "같은 값이 여러 행에 있어 한 곳만 고치면 데이터가 어긋나는 문제"
+          }
+        ],
+        "distractor": "삭제 이상"
+      }
+    },
+    {
+      "id": "U02-t6",
+      "title": "1·2·3정규형",
+      "points": [
+        "1정규형: 한 칸에 값이 하나만 들어가야 해요(원자값). 예: 취미 칸에 '농구, 독서'처럼 여러 값을 넣으면 안 돼요.",
+        "2정규형: 복합키의 일부에만 종속된 열(부분 종속)을 떼어 내요. 예: student_name은 student_id에만 종속 → students 표로",
+        "3정규형: 일반 열을 거쳐 종속된 열(이행 종속)을 떼어 내요. 예: 학생 표 안에서 student_id → dept_id → dept_name이라 dept_name은 departments 표로",
+        "정규화하면 각 정보가 한 번만 저장돼요. 나눈 표는 조인으로 다시 이어 원래 정보를 복원할 수 있어요.",
+        "반대로 조회를 빠르게 하려고 일부러 중복을 허용하는 것은 반정규화라고 해요."
+      ],
+      "table": {
+        "header": [
+          "정규형",
+          "없애는 것",
+          "enrollment_raw 예"
+        ],
+        "rows": [
+          [
+            "1정규형",
+            "한 칸의 여러 값",
+            "(이미 만족)"
+          ],
+          [
+            "2정규형",
+            "부분 종속",
+            "student_name·dept_id·dept_name(→학생 표), course_name(→강좌 표)"
+          ],
+          [
+            "3정규형",
+            "이행 종속",
+            "학생 표 안의 dept_name"
+          ]
+        ]
+      },
+      "tip": "순서 암기: 1정규형 원자값 → 2정규형 부분 종속 제거 → 3정규형 이행 종속 제거",
+      "match": {
+        "pairs": [
+          {
+            "term": "1정규형",
+            "desc": "한 칸에 값이 하나만 들어가도록(원자값) 만든 단계"
+          },
+          {
+            "term": "부분 종속",
+            "desc": "복합키 중 일부 열에만 종속된 것 (예: student_id → student_name)"
+          },
+          {
+            "term": "이행 종속",
+            "desc": "A → B → C처럼 일반 열을 거쳐 종속된 것 (예: dept_name)"
+          }
+        ],
+        "distractor": "반정규화"
+      }
+    },
+    {
+      "id": "U02-t7",
+      "title": "모델과 조인·NULL",
+      "points": [
+        "모델에서 정한 관계는 SQL의 조인(JOIN)으로 확인해요. JOIN은 두 표의 행을 같은 키 값으로 이어 붙여요(U07에서 자세히).",
+        "학생-수강은 선택 관계라 수강이 없는 학생(라온·마루)이 있어요. 짝이 있는 행만 남기면 두 학생은 결과에서 빠져요.",
+        "LEFT JOIN은 왼쪽 표(학생)의 행을 짝이 없어도 모두 남겨요. 짝이 없는 수강 쪽 칸은 NULL로 채워져요.",
+        "NULL은 '값이 없음·알 수 없음'을 뜻하는 표시예요. 0이나 빈 글자('')와 달라요.",
+        "반대로 students.dept_id는 NOT NULL이라 모든 학생이 학과를 꼭 가져요(필수 관계)."
+      ],
+      "table": {
+        "header": [
+          "student_name",
+          "course_id (LEFT JOIN 결과 일부)"
+        ],
+        "rows": [
+          [
+            "다온",
+            "102"
+          ],
+          [
+            "라온",
+            "NULL"
+          ],
+          [
+            "마루",
+            "NULL"
+          ],
+          [
+            "바다",
+            "102"
+          ]
+        ]
+      },
+      "tip": "JOIN 결과 행 수가 생각보다 적다면 '짝 없는 행'을 의심하세요. 선택 관계가 원인일 수 있어요.",
+      "match": {
+        "pairs": [
+          {
+            "term": "LEFT JOIN",
+            "desc": "왼쪽 표의 행을 짝이 없어도 빼지 않고 모두 남기는 조인"
+          },
+          {
+            "term": "NULL",
+            "desc": "값이 없거나 알 수 없음을 뜻하는 표시로 0과 다름"
+          },
+          {
+            "term": "선택 관계",
+            "desc": "상대 행이 0개여도 되는 연결 (예: 수강이 없는 학생)"
+          }
+        ],
+        "distractor": "필수 관계"
+      }
+    }
+  ],
+  "quiz": [
+    {
+      "id": "U02-c1",
+      "question": "다음 중 '존재에 의한 관계'의 예로 가장 알맞은 것은?",
+      "options": [
+        "학생이 강좌를 수강 신청한다",
+        "학생이 학과에 소속되어 있다",
+        "학생이 캠프 참가비를 결제한다",
+        "학생이 동아리에 가입 신청서를 낸다"
+      ],
+      "answer": 1,
+      "explanation": "소속은 따로 행동하지 않아도 늘 이어져 있는 관계라 존재에 의한 관계예요. 수강 신청·결제·가입 신청은 행동이 일어나야 생기는 행위에 의한 관계예요.",
+      "tag": "관계"
+    },
+    {
+      "id": "U02-c2",
+      "question": "한 학생은 여러 강좌를 듣고, 한 강좌에는 여러 학생이 들어요. 학생-강좌 관계의 차수와 이를 표로 만드는 방법으로 옳은 것은?",
+      "options": [
+        "1:1 — 학생 표에 course_id 열 하나를 둔다",
+        "1:N — 강좌 표에 student_id 열 하나를 둔다",
+        "M:N — 중간 표(enrollment)를 두어 1:N 두 개로 푼다",
+        "M:N — 학생 표의 course_id 칸에 '101,102'처럼 여러 값을 적는다"
+      ],
+      "answer": 2,
+      "explanation": "양쪽 모두 여럿과 연결되니 M:N이에요. M:N은 중간 표(수강)를 두어 학생-수강 1:N, 강좌-수강 1:N으로 풀어요. 한 칸에 여러 값을 적으면 1정규형을 어겨요.",
+      "tag": "차수·선택성"
+    },
+    {
+      "id": "U02-c3",
+      "question": "students에는 학생 1~6이 있고, enrollment(수강)에는 student_id가 1, 1, 2, 3, 3, 6인 행만 있어요. '학생 → 수강' 관계의 선택성으로 알맞은 것은?",
+      "options": [
+        "선택 — 수강 행이 0개인 학생(4, 5)도 있을 수 있다",
+        "필수 — 학생 4, 5는 수강 행이 없으니 잘못 저장된 것이다",
+        "필수 — 수강 행이 2개인 학생이 있기 때문이다",
+        "선택 — enrollment의 score에 NULL이 있기 때문이다"
+      ],
+      "answer": 0,
+      "explanation": "학생 4·5는 수강 행이 하나도 없지만 students에 정상적으로 있어요. 상대가 0개여도 되니 선택 관계예요. 행이 몇 개인지는 차수의 문제이고, score의 NULL은 점수가 비었다는 뜻이라 선택성과 관계없어요.",
+      "tag": "차수·선택성"
+    },
+    {
+      "id": "U02-c4",
+      "question": "기본키(PK)와 외래키(FK)에 대한 설명으로 옳은 것은?",
+      "options": [
+        "두 행이 같은 기본키 값을 가져도 된다",
+        "기본키 열에는 NULL을 넣을 수 있다",
+        "한 표에는 외래키를 하나만 둘 수 있다",
+        "외래키는 다른 표의 기본키를 가리켜서, 그 표에 없는 키 값은 넣을 수 없다"
+      ],
+      "answer": 3,
+      "explanation": "기본키 값은 중복될 수 없고(복합키는 열 묶음 전체로 판단), 기본키를 이루는 각 열에는 NULL이 들어갈 수 없어요. enrollment처럼 외래키를 2개 이상 둘 수도 있어요. 외래키에 부모 표에 없는 값을 넣으면 참조 무결성 위반으로 오류가 나요(SQLite는 PRAGMA foreign_keys = ON일 때만 검사하며, 학습 DB는 켜 두었어요).",
+      "tag": "PK/FK"
+    },
+    {
+      "id": "U02-c5",
+      "question": "students(학생 6명)와 enrollment(수강 6행)를 student_id로 이어요. 학생 4·5는 수강 행이 없어요. 짝 있는 행만 남기는 JOIN은 6행이에요. 학생을 모두 남기는 LEFT JOIN의 결과는?",
+      "options": [
+        "6행 — 학생 4·5는 결과에 없다",
+        "8행 — 학생 4·5의 course_id는 NULL이다",
+        "8행 — 학생 4·5의 course_id는 0이다",
+        "12행 — 학생마다 수강 행이 2개씩 붙는다"
+      ],
+      "answer": 1,
+      "explanation": "LEFT JOIN은 짝 있는 6행에 짝 없는 학생 4·5의 2행을 더해 8행이에요. 수강 쪽 칸은 값이 없으니 0이 아니라 NULL로 채워져요.",
+      "tag": "모델과 조인·NULL"
+    },
+    {
+      "id": "U02-c6",
+      "question": "학교에는 원래 (학년, 반, 번호)가 있지만, 시스템이 1, 2, 3…을 자동으로 붙인 student_id를 기본키로 쓰기로 했어요. 이런 인조 식별자를 쓸 때 주의할 점은?",
+      "options": [
+        "업무에 원래 있던 값이라 마음대로 바꿀 수 없다",
+        "NULL이 자주 들어가 행을 구별할 수 없다",
+        "같은 학생을 실수로 두 번 넣어도 번호만 달라져 중복을 막기 어렵다",
+        "다른 표의 외래키가 가리킬 수 없다"
+      ],
+      "answer": 2,
+      "explanation": "인조 식별자는 새 행마다 새 번호가 붙어서, 같은 학생이 두 번 들어가도 막지 못해요. 그래서 본질 식별자인 (학년, 반, 번호)에 UNIQUE를 걸어 중복을 막기도 해요.",
+      "tag": "본질/인조 식별자"
+    },
+    {
+      "id": "U02-c7",
+      "question": "enrollment의 기본키는 (student_id, course_id)예요. students의 기본키는 student_id뿐이고 dept_id는 외래키(일반 열)예요. 옳은 것은?",
+      "options": [
+        "학생-수강은 식별 관계, 학과-학생은 비식별 관계",
+        "학생-수강은 비식별 관계, 학과-학생은 식별 관계",
+        "둘 다 식별 관계",
+        "둘 다 비식별 관계"
+      ],
+      "answer": 0,
+      "explanation": "부모 키(student_id)가 자식(enrollment)의 기본키 안에 들어가면 식별 관계, 부모 키(dept_id)가 자식(students)의 일반 열로만 쓰이면 비식별 관계예요.",
+      "tag": "식별/비식별 관계"
+    },
+    {
+      "id": "U02-c8",
+      "question": "enrollment_raw(student_id, student_name, course_id, course_name, score)에서 항상 성립하는 함수종속(A → B: A가 정해지면 B가 하나로 정해짐)은?",
+      "options": [
+        "student_id → course_name",
+        "student_name → score",
+        "course_id → score",
+        "course_id → course_name"
+      ],
+      "answer": 3,
+      "explanation": "강좌 번호가 정해지면 강좌 이름은 하나로 정해져요. 한 학생은 여러 강좌를 들으므로 student_id로 course_name이 하나로 정해지지 않고, score는 학생과 강좌가 둘 다 정해져야 하나로 정해져요.",
+      "tag": "함수종속"
+    },
+    {
+      "id": "U02-c9",
+      "question": "enrollment_raw에는 학생·학과·강좌·점수가 한 표에 섞여 있어요. 나래는 수강 행이 1개뿐인데, 그 행을 지웠더니 나래의 이름과 학과 정보까지 사라졌어요. 이 문제는?",
+      "options": [
+        "삽입 이상",
+        "갱신 이상",
+        "삭제 이상",
+        "참조 무결성 위반"
+      ],
+      "answer": 2,
+      "explanation": "지우려던 정보(수강)와 함께 남겨야 할 정보(학생·학과)까지 사라지는 것이 삭제 이상이에요. 학생·학과·강좌·수강 표로 나누면(정규화) 막을 수 있어요.",
+      "tag": "이상현상"
+    },
+    {
+      "id": "U02-c10",
+      "question": "enrollment_raw(student_id, student_name, dept_id, dept_name, course_id, course_name, score)의 기본키는 (student_id, course_id)예요. 정규화 설명으로 옳은 것은?",
+      "options": [
+        "student_name은 이행 종속이라 3정규형에서 분리한다",
+        "course_name은 부분 종속이라 2정규형에서 분리한다",
+        "score는 부분 종속이라 2정규형에서 분리한다",
+        "dept_name은 한 칸에 값이 여러 개라 1정규형에서 분리한다"
+      ],
+      "answer": 1,
+      "explanation": "course_name은 기본키의 일부인 course_id만으로 정해지는 부분 종속이라 2정규형에서 courses로 떼어 내요. student_name·dept_id·dept_name도 student_id에만 종속(부분 종속)이라 학생 표로 옮기고, score는 키 전체가 필요해 남겨요. 학생 표 안의 student_id → dept_id → dept_name은 이행 종속이라 3정규형에서 학과 표로 떼어 내요.",
+      "tag": "1·2·3정규형"
+    }
+  ],
+  "practice": [
+    {
+      "id": "U02-p1",
+      "title": "학과-학생 관계를 결과로 보기",
+      "goal": "외래키 dept_id로 학과와 학생을 이어 1:N 관계와 선택성을 결과에서 확인해요.",
+      "dataset": "school",
+      "sql": "SELECT d.dept_id, d.dept_name, s.student_id, s.student_name\nFROM departments d\nJOIN students s ON s.dept_id = d.dept_id\nORDER BY d.dept_id, s.student_id;",
+      "run": true,
+      "steps": [
+        "FROM departments d: 부모인 학과 표를 읽고 짧은 이름 d를 붙여요.",
+        "JOIN students s ON …: 학생의 외래키 dept_id가 학과의 기본키 dept_id와 같은 행끼리 이어요.",
+        "ORDER BY: 학과 번호 순, 같은 학과 안에서는 학번 순으로 보여 줘요.",
+        "AI컴퓨터(10)는 3번 나오고 학생은 각각 1번만 나와요. 학과 하나에 학생 여럿 → 1:N이에요.",
+        "전기에너지(40)는 학생이 0명이라 결과에 없어요. 학과 쪽에서 보면 학생이 없어도 되는 선택 관계예요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "FROM departments d",
+            "desc": "부모 쪽인 학과 표를 읽고 짧은 이름을 붙임"
+          },
+          {
+            "term": "ON s.dept_id = d.dept_id",
+            "desc": "학생의 외래키와 학과의 기본키 값이 같은 행끼리 잇는 조건"
+          },
+          {
+            "term": "ORDER BY",
+            "desc": "학과 번호 순, 같은 학과 안에서는 학번 순으로 결과를 정렬"
+          }
+        ],
+        "distractor": "WHERE s.grade = 3"
+      }
+    },
+    {
+      "id": "U02-p2",
+      "title": "수강 표의 복합키와 외래키 보기",
+      "goal": "enrollment에서 student_id·course_id는 각각 반복되지만 둘을 묶으면 유일한 것을 확인해요.",
+      "dataset": "school",
+      "sql": "SELECT e.student_id, s.student_name, e.course_id, c.course_name, e.score\nFROM enrollment e\nJOIN students s ON s.student_id = e.student_id\nJOIN courses c ON c.course_id = e.course_id\nORDER BY e.student_id, e.course_id;",
+      "run": true,
+      "steps": [
+        "FROM enrollment e: 자식인 수강 표에서 시작해요. 수강 행은 6개예요.",
+        "첫 번째 JOIN: 외래키 e.student_id로 학생 표를 찾아 이름을 붙여요.",
+        "두 번째 JOIN: 외래키 e.course_id로 강좌 표를 찾아 강좌 이름을 붙여요.",
+        "결과에서 student_id 1은 2번, course_id 101은 3번 나와요. 어느 한 열만으로는 행을 구별할 수 없어요.",
+        "(student_id, course_id) 짝은 모두 달라요. 그래서 둘을 묶은 복합키가 기본키이고, 부모 키가 PK 안에 있으니 식별 관계예요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "ON s.student_id = e.student_id",
+            "desc": "수강 행의 학생 번호로 학생 표에서 이름을 찾아 잇는 조건"
+          },
+          {
+            "term": "ON c.course_id = e.course_id",
+            "desc": "수강 행의 강좌 번호로 강좌 표에서 강좌 이름을 찾아 잇는 조건"
+          },
+          {
+            "term": "FROM enrollment e",
+            "desc": "자식인 수강 표에서 시작하고 짧은 이름을 붙임"
+          }
+        ],
+        "distractor": "WHERE e.score >= 80"
+      }
+    },
+    {
+      "id": "U02-p3",
+      "title": "비정규 수강표의 중복 찾기",
+      "goal": "enrollment_raw에서 반복되는 값을 찾고, 각 열이 무엇에 종속되는지 짚어 봐요.",
+      "dataset": "normal",
+      "sql": "SELECT student_id, student_name, dept_id, dept_name, course_id, course_name, score\nFROM enrollment_raw\nORDER BY student_id, course_id;",
+      "run": true,
+      "steps": [
+        "FROM enrollment_raw: 학생·학과·강좌·점수가 한 표에 섞인 비정규 수강표를 읽어요. 기본키는 (student_id, course_id)예요.",
+        "가온(1)은 2번, SQL캠프는 3번, AI컴퓨터는 4번 나와요. 같은 값이 반복 저장돼 있어요.",
+        "student_name·dept_id는 student_id만, course_name은 course_id만 알면 정해져요 → 부분 종속(2정규형에서 학생·강좌 표로 분리).",
+        "학생 표로 옮긴 뒤 보면 dept_name은 student_id → dept_id → dept_name으로 정해져요 → 이행 종속(3정규형에서 학과 표로 분리).",
+        "score만 학생과 강좌가 둘 다 정해져야 정해져요. 그래서 score는 enrollment에 남아요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "student_name",
+            "desc": "학번만 알면 하나로 정해져 부분 종속인 학생 이름 열"
+          },
+          {
+            "term": "dept_name",
+            "desc": "학과 번호를 거쳐 정해지는 이행 종속 열"
+          },
+          {
+            "term": "course_name",
+            "desc": "강좌 번호만 알면 정해져 부분 종속인 강좌 이름 열"
+          }
+        ],
+        "distractor": "score"
+      }
+    },
+    {
+      "id": "U02-p4",
+      "title": "선택 관계가 만드는 NULL",
+      "goal": "LEFT JOIN으로 수강이 없는 학생이 NULL과 함께 남는 것을 보고 JOIN 결과와 비교해요.",
+      "dataset": "school",
+      "sql": "SELECT s.student_id, s.student_name, e.course_id, e.score\nFROM students s\nLEFT JOIN enrollment e ON e.student_id = s.student_id\nORDER BY s.student_id, e.course_id;",
+      "run": true,
+      "steps": [
+        "FROM students s: 왼쪽 표는 학생 6명이에요.",
+        "LEFT JOIN … ON: 학번이 같은 수강 행을 붙이되, 짝이 없는 학생도 빼지 않아요.",
+        "결과는 8행이에요. 짝 있는 6행 + 수강이 없는 라온(4)·마루(5) 2행이에요.",
+        "라온·마루의 course_id·score는 짝이 없어서 NULL이에요. 다온의 SQL캠프 score NULL은 수강은 했지만 점수가 없는 경우라 뜻이 달라요.",
+        "LEFT를 빼고 JOIN만 쓰면 6행이 되고 라온·마루가 사라져요. 실습 점검에서 두 결과를 직접 비교해 봐요."
+      ],
+      "match": {
+        "pairs": [
+          {
+            "term": "LEFT JOIN",
+            "desc": "짝이 없는 왼쪽 표(학생)의 행도 빼지 않고 모두 남기는 조인"
+          },
+          {
+            "term": "ON e.student_id = s.student_id",
+            "desc": "수강 행과 학생 행을 학번이 같은 것끼리 잇는 조건"
+          },
+          {
+            "term": "ORDER BY",
+            "desc": "학번 순, 같은 학생 안에서는 강좌 번호 순으로 결과를 정렬"
+          }
+        ],
+        "distractor": "INNER JOIN"
+      }
+    }
+  ]
+}

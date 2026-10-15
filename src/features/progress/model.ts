@@ -1,5 +1,6 @@
 import { ACTIVITY_BY_ID, CHALLENGE_BY_ID, CHECKPOINTS, FINAL_DIAGNOSTIC, QUESTION_BY_ID, UNITS, UNIT_BY_ID, UNIT_IDS, VARIANT_OF, challengeOf } from '../../content';
 import type { UnitId } from '../../content/types';
+import { STAGE_COUNTS, quizNeed } from '../../content/stages/meta';
 
 /**
  * 학습자 진도 상태(순수 데이터 + 순수 함수).
@@ -67,6 +68,22 @@ export interface LearnerState {
   unitLocks?: Partial<Record<UnitId, string[]>>;
   /** 단원 초기화: 마지막 시각과 누적 횟수. 병합할 때 이 시각을 모르는(더 오래된) 쪽의 그 단원 기록은 버린다 */
   unitResets?: Partial<Record<UnitId, { at: string; n: number }>>;
+  /** 단원 단계(1 이론·개념 맞추기, 2 개념 점검, 3 실습 설명·맞추기) 기록. 4단계는 기존 활동·체크포인트 */
+  stages?: Partial<Record<UnitId, Partial<Record<StageKey, StageRecord>>>>;
+  /** 마친 이론 카드·실습 예제(ID → 처음 마친 시각) */
+  stageItems?: Record<string, string>;
+}
+
+/* ---------------- 단원 단계(2026-10-15 구조 개편) ---------------- */
+export type StageNo = 1 | 2 | 3 | 4;
+export const STAGE_NOS: StageNo[] = [1, 2, 3, 4];
+export type StageKey = 's1' | 's2' | 's3';
+export const STAGE_NAME: Record<StageNo, string> = { 1: '이론·개념 맞추기', 2: '개념 점검 문제', 3: '실습 설명·실습 맞추기', 4: '실습 점검 문제' };
+export interface StageRecord {
+  best?: number;
+  total?: number;
+  passedAt?: string;
+  lastAt?: string;
 }
 
 export function emptyLearnerState(learnerKey: string, now = new Date().toISOString()): LearnerState {
@@ -124,7 +141,8 @@ export function unitStatus(s: LearnerState, unitId: UnitId): UnitStatus {
   if (!isUnitUnlocked(s, unitId)) return 'locked';
   if (isUnitComplete(s, unitId)) return unitCheckpointScore(s, unitId) === 3 ? 'complete' : 'review';
   const unit = UNITS.find((u) => u.id === unitId)!;
-  const touched = unit.activityIds.some((a) => s.activities[a]?.attempts || s.activities[a]?.completedAt) || unit.checkpointIds.some((q) => s.questions[q]?.attempts);
+  const touched = unit.activityIds.some((a) => s.activities[a]?.attempts || s.activities[a]?.completedAt) || unit.checkpointIds.some((q) => s.questions[q]?.attempts)
+    || !!s.stages?.[unitId] || Object.keys(s.stageItems ?? {}).some((k) => k.startsWith(`${unitId}-`));
   return touched ? 'in-progress' : 'ready';
 }
 
@@ -143,6 +161,11 @@ export function nextStep(s: LearnerState): string {
   for (const u of UNITS) {
     if (!isUnitUnlocked(s, u.id)) break;
     if (isUnitComplete(s, u.id)) continue;
+    // 새 단계 구조: 4단계를 아직 시작하지 않았으면 통과하지 못한 첫 단계부터
+    if (!stage4Touched(s, u.id)) {
+      const n = ([1, 2, 3] as const).find((k) => !stagePassed(s, u.id, k));
+      if (n) return `/learn/${u.id}/stage/${n}`;
+    }
     const a = u.activityIds.find((id) => !isActivityComplete(s, id));
     if (a) return `/learn/${u.id}/${a}`;
     return `/learn/${u.id}/checkpoint`;
@@ -316,6 +339,7 @@ export function mergeLearnerStates(local0: LearnerState, remote0: LearnerState):
     wrongLog: local.wrongLog.length >= remote.wrongLog.length ? local.wrongLog : remote.wrongLog,
     unitLocks,
     unitResets: resets,
+    ...mergeStages(local, remote),
   };
 }
 
@@ -350,7 +374,10 @@ function stripUnit(s: LearnerState, u: UnitId): LearnerState {
   if (challengeId) delete challenges[challengeId];
   const unitLocks = { ...(s.unitLocks ?? {}) };
   delete unitLocks[u];
-  return { ...s, activities, questions, challenges, unitLocks, celebratedUnits: s.celebratedUnits.filter((x) => x !== u) };
+  const stages = { ...(s.stages ?? {}) };
+  delete stages[u];
+  const stageItems = Object.fromEntries(Object.entries(s.stageItems ?? {}).filter(([k]) => !k.startsWith(`${u}-`)));
+  return { ...s, activities, questions, challenges, unitLocks, stages, stageItems, celebratedUnits: s.celebratedUnits.filter((x) => x !== u) };
 }
 
 const later = (now: string, prev?: string) => (prev && prev >= now ? new Date(Date.parse(prev) + 1).toISOString() : now);
@@ -399,4 +426,105 @@ export function unitKeepList(s: LearnerState, u: UnitId): string[] {
   for (const a of activityIds) if (s.activities[a]) keep.push(a);
   if (challengeId && s.challenges[challengeId]) keep.push(`mastery:${challengeId}`);
   return keep;
+}
+
+/* ---------------- 단원 단계 판정·기록 ---------------- */
+
+export const stageItemDone = (s: LearnerState, id: string) => !!s.stageItems && Object.hasOwn(s.stageItems, id);
+
+/** 4단계(실습 점검)를 이미 시작했는지: 예전 방식으로 공부한 학생은 1~3단계와 관계없이 4단계가 열린다 */
+export function stage4Touched(s: LearnerState, u: UnitId): boolean {
+  const unit = UNITS.find((x) => x.id === u)!;
+  // 예전 방식으로 활동을 열어 본 기록(초안·활동 시간만 있어도)이 있으면 이어서 할 수 있게
+  return unit.activityIds.some((a) => !!s.activities[a]) || unit.checkpointIds.some((q) => s.questions[q]?.attempts);
+}
+
+export function stagePassed(s: LearnerState, u: UnitId, n: StageNo): boolean {
+  if (n === 4) return isUnitComplete(s, u);
+  return !!s.stages?.[u]?.[`s${n}`]?.passedAt;
+}
+
+/** 앞 단계를 통과해야 열린다(1단계는 항상). 잠겨 있어도 "그래도 풀어보기"로 들어갈 수 있다 */
+export function stageOpen(s: LearnerState, u: UnitId, n: StageNo): boolean {
+  if (n === 1) return true;
+  if (n === 4 && stage4Touched(s, u)) return true;
+  return stagePassed(s, u, (n - 1) as StageNo);
+}
+
+/** 통과한 단계 수(0~4) */
+export const unitStageLevel = (s: LearnerState, u: UnitId) => STAGE_NOS.filter((n) => stagePassed(s, u, n)).length;
+
+function setStage(s: LearnerState, u: UnitId, k: StageKey, f: (r: StageRecord) => StageRecord): LearnerState {
+  const cur = { ...(s.stages?.[u] ?? {}) };
+  cur[k] = f(cur[k] ?? {});
+  return { ...s, stages: { ...(s.stages ?? {}), [u]: cur } };
+}
+
+/** 1단계 카드·3단계 예제 하나를 마침. 그 단계의 항목을 모두 마치면 단계 통과 */
+/** 1단계 카드·3단계 예제 ID 목록 */
+export const stageItemIds = (u: UnitId, n: 1 | 3): string[] => Array.from({ length: n === 1 ? STAGE_COUNTS[u].cards : STAGE_COUNTS[u].practice }, (_, i) => `${u}-${n === 1 ? 't' : 'p'}${i + 1}`);
+
+export function markStageItem(s: LearnerState, u: UnitId, n: 1 | 3, itemId: string, now = new Date().toISOString()): { state: LearnerState; stageDone: boolean; firstPass: boolean } {
+  const ids = stageItemIds(u, n);
+  let state: LearnerState = stageItemDone(s, itemId) ? s : { ...s, stageItems: { ...(s.stageItems ?? {}), [itemId]: now } };
+  const done = ids.filter((id) => stageItemDone(state, id)).length;
+  const stageDone = done === ids.length;
+  const firstPass = stageDone && !stagePassed(state, u, n);
+  state = setStage(state, u, `s${n}`, (r) => ({ ...r, best: done, total: ids.length, ...(stageDone ? { passedAt: r.passedAt ?? now } : {}), lastAt: now }));
+  return { state, stageDone, firstPass };
+}
+
+/** 2단계 개념 점검 결과. 최고 점수 유지, 기준(70%) 이상이면 통과 */
+export function recordStageQuiz(s: LearnerState, u: UnitId, score: number, total: number, now = new Date().toISOString()): { state: LearnerState; passed: boolean; firstPass: boolean } {
+  const passed = score >= quizNeed(total);
+  const firstPass = passed && !stagePassed(s, u, 2);
+  const state = setStage(s, u, 's2', (r) => ({
+    best: Math.max(r.best ?? 0, score), total,
+    ...(r.passedAt || passed ? { passedAt: r.passedAt ?? now } : {}),
+    lastAt: now,
+  }));
+  return { state, passed, firstPass };
+}
+
+const minIso = (a?: string, b?: string) => (!a ? b : !b ? a : a < b ? a : b);
+const maxIso = (a?: string, b?: string) => (!a ? b : !b ? a : a > b ? a : b);
+
+/** 단계 기록 병합: 통과는 사라지지 않고(이른 시각), 최고 점수는 큰 쪽, 마친 항목은 합집합 */
+function mergeStages(a: LearnerState, b: LearnerState): Pick<LearnerState, 'stages' | 'stageItems'> {
+  const stages: NonNullable<LearnerState['stages']> = {};
+  for (const u of UNIT_IDS) {
+    const ua = a.stages?.[u], ub = b.stages?.[u];
+    if (!ua && !ub) continue;
+    const out: Partial<Record<StageKey, StageRecord>> = {};
+    for (const k of ['s1', 's2', 's3'] as StageKey[]) {
+      const ra = ua?.[k], rb = ub?.[k];
+      if (!ra && !rb) continue;
+      const rec: StageRecord = {};
+      const best = Math.max(ra?.best ?? -1, rb?.best ?? -1);
+      if (best >= 0) rec.best = best;
+      const total = ra?.total ?? rb?.total;
+      if (total !== undefined) rec.total = total;
+      const passedAt = minIso(ra?.passedAt, rb?.passedAt);
+      if (passedAt) rec.passedAt = passedAt;
+      const lastAt = maxIso(ra?.lastAt, rb?.lastAt);
+      if (lastAt) rec.lastAt = lastAt;
+      out[k] = rec;
+    }
+    stages[u] = out;
+  }
+  const stageItems: Record<string, string> = {};
+  for (const k of new Set([...Object.keys(a.stageItems ?? {}), ...Object.keys(b.stageItems ?? {})])) {
+    stageItems[k] = minIso(a.stageItems?.[k], b.stageItems?.[k])!;
+  }
+  // 두 기기에서 나눠 마친 카드·예제가 합쳐져 모두 끝났으면 그 단계도 통과
+  for (const u of UNIT_IDS) {
+    for (const [k, ids] of [['s1', stageItemIds(u, 1)], ['s3', stageItemIds(u, 3)]] as const) {
+      const times = ids.map((id) => stageItems[id]);
+      const rec = stages[u]?.[k];
+      if (!ids.length || times.some((t) => !t) || rec?.passedAt) continue;
+      const at = times.reduce((m, t) => (t! > m ? t! : m), '');
+      stages[u] = { ...(stages[u] ?? {}), [k]: { ...(rec ?? {}), best: ids.length, total: ids.length, passedAt: at, lastAt: maxIso(rec?.lastAt, at) } };
+    }
+  }
+  return { stages, stageItems };
 }

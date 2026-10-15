@@ -12,9 +12,9 @@ export const U08 = [
       { term: '스칼라 서브쿼리', meaning: 'SELECT 절 등에서 값 하나처럼 쓰이는 서브쿼리' },
     ],
     mode: 'executable', datasetId: 'school',
-    prompt: '전체 평균 점수보다 높은 점수를 받은 수강 행의 student_id, course_id, score를 조회하세요. 평균값을 직접 쓰지 말고 서브쿼리로 구하세요.',
+    prompt: 'enrollment 표에서 전체 평균 점수보다 높은 점수를 받은 수강 행의 student_id, course_id, score를 조회하세요. 평균값을 직접 쓰지 말고 서브쿼리로 구하세요.',
     prediction: {
-      prompt: '안쪽 SELECT AVG(score) FROM enrollment 의 결과는?',
+      prompt: '평균을 구하는 안쪽 쿼리 SELECT AVG(score) FROM enrollment 의 결과는? (enrollment 표의 score 열)',
       options: ['68.3', '82', '85'],
       correctIndex: 1,
       reveal: 'NULL을 뺀 5개 점수의 평균이 82예요.',
@@ -46,7 +46,7 @@ export const U08 = [
       { term: 'EXISTS', meaning: '서브쿼리 결과 행이 하나라도 있으면 TRUE' },
     ],
     mode: 'executable', datasetId: 'school',
-    prompt: 'EXISTS (SELECT 1 FROM enrollment e WHERE e.student_id = s.student_id AND e.course_id = 102)가 학생마다 TRUE인지 FALSE인지 고르세요.',
+    prompt: 'students 표(별칭 s)의 학생마다 EXISTS (SELECT 1 FROM enrollment e WHERE e.student_id = s.student_id AND e.course_id = 102)가 TRUE인지 FALSE인지 고르세요.',
     hints: [
       '학생마다 enrollment에서 그 학생의 102번 강좌 행을 찾아보세요.',
       '한 행이라도 있으면 TRUE, 없으면 FALSE예요.',
@@ -77,9 +77,9 @@ export const U08 = [
       { term: 'EXCEPT (MINUS)', meaning: '왼쪽에만 있는 행. Oracle에서는 MINUS' },
     ],
     mode: 'executable', datasetId: 'school',
-    prompt: 'SQL캠프(101)와 IoT캠프(102) 수강생 번호를 합친 결과들을 실행해 비교하고 질문에 답하세요.',
+    prompt: 'enrollment 표의 SQL캠프(101) 수강생 번호와 IoT캠프(102) 수강생 번호를 UNION·UNION ALL·INTERSECT·EXCEPT로 연결한 결과를 실행해 비교하고 질문에 답하세요.',
     prediction: {
-      prompt: '101 수강생 UNION 102 수강생의 결과는 몇 행일까요?',
+      prompt: 'enrollment 표에서 101 수강생 번호 목록과 102 수강생 번호 목록을 UNION으로 합치면 몇 행일까요?',
       options: ['4행', '6행', '2행'],
       correctIndex: 0,
       reveal: '101은 {1,2,3}, 102는 {1,3,6}이에요. 중복(1, 3)을 없애면 {1,2,3,6} 4행이에요.',
@@ -122,7 +122,7 @@ export const U08 = [
       { term: '< ALL', meaning: '서브쿼리의 모든 값보다 작으면 참 (= 최솟값보다 작으면)' },
     ],
     mode: 'simulation', datasetId: 'school',
-    prompt: '각 조건으로 students를 거르면 몇 명이 남는지 고르세요. AI컴퓨터(10) 학생들의 학년은 3, 3, 2예요.',
+    prompt: 'students 표(6명)에 각 조건을 WHERE로 걸면 몇 명이 남는지 고르세요. AI컴퓨터(10) 학생들의 학년은 3, 3, 2예요.',
     hints: [
       'IN (SELECT student_id FROM enrollment)은 수강 기록이 있는 학생이에요.',
       '> ANY (3, 3, 2)는 2보다 크면 참, < ALL (3, 3, 2)는 2보다 작으면 참이에요.',

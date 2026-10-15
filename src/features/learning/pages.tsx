@@ -6,9 +6,11 @@ import { useLearner, xpGained } from '../../app/LearnerContext';
 import { ModeBadge } from '../../components/common';
 import { useFocusGate } from '../focus/FocusContext';
 import {
-  answerQuestion, checkpointSolved, isActivityComplete, isUnitComplete, isUnitUnlocked, revealQuestion, unitCheckpointScore, unitStatus,
-  type LearnerState,
+  answerQuestion, checkpointSolved, isActivityComplete, isUnitComplete, isUnitUnlocked, revealQuestion, STAGE_NAME, STAGE_NOS, stageOpen, stagePassed,
+  unitCheckpointScore, unitStageLevel, unitStatus, type LearnerState,
 } from '../progress/model';
+import { STAGE_COUNTS, quizNeed } from '../../content/stages/meta';
+import { StageStatus } from './StageStatus';
 import { ActivityRunner } from './ActivityRunner';
 import { QuestionCard, type Graded } from './QuestionCard';
 
@@ -54,7 +56,38 @@ export function UnitPage() {
         <h1>{u.id} {u.title}</h1>
         <p>{u.intro}</p>
         <p className="small muted">예상 {u.minutes}분{u.extraNote ? ` (${u.extraNote})` : ''} · 핵심 개념: {u.concepts.join(', ')}</p>
+        <p className="small muted" style={{ margin: 0 }}>단계 {unitStageLevel(state, unitId)}/4 · 앞 단계를 통과하면 다음 단계가 열려요.</p>
       </div>
+      <ol className="cg-levels">
+        {STAGE_NOS.map((n) => {
+          const st4 = n === 4;
+          const detail = n === 1 ? `이론 카드 ${STAGE_COUNTS[unitId].cards}장 · 카드마다 개념 맞추기` :
+            n === 2 ? `객관식 ${STAGE_COUNTS[unitId].quiz}문항 · ${quizNeed(STAGE_COUNTS[unitId].quiz)}개 이상` :
+            n === 3 ? `실습 예제 ${STAGE_COUNTS[unitId].practice}개 · 실행해 보고 SQL 조각 맞추기` :
+            '실습 활동 4개 + 체크포인트(2문항 이상) · 경험치';
+          const open = stageOpen(state, unitId, n);
+          const passed = stagePassed(state, unitId, n);
+          return (
+            <li key={n} className="panel">
+              <span className="cg-lv-num">{n}</span>
+              <span className="stack" style={{ gap: '0.15rem' }}>
+                <b>{STAGE_NAME[n]}</b>
+                <span className="small muted">{detail}</span>
+              </span>
+              <StageStatus unitId={unitId} n={n} />
+              {st4 ? (
+                <button type="button" className={`btn btn-small ${open && !passed ? 'btn-primary' : ''}`} onClick={() => { const h = document.getElementById('unit-acts'); h?.scrollIntoView({ block: 'start' }); h?.focus(); }}>
+                  {passed ? '다시 보기' : open ? '아래에서 시작' : '살펴보기'}
+                </button>
+              ) : (
+                <Link className={`btn btn-small ${open && !passed ? 'btn-primary' : ''}`} to={`/learn/${unitId}/stage/${n}`}>{passed ? '다시 보기' : open ? '시작' : '살펴보기'}</Link>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      <h2 id="unit-acts" tabIndex={-1} style={{ fontSize: '1.1rem', margin: '0.5rem 0 0', scrollMarginTop: '4.5rem' }}>4단계 실습 점검 문제</h2>
+      {!stageOpen(state, unitId, 4) && <p className="small muted" style={{ margin: 0 }}>3단계까지 통과하면 열려요. 미리 풀어 볼 수도 있어요.</p>}
       <ul className="unit-acts">
         {acts.map((a, i) => {
           const p = state.activities[a.id];
@@ -91,8 +124,35 @@ export function UnitPage() {
   );
 }
 
+/** 4단계(실습 점검)가 아직 잠겨 있으면 앞 단계 안내 + 그래도 풀어보기 */
+function Stage4Gate({ unitId, children }: { unitId: UnitId; children: React.ReactNode }) {
+  const { state } = useLearner();
+  const [force, setForce] = useState(false);
+  // 잠긴 단원이면 안쪽 화면이 '열리지 않은 단원' 안내를 보여 준다
+  if (!isUnitUnlocked(state, unitId) || stageOpen(state, unitId, 4) || force) return <>{children}</>;
+  const first = ([1, 2, 3] as const).find((n) => !stagePassed(state, unitId, n)) ?? 3;
+  return (
+    <div className="page page-narrow stack">
+      <Crumbs unitId={unitId} here="4단계 실습 점검" />
+      <div className="panel stack">
+        <p style={{ margin: 0 }}>실습 점검 문제는 <b>1~3단계</b>(이론·개념 맞추기 → 개념 점검 → 실습 설명·맞추기)를 통과하면 열려요. 지금은 <b>{first}단계 {STAGE_NAME[first]}</b> 차례예요.</p>
+        <div className="row">
+          <Link className="btn btn-primary" to={`/learn/${unitId}/stage/${first}`}>{first}단계로</Link>
+          <button className="btn" onClick={() => setForce(true)}>그래도 풀어보기</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- 활동 ---------------- */
 export function ActivityPage() {
+  const { unitId } = useParams();
+  if (!isUnitId(unitId)) return <Navigate to="/garden" replace />;
+  return <Stage4Gate unitId={unitId}><ActivityPageInner /></Stage4Gate>;
+}
+
+function ActivityPageInner() {
   const { unitId, activityId } = useParams();
   const { state } = useLearner();
   const nav = useNavigate();
@@ -214,6 +274,12 @@ function CheckpointSlot({ originalId, index }: { originalId: string; index: numb
 }
 
 export function CheckpointPage() {
+  const { unitId } = useParams();
+  if (!isUnitId(unitId)) return <Navigate to="/garden" replace />;
+  return <Stage4Gate unitId={unitId}><CheckpointPageInner /></Stage4Gate>;
+}
+
+function CheckpointPageInner() {
   const { unitId } = useParams();
   const { state } = useLearner();
   if (!isUnitId(unitId)) return <Navigate to="/garden" replace />;
