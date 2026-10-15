@@ -51,6 +51,10 @@ export interface CgState {
   wrong: Record<string, WrongEntry>;
   /** 개념 맞추기를 마친 이론 카드(카드 ID → 처음 마친 시각) */
   cards: Record<string, string>;
+  /** 단원 집중 학습 중 잠긴 시각들(마지막 초기화 이후) */
+  locks: Partial<Record<CgUnitId, string[]>>;
+  /** 단원 초기화: 마지막 시각과 누적 횟수. 병합할 때 이 시각을 모르는(더 오래된) 쪽의 그 단원 기록은 버린다 */
+  resets: Partial<Record<CgUnitId, { at: string; n: number }>>;
   /** 마지막 변경 시각 */
   upd: string;
 }
@@ -65,7 +69,10 @@ export const CARD_ID_RE = /^U[1-8]-t\d{1,3}$/;
 /** 기기 시계가 서로 달라도 사건 순서가 뒤집히지 않게: 앞 사건보다 최소 1ms 뒤 시각 */
 const after = (now: string, prev?: string) => (prev && prev >= now ? new Date(Date.parse(prev) + 1).toISOString() : now);
 
-export const emptyCgState = (): CgState => ({ v: 1, units: {}, mock: [], wrong: {}, cards: {}, upd: '' });
+export const emptyCgState = (): CgState => ({ v: 1, units: {}, mock: [], wrong: {}, cards: {}, locks: {}, resets: {}, upd: '' });
+
+/** 한 단원에서 이만큼 잠기면 그 단원의 진도·점수를 초기화한다(선생님 결정) */
+export const LOCK_LIMIT = 5;
 
 /** 저장된 JSON을 안전하게 읽는다(모르는 필드·잘못된 값은 버림) */
 export function normalizeCgState(raw: unknown): CgState {
@@ -96,6 +103,18 @@ export function normalizeCgState(raw: unknown): CgState {
   }
   if (r.cards && typeof r.cards === 'object') {
     for (const [k, v] of Object.entries(r.cards)) if (CARD_ID_RE.test(k) && typeof v === 'string') s.cards[k] = v;
+  }
+  for (const u of CG_UNIT_IDS) {
+    const l = r.locks && typeof r.locks === 'object' ? (r.locks as Record<string, unknown>)[u] : undefined;
+    if (Array.isArray(l)) {
+      const ok = l.filter((x): x is string => typeof x === 'string').slice(-50);
+      if (ok.length) s.locks[u] = ok;
+    }
+    const z = r.resets && typeof r.resets === 'object' ? (r.resets as Record<string, unknown>)[u] : undefined;
+    if (z && typeof z === 'object' && typeof (z as { at?: unknown }).at === 'string') {
+      const n = (z as { n?: unknown }).n;
+      s.resets[u] = { at: (z as { at: string }).at, n: typeof n === 'number' && n > 0 ? n : 1 };
+    }
   }
   if (typeof r.upd === 'string') s.upd = r.upd;
   return s;
@@ -162,6 +181,45 @@ function setLevel(s: CgState, u: CgUnitId, lv: CgLevel, f: (r: LevelRecord) => L
   const ur = { ...(s.units[u] ?? {}) };
   ur[`lv${lv}`] = f(ur[`lv${lv}`] ?? {});
   return stamp({ ...s, units: { ...s.units, [u]: ur } }, now);
+}
+
+/** 단원 잠김 횟수(마지막 초기화 이후) */
+export const lockCount = (s: CgState, u: CgUnitId) => s.locks[u]?.length ?? 0;
+
+const unitCardPrefix = (u: CgUnitId) => `${u}-t`;
+
+/** 단원의 진도·점수(단계 기록·카드)와 잠김 횟수를 지운다. 오답노트·모의고사·다른 단원은 그대로 */
+export function resetUnit(s: CgState, u: CgUnitId, now = new Date().toISOString()): CgState {
+  const units = { ...s.units };
+  delete units[u];
+  const cards = Object.fromEntries(Object.entries(s.cards).filter(([k]) => !k.startsWith(unitCardPrefix(u))));
+  const locks = { ...s.locks };
+  delete locks[u];
+  const prev = s.resets[u];
+  return stamp({ ...s, units, cards, locks, resets: { ...s.resets, [u]: { at: after(now, prev?.at), n: (prev?.n ?? 0) + 1 } } }, now);
+}
+
+/** 잠김 1회 기록. 한도에 닿으면 그 단원을 초기화한다 */
+export function addLock(s: CgState, u: CgUnitId, now = new Date().toISOString()): { state: CgState; count: number; reset: boolean } {
+  const list = [...(s.locks[u] ?? []), after(now, s.locks[u]?.at(-1))];
+  if (list.length >= LOCK_LIMIT) return { state: resetUnit(s, u, now), count: list.length, reset: true };
+  return { state: stamp({ ...s, locks: { ...s.locks, [u]: list } }, now), count: list.length, reset: false };
+}
+
+/** 병합 전: 상대가 아는 더 최근 초기화를 모르는 쪽이면 그 단원 기록을 버린다(초기화가 되살아나지 않게) */
+function dropStaleUnits(x: CgState, latest: CgState['resets']): CgState {
+  let out = x;
+  for (const u of CG_UNIT_IDS) {
+    const r = latest[u];
+    if (r && (x.resets[u]?.at ?? '') < r.at) {
+      const units = { ...out.units };
+      delete units[u];
+      const locks = { ...out.locks };
+      delete locks[u];
+      out = { ...out, units, locks, cards: Object.fromEntries(Object.entries(out.cards).filter(([k]) => !k.startsWith(unitCardPrefix(u)))) };
+    }
+  }
+  return out;
 }
 
 /** 카드 목록 중 개념 맞추기를 마친 장 수 */
@@ -231,7 +289,20 @@ const maxIso = (a?: string, b?: string) => (!a ? b : !b ? a : a > b ? a : b);
  * 두 기기의 기록 병합(같은 학생). 통과는 사라지지 않고, 최고 점수는 큰 쪽, 모의고사는 합집합,
  * 오답노트는 문항별로 더 최근 사건(틀림/다시 맞힘)을 따른다.
  */
-export function mergeCgStates(a: CgState, b: CgState): CgState {
+export function mergeCgStates(a0: CgState, b0: CgState): CgState {
+  const resets: CgState['resets'] = {};
+  for (const u of CG_UNIT_IDS) {
+    const ra = a0.resets[u], rb = b0.resets[u];
+    if (!ra && !rb) continue;
+    const at = maxIso(ra?.at, rb?.at)!;
+    resets[u] = { at, n: Math.max(ra?.n ?? 0, rb?.n ?? 0) };
+  }
+  const a = dropStaleUnits(a0, resets), b = dropStaleUnits(b0, resets);
+  const locks: CgState['locks'] = {};
+  for (const u of CG_UNIT_IDS) {
+    const l = [...new Set([...(a.locks[u] ?? []), ...(b.locks[u] ?? [])])].sort();
+    if (l.length) locks[u] = l.slice(-50);
+  }
   const units: CgState['units'] = {};
   for (const u of CG_UNIT_IDS) {
     const ua = a.units[u], ub = b.units[u];
@@ -266,7 +337,7 @@ export function mergeCgStates(a: CgState, b: CgState): CgState {
   }
   const cards: CgState['cards'] = {};
   for (const k of new Set([...Object.keys(a.cards), ...Object.keys(b.cards)])) cards[k] = minIso(a.cards[k], b.cards[k])!;
-  return { v: 1, units, mock, wrong, cards, upd: maxIso(a.upd, b.upd) ?? '' };
+  return { v: 1, units, mock, wrong, cards, locks, resets, upd: maxIso(a.upd, b.upd) ?? '' };
 }
 
 /** 의미 있는 진행이 있는지(가져오기 안내용) */

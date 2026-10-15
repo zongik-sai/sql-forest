@@ -5,6 +5,7 @@ import { LocalLedger, totalXpOf, type Ledger } from '../../src/features/progress
 import {
   answerQuestion, completeActivity, eligibleBadges, eligibleRewards, emptyLearnerState, isUnitComplete, isUnitUnlocked,
   revealHint, revealQuestion, revealSolution, viewExplanation, type LearnerState, unitStatus, mergeLearnerStates, recordAttempt,
+  addUnitLock, resetUnitProgress, unitLockCount, unitRewardIds, UNIT_LOCK_LIMIT, recordChallenge, unitKeepList,
 } from '../../src/features/progress/model';
 import { REWARD_CATALOG } from '../../src/features/progress/rewards';
 import { removeWithPrefix } from '../../src/lib/storage';
@@ -225,5 +226,67 @@ describe('XP 시나리오 (05_GROWTH_SYSTEM 테스트 사례)', () => {
   it('48개 활동·36개 체크포인트 ID가 보상 ID와 1:1', () => {
     expect(new Set(ACTIVITIES.map((a) => `activity:${a.id}`)).size).toBe(48);
     expect(new Set(CHECKPOINTS.map((q) => `checkpoint:${q.id}`)).size).toBe(36);
+  });
+});
+
+describe('단원 집중 학습: 잠김 5번이면 그 단원 초기화(데이터베이스)', () => {
+  const T = (n: number) => `2026-10-15T00:00:${String(n).padStart(2, '0')}.000Z`;
+  const studied = () => {
+    let s = emptyLearnerState('t');
+    for (const u of ['U01', 'U02'] as const) {
+      const unit = UNITS.find((x) => x.id === u)!;
+      for (const a of unit.activityIds) s = completeActivity(s, a, T(1));
+      for (const q of unit.checkpointIds) s = answerQuestion(s, q, 'x', true, T(1));
+      s = { ...s, celebratedUnits: [...s.celebratedUnits, u] };
+    }
+    s = answerQuestion(s, VARIANT_OF['U01-Q03'].id, 'x', false, T(2));
+    s = recordChallenge(s, 'CH-U01', 'solved', T(2));
+    return s;
+  };
+  it('5번째 잠김에 그 단원의 활동·체크포인트(변형 포함)·도전·축하 기록을 지우고 오답 기록·다른 단원은 남긴다', () => {
+    let s = studied();
+    const wrongBefore = s.wrongLog.length;
+    for (let i = 1; i < UNIT_LOCK_LIMIT; i++) s = addUnitLock(s, 'U01', T(10 + i)).state;
+    expect(unitLockCount(s, 'U01')).toBe(4);
+    const r = addUnitLock(s, 'U01', T(20));
+    expect(r).toMatchObject({ count: 5, reset: true });
+    expect(isUnitComplete(r.state, 'U01')).toBe(false);
+    expect(Object.keys(r.state.activities).some((k) => k.startsWith('U01'))).toBe(false);
+    expect(Object.keys(r.state.questions).some((k) => k.includes('U01'))).toBe(false);
+    expect(r.state.challenges['CH-U01']).toBeUndefined();
+    expect(r.state.celebratedUnits).toEqual(['U02']);
+    expect(isUnitComplete(r.state, 'U02')).toBe(true);
+    expect(r.state.wrongLog.length).toBe(wrongBefore);
+    expect(unitLockCount(r.state, 'U01')).toBe(0);
+    expect(eligibleRewards(r.state).some((x) => x.includes('U01'))).toBe(false);
+  });
+  it('다른 기기의 예전 기록과 합쳐도 초기화가 되살아나지 않는다', () => {
+    const old = studied();
+    const fresh = completeActivity(resetUnitProgress(old, 'U01', T(30)), 'U01-A01', T(31));
+    for (const m of [mergeLearnerStates(old, fresh), mergeLearnerStates(fresh, old)]) {
+      expect(Object.keys(m.activities).filter((k) => k.startsWith('U01'))).toEqual(['U01-A01']);
+      expect(isUnitComplete(m, 'U01')).toBe(false);
+      expect(isUnitComplete(m, 'U02')).toBe(true);
+      expect(m.unitResets?.U01?.at).toBe(T(30));
+    }
+  });
+  it('단원 초기화로 지우는 보상: 활동 4·체크포인트 3·단원·단원 배지', () => {
+    expect(unitRewardIds('U03')).toEqual(['activity:U03-A01', 'activity:U03-A02', 'activity:U03-A03', 'activity:U03-A04', 'checkpoint:U03-Q01', 'checkpoint:U03-Q02', 'checkpoint:U03-Q03', 'unit:U03', 'badge:unit-U03']);
+  });
+  it('서버 초기화 재전송 때 남길 목록: 초기화 뒤 새로 한 공부만', () => {
+    let s = resetUnitProgress(studied(), 'U01', T(30));
+    expect(unitKeepList(s, 'U01')).toEqual([]);
+    s = completeActivity(s, 'U01-A02', T(31));
+    s = recordChallenge(s, 'CH-U01', 'learned', T(32));
+    expect(unitKeepList(s, 'U01').sort()).toEqual(['U01-A02', 'activity:U01-A02', 'mastery:CH-U01']);
+    expect(unitKeepList(s, 'U02')).toContain('unit:U02');
+  });
+  it('데모 원장: forget으로 그 단원 보상을 지우면 다시 받을 수 있다', async () => {
+    removeWithPrefix('test:forget');
+    const ledger = new LocalLedger('test:forget');
+    expect((await ledger.award('activity:U01-A01')).status).toBe('awarded');
+    ledger.forget(unitRewardIds('U01'));
+    expect(totalXpOf(ledger.snapshot())).toBe(0);
+    expect((await ledger.award('activity:U01-A01')).status).toBe('awarded');
   });
 });

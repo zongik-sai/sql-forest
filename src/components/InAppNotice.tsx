@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { suspendLearning } from '../features/focus/fullscreen';
 
 /**
  * 카카오톡 등 앱 안의 브라우저(웹뷰)에서는 Google이 로그인을 막는다(disallowed_useragent).
@@ -33,7 +34,7 @@ export function InAppNotice() {
     <div className="notice notice-warn inapp" role="alert">
       <b>{kind === 'kakao' ? '카카오톡' : '앱'} 안에서 열려 있어요.</b> 여기서는 Google 로그인이 막혀요. 기본 브라우저(Chrome·Safari 등)로 열어 주세요.
       <div className="row" style={{ marginTop: '0.4rem' }}>
-        {ext && <a className="btn btn-small btn-primary" href={ext}>기본 브라우저로 열기</a>}
+        {ext && <a className="btn btn-small btn-primary" href={ext} onClick={suspendLearning}>기본 브라우저로 열기</a>}
         <button
           className="btn btn-small"
           onClick={async () => {

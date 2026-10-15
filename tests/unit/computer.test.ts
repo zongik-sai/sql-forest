@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeWrongIds, addMock, cardsDone, emptyCgState, isOpen, isPassed, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
+  activeWrongIds, addLock, addMock, cardsDone, lockCount, LOCK_LIMIT, resetUnit, emptyCgState, isOpen, isPassed, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
   passNeed, passedCount, plantStage, recordScore, scoreMock, unitLevel, type CgState, type MockRecord,
 } from '../../src/features/computer/model';
 import { buildMock, optionOrder, orderByArea, seededRandom } from '../../src/features/computer/mock';
@@ -121,7 +121,7 @@ describe('기기 간 병합', () => {
   it('저장된 JSON이 이상해도 안전하게 읽는다', () => {
     expect(normalizeCgState(null)).toEqual(emptyCgState());
     expect(normalizeCgState({ units: { U1: { lv2: { best: 'x', passedAt: 3 } }, U99: {} }, mock: [{ bad: 1 }], wrong: { 'U2-a3': { at: T(1) } } })).toEqual({
-      v: 1, units: { U1: { lv2: {} } }, mock: [], wrong: { 'U2-a3': { at: T(1), n: 1 } }, cards: {}, upd: '',
+      v: 1, units: { U1: { lv2: {} } }, mock: [], wrong: { 'U2-a3': { at: T(1), n: 1 } }, cards: {}, locks: {}, resets: {}, upd: '',
     });
   });
 });
@@ -327,5 +327,56 @@ describe('카드별 개념 맞추기 데이터 검증', () => {
         expect(p.desc.length, c.id).toBeLessThanOrEqual(60);
       }
     }
+  });
+});
+
+describe('단원 집중 학습: 잠김 5번이면 그 단원 초기화', () => {
+  const ids = ['U1-t1', 'U1-t2'];
+  const studied = () => {
+    let s = markCard(markCard(emptyCgState(), 'U1', 'U1-t1', ids, T(1)).state, 'U1', 'U1-t2', ids, T(2)).state;
+    s = recordScore(s, 'U1', 2, 26, 30, T(3)).state;
+    s = markCard(s, 'U2', 'U2-t1', ['U2-t1'], T(4)).state;
+    s = noteAnswer(s, 'U1-b3', false, T(5));
+    return s;
+  };
+  it('4번까지는 세기만, 5번째에 그 단원 진도·점수·카드·잠김을 지운다(오답노트·다른 단원은 그대로)', () => {
+    let s = studied();
+    for (let i = 1; i < LOCK_LIMIT; i++) {
+      const r = addLock(s, 'U1', T(10 + i));
+      expect(r).toMatchObject({ count: i, reset: false });
+      s = r.state;
+    }
+    expect(lockCount(s, 'U1')).toBe(4);
+    const r = addLock(s, 'U1', T(20));
+    expect(r).toMatchObject({ count: 5, reset: true });
+    expect(r.state.units.U1).toBeUndefined();
+    expect(Object.keys(r.state.cards)).toEqual(['U2-t1']);
+    expect(lockCount(r.state, 'U1')).toBe(0);
+    expect(r.state.resets.U1).toEqual({ at: T(20), n: 1 });
+    expect(r.state.units.U2?.lv1).toBeDefined();
+    expect(activeWrongIds(r.state)).toEqual(['U1-b3']);
+  });
+  it('다른 기기의 예전 기록과 합쳐도 초기화가 되살아나지 않는다(초기화를 모르는 쪽의 그 단원만 버림)', () => {
+    const old = studied();
+    const reset = resetUnit(old, 'U1', T(30));
+    const again = markCard(reset, 'U1', 'U1-t1', ids, T(31)).state;
+    for (const m of [mergeCgStates(old, again), mergeCgStates(again, old)]) {
+      expect(m.units.U1?.lv2).toBeUndefined();
+      expect(Object.keys(m.cards).sort()).toEqual(['U1-t1', 'U2-t1']);
+      expect(m.cards['U1-t1']).toBe(T(31));
+      expect(m.units.U2?.lv1).toBeDefined();
+      expect(m.resets.U1?.at).toBe(T(30));
+    }
+  });
+  it('같은 초기화를 아는 두 기기의 잠김은 합쳐서 센다', () => {
+    const base = resetUnit(emptyCgState(), 'U3', T(1));
+    const a = addLock(base, 'U3', T(2)).state;
+    const b = addLock(addLock(base, 'U3', T(3)).state, 'U3', T(4)).state;
+    expect(lockCount(mergeCgStates(a, b), 'U3')).toBe(3);
+  });
+  it('저장 JSON의 잠김·초기화 기록을 안전하게 읽는다', () => {
+    const s = normalizeCgState({ locks: { U1: [T(1), 3, T(2)], U9: [T(1)], constructor: [T(1)] }, resets: { U2: { at: T(5) }, U3: { n: 2 } } });
+    expect(s.locks).toEqual({ U1: [T(1), T(2)] });
+    expect(s.resets).toEqual({ U2: { at: T(5), n: 1 } });
   });
 });

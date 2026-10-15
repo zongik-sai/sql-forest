@@ -68,7 +68,9 @@ test('알 수 없는 hash 경로는 과목 선택 화면으로', async ({ page }
 
 test('운영 빌드: 컴퓨터 일반 문제은행이 하위 경로에서 따로 내려받아져 열린다', async ({ page }) => {
   await page.goto('./#/computer/unit/U1/1');
-  await expect(page.getByRole('heading', { name: '1단계 이론' })).toBeVisible();
+  // 단원은 전체화면 집중 학습 시작 화면부터
+  await page.getByTestId('focus-overlay').getByRole('button', { name: /학습 시작$/ }).click();
+  await expect(page.getByRole('heading', { name: '1단계 이론·개념 맞추기' })).toBeVisible();
   await expect(page.locator('.cg-card').first()).toContainText('자료(Data)와 정보(Information)');
 });
 

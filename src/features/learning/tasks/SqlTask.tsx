@@ -168,7 +168,7 @@ export function SqlEditorTask(props: TaskProps<SqlEditorConfig>) {
         aria-describedby={`ed-help-${props.activity.id}`}
       />
       <p id={`ed-help-${props.activity.id}`} className="small muted" style={{ margin: 0 }}>
-        Ctrl+Enter로 실행·채점. Tab은 들여쓰기(편집기 밖으로 나가려면 Esc 후 Tab).
+        Ctrl+Enter로 실행·채점. Tab은 들여쓰기. 편집기 밖으로 나가려면 Shift+Tab(또는 Esc 후 Tab — 전체화면에서 Esc가 전체화면을 끝내는 브라우저는 잠김으로 세요).
       </p>
       <div className="row">
         <button className="btn btn-primary" onClick={() => void g.grade(sql)} disabled={g.busy || !g.active}>

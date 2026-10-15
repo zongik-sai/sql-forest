@@ -10,6 +10,9 @@ test('데모: 시작 → 최초 진단 건너뛰기 → U01 활동 4개(실제 �
   await page.getByRole('button', { name: '개발 데모로 시작' }).click();
   await expect(page.getByRole('heading', { name: '최초 진단 (5문항)' })).toBeVisible();
   await page.getByRole('button', { name: '처음부터 배우기' }).click();
+  // 단원 학습은 전체화면 집중 학습 시작 화면부터
+  await expect(page.getByTestId('focus-overlay')).toContainText('1단원 집중 학습');
+  await resumeIfPaused(page);
 
   // U01-A01 분류
   await expect(page.getByRole('heading', { name: '엔터티·속성·값 나누기' })).toBeVisible();
@@ -93,10 +96,10 @@ test('초안 저장 → 새로고침 → 단계·초안 복구, 사용자 클릭
   await page.getByLabel(/SQL 편집기/).fill("INSERT INTO students VALUES (9, '임시초안'");
   await page.waitForTimeout(300);
   await page.reload();
-  // 새로고침 후에는 자동 시작하지 않는다
+  // 새로고침 후에는 자동 시작하지 않는다(학습 중 새로고침은 화면을 떠난 것이라 잠김 1번으로 센다)
   await expect(page.getByTestId('focus-overlay')).toBeVisible();
-  await expect(page.getByTestId('focus-overlay')).toContainText('저장된 단계와 초안을 불러왔어요');
-  await page.getByRole('button', { name: '학습 계속하기' }).click();
+  await expect(page.getByTestId('focus-overlay')).toContainText('지금까지 이 단원 잠김 1/5');
+  await resumeIfPaused(page);
   await expect(page.getByLabel(/SQL 편집기/)).toHaveValue("INSERT INTO students VALUES (9, '임시초안'");
   // 예측 제출 상태도 복구
   await expect(page.locator('text=예측과 달라요')).toBeVisible();

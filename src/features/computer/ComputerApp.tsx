@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Link, NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { Link, NavLink, Navigate, Outlet, Route, Routes, useNavigate, useParams } from 'react-router-dom';
+import { FocusGate, FocusProvider, type StrictScope } from '../focus/FocusContext';
+import { suspendLearning } from '../focus/fullscreen';
+import { learnerPrefix, removeWithPrefix } from '../../lib/storage';
 import { InAppNotice } from '../../components/InAppNotice';
 import { Plant, PLANT_STAGES } from '../../components/Plant';
 import { isSupabaseConfigured } from '../../lib/config';
 import { useAuth } from '../auth/AuthContext';
-import { CG_UNITS } from './content';
-import { activeWrongIds, nextPlantGoal, passedCount, plantStage, TOTAL_STEPS } from './model';
+import { CG_UNITS, CG_UNIT_BY_ID } from './content';
+import { activeWrongIds, addLock, lockCount, LOCK_LIMIT, nextPlantGoal, passedCount, plantStage, TOTAL_STEPS } from './model';
+import type { CgUnitId } from './types';
 import { CgProvider, useCg, type CgSaveStatus } from './store';
 import { CgHome } from './pages/Home';
 import { LevelPage, UnitPage } from './pages/Unit';
@@ -46,7 +50,7 @@ function CgTopBar() {
       ) : cg.mode === 'demo' ? (
         <button className="btn btn-small btn-quiet" onClick={auth.exitDemo}>데모 나가기</button>
       ) : isSupabaseConfigured ? (
-        <button className="btn btn-small btn-primary" onClick={() => void auth.signIn('/computer')}>Google 로그인</button>
+        <button className="btn btn-small btn-primary" onClick={() => { suspendLearning(); void auth.signIn('/computer'); }}>Google 로그인</button>
       ) : null}
       {unsaved && (
         <div className="notice notice-warn row cg-unsaved" role="alert">
@@ -104,6 +108,50 @@ function CgLayout() {
   );
 }
 
+const noop = () => {};
+
+/**
+ * 단원 화면(단원 보기·1~5단계): 전체화면 집중 학습. 포커스를 잃거나 전체화면을 나가면 잠기고,
+ * 한 단원에서 5번 잠기면 그 단원의 진도·점수(단계 기록·카드·풀던 초안)를 초기화한다.
+ */
+function CgUnitShell() {
+  const { unitId } = useParams();
+  const u = CG_UNIT_BY_ID[unitId as CgUnitId];
+  const cg = useCg();
+  const auth = useAuth();
+  const nav = useNavigate();
+  const prefix = learnerPrefix(auth.identity ? auth.identity.learnerKey : 'guest');
+  if (!u) return <Navigate to="/computer" replace />;
+  const strict: StrictScope = {
+    key: `cg:${u.id}`,
+    label: `${u.num}단원`,
+    locks: lockCount(cg.state, u.id),
+    limit: LOCK_LIMIT,
+    onLock: () => {
+      let out = { count: 0, reset: false };
+      cg.commit((s) => {
+        const r = addLock(s, u.id);
+        out = { count: r.count, reset: r.reset };
+        return r.state;
+      });
+      if (out.reset) {
+        // 풀던 빈칸·객관식 초안도 함께 지운다
+        removeWithPrefix(`${prefix}cg:blanks:${u.id}`);
+        removeWithPrefix(`${prefix}cg:run:${u.id}:`);
+        nav(`/computer/unit/${u.id}/1`, { replace: true });
+      }
+      return out;
+    },
+  };
+  return (
+    <FocusProvider strict={strict} interruptSql={false} onActiveSeconds={noop} onPause={noop}>
+      <FocusGate exit={{ to: '/computer', label: '단원 목록으로 나가기' }}>
+        <div key={cg.state.resets[u.id]?.n ?? 0}><Outlet /></div>
+      </FocusGate>
+    </FocusProvider>
+  );
+}
+
 export function ComputerRoutes() {
   const auth = useAuth();
   if (auth.status === 'loading') return <div className="page" role="status">불러오는 중…</div>;
@@ -113,8 +161,10 @@ export function ComputerRoutes() {
       <Routes>
         <Route element={<CgLayout />}>
           <Route index element={<CgHome />} />
-          <Route path="unit/:unitId" element={<UnitPage />} />
-          <Route path="unit/:unitId/:level" element={<LevelPage />} />
+          <Route path="unit/:unitId" element={<CgUnitShell />}>
+            <Route index element={<UnitPage />} />
+            <Route path=":level" element={<LevelPage />} />
+          </Route>
           <Route path="mock" element={<MockHubPage />} />
           <Route path="mock/:kind" element={<MockExamPage />} />
           <Route path="wrong" element={<WrongNotePage />} />

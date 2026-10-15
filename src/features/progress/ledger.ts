@@ -29,6 +29,8 @@ export interface Ledger {
   award(rewardId: string): Promise<AwardResult>;
   awardBadge(badgeId: string, solvedChallenges: number): Promise<AwardResult>;
   subscribe(fn: () => void): () => void;
+  /** 단원 초기화: 이 보상·배지 기록을 지운다(로그인 사용자는 화면 사본만, 서버는 reset_db_unit) */
+  forget(ids: string[]): void;
 }
 
 export function totalXpOf(s: LedgerSnapshot, includePending = true): number {
@@ -91,5 +93,14 @@ export class LocalLedger implements Ledger {
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+
+  forget(ids: string[]): void {
+    const s = this.snapshot();
+    for (const id of ids) {
+      delete s.rewards[id];
+      delete s.badges[id];
+    }
+    this.save(s);
   }
 }

@@ -7,8 +7,8 @@ import { supabase } from '../features/auth/supabase';
 import { levelOf, MILESTONE_LEVELS } from '../features/growth/levels';
 import { LocalLedger, totalXpOf, type AwardResult, type Ledger, type LedgerSnapshot } from '../features/progress/ledger';
 import {
-  eligibleBadges, eligibleRewards, emptyLearnerState, isUnitComplete, mergeLearnerStates, solvedChallengeCount, unitCheckpointScore,
-  type LearnerState,
+  addUnitLock, eligibleBadges, eligibleRewards, emptyLearnerState, isUnitComplete, mergeLearnerStates, solvedChallengeCount, unitCheckpointScore,
+  unitItems, unitKeepList, unitRewardIds, type ActivityProgress, type LearnerState,
 } from '../features/progress/model';
 import { BADGE_BY_ID, REWARD_BY_ID } from '../features/progress/rewards';
 import { learnerPrefix, readJson, removeWithPrefix, writeJson } from '../lib/storage';
@@ -42,7 +42,12 @@ interface LearnerCtx {
   /** 데모·내 데이터 초기화 */
   resetMyData: () => Promise<string | null>;
   remote: RemoteProgress | null;
+  /** 단원 집중 학습: 잠김 1회 기록(동기 저장). 한도에 닿으면 그 단원 초기화(서버 포함) */
+  lockUnit: (unitId: UnitId) => { count: number; reset: boolean };
 }
+
+/** 활동 ID → 단원('U03-A02' → 'U03', 'CH-U03' → 'U03') */
+const unitOfActivity = (id: string): UnitId | null => (/^(?:CH-)?(U\d\d)/.exec(id)?.[1] as UnitId | undefined) ?? null;
 
 const Ctx = createContext<LearnerCtx | null>(null);
 export const useLearner = () => {
@@ -87,6 +92,36 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
     return () => window.removeEventListener('storage', on);
   }, [stateKey]);
 
+  /**
+   * 단원 초기화 마무리: 초기화한 단원인데 서버에 지금 학습 상태에 없는 그 단원 경험치·배지(또는 활동 행)가 남아 있으면
+   * (오프라인·로그아웃 등으로 서버 초기화를 못 한 경우) 학습 상태에 있는 것(초기화 뒤 새로 한 공부)만 남기고 지운다.
+   * 어느 기기에서든 이어서 처리된다. staleUnits: 불러온 활동 행 중 학습 상태에 없는 것이 있던 단원
+   */
+  const syncResets = useCallback(async (s: LearnerState, staleUnits: Set<UnitId> = new Set()) => {
+    if (!remote || !(ledger instanceof SupabaseLedger)) return;
+    const marks = Object.entries(s.unitResets ?? {}) as [UnitId, { at: string; n: number }][];
+    if (!marks.length) return;
+    try {
+      await ledger.refresh();
+    } catch {
+      return;
+    }
+    const snap = ledger.snapshot();
+    let changed = false;
+    for (const [u, m] of marks) {
+      const keep = unitKeepList(s, u);
+      const extra = unitRewardIds(u).some((id) => (snap.rewards[id] !== undefined || snap.badges[id] !== undefined) && !keep.includes(id));
+      if ((extra || staleUnits.has(u)) && (await remote.resetUnit(u, m.at, m.n, keep))) changed = true;
+    }
+    if (changed) await ledger.refresh().catch(() => {});
+  }, [remote, ledger]);
+
+  useEffect(() => {
+    const on = () => void syncResets(stateRef.current);
+    window.addEventListener('online', on);
+    return () => window.removeEventListener('online', on);
+  }, [syncResets]);
+
   // 로그인 사용자: 서버 상태를 불러와 로컬 캐시와 병합
   useEffect(() => {
     if (!remote || !(ledger instanceof SupabaseLedger)) return;
@@ -106,12 +141,32 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
         suppressLevelUp.current = false;
         const { state: rs, activities } = await remote.load();
         if (!alive) return;
-        setState((cur) => {
-          const server: LearnerState = { ...(rs ?? emptyLearnerState(identity.learnerKey)), learnerKey: identity.learnerKey, activities: { ...(rs?.activities ?? {}), ...activities } };
-          const merged = mergeLearnerStates(cur, server);
-          writeJson(stateKey, merged);
-          return merged;
-        });
+        // 병합은 setState 밖에서(바로 이어서 초기화 마무리에 쓰므로). stateRef는 매 렌더·commit마다 최신
+        const cur = stateRef.current;
+        // 초기화 표시보다 이른 활동 행은 버린다(서버 초기화를 아직 못 했어도 되살아나지 않게. 시계 차이는 syncResets가 보정)
+        const marks = { ...(rs?.unitResets ?? {}) };
+        for (const [u, mk] of Object.entries(cur.unitResets ?? {})) if (mk && (!marks[u as UnitId] || marks[u as UnitId]!.at < mk.at)) marks[u as UnitId] = mk;
+        const rows: Record<string, ActivityProgress> = {};
+        for (const [id, a] of Object.entries(activities)) {
+          const u = unitOfActivity(id);
+          const mk = u ? marks[u] : undefined;
+          if (mk && Date.parse(a.updatedAt) <= Date.parse(mk.at)) continue;
+          rows[id] = a;
+        }
+        const server: LearnerState = { ...(rs ?? emptyLearnerState(identity.learnerKey)), learnerKey: identity.learnerKey, activities: { ...(rs?.activities ?? {}), ...rows } };
+        const merged = mergeLearnerStates(cur, server);
+        stateRef.current = merged;
+        setState(merged);
+        writeJson(stateKey, merged);
+        // 초기화한 단원인데 서버에 학습 상태에 없는 활동 행이 남아 있으면 정리 대상
+        const staleUnits = new Set<UnitId>();
+        for (const id of Object.keys(activities)) {
+          const u = unitOfActivity(id);
+          if (u && merged.unitResets?.[u] && !merged.activities[id]) staleUnits.add(u);
+        }
+        // 서버 스냅샷이 이 기기의 초기화를 모르면 바로 알려 주고, 남은 서버 기록을 정리한다
+        if (JSON.stringify(rs?.unitResets ?? {}) !== JSON.stringify(merged.unitResets ?? {})) remote.saveSnapshot(merged, true);
+        await syncResets(merged, staleUnits);
         await remote.startSession();
       } catch {
         suppressLevelUp.current = false;
@@ -122,7 +177,7 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
       alive = false;
       un();
     };
-  }, [remote, ledger, identity.learnerKey, stateKey]);
+  }, [remote, ledger, identity.learnerKey, stateKey, syncResets]);
 
   const totalXp = totalXpOf(snap);
   const level = levelOf(totalXp);
@@ -217,6 +272,28 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
     remote.resolveConflict(activityId, c.server.revision);
   }, [remote, commit]);
 
+  const lockUnit = useCallback((u: UnitId) => {
+    let out = { count: 0, reset: false };
+    void commit((s) => {
+      const r = addUnitLock(s, u);
+      out = { count: r.count, reset: r.reset };
+      return r.state;
+    }, { immediate: true });
+    if (out.reset) {
+      // 저장 대기 중인 그 단원 활동은 버리고, 화면의 경험치·배지 사본에서도 뺀 뒤 서버 기록을 지운다.
+      // 실패해도(오프라인 등) 학습 상태의 초기화 표시가 남아 다음 접속 때 syncResets가 마무리한다.
+      remote?.dropQueued(unitItems(u).activityIds);
+      ledger.forget(unitRewardIds(u));
+      const mark = stateRef.current.unitResets?.[u];
+      if (remote && mark) {
+        void remote.resetUnit(u, mark.at, mark.n, []).then((ok) => {
+          if (ok && ledger instanceof SupabaseLedger) void ledger.refresh().catch(() => {});
+        });
+      }
+    }
+    return out;
+  }, [commit, remote, ledger]);
+
   const resetMyData = useCallback(async () => {
     if (remote) {
       const err = await remote.deleteMyData();
@@ -235,7 +312,7 @@ export function LearnerProvider({ identity, children }: { identity: Identity; ch
     pendingSync: snap.pendingRewards.length > 0,
     saveStatus, conflicts, resolveConflict,
     celebrations, dismissCelebration: (id) => setCelebrations((c) => c.filter((x) => x.id !== id)),
-    resetMyData, remote,
+    resetMyData, remote, lockUnit,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -27,11 +27,16 @@ export async function openWithState(page: Page, state: LearnerState | null, path
   await page.goto(`./#${path}`);
 }
 
-/** 새로고침/직접 진입 시 보이는 '학습 계속하기'를 누른다 */
+/** 새로고침/직접 진입 시 보이는 '학습 계속하기' 또는 단원 집중 학습 시작 버튼을 누른다 */
 export async function resumeIfPaused(page: Page) {
-  const btn = page.getByRole('button', { name: '학습 계속하기' });
+  const overlay = page.getByTestId('focus-overlay');
+  // 단원 화면은 시작 화면(전체화면으로 학습 시작)이 먼저 뜬다
+  await overlay.waitFor({ state: 'visible', timeout: 1500 }).catch(() => {});
+  const btn = overlay.getByRole('button', { name: /^(학습 계속하기|(전체화면으로 )?학습 시작|(전체화면으로 )?다시 시작)$/ });
   if (await btn.isVisible().catch(() => false)) await btn.click();
-  await expect(page.getByTestId('focus-overlay')).toHaveCount(0);
+  await expect(overlay).toHaveCount(0);
+  // 전체화면 전환 직후 유예 시간(이탈을 세지 않는 1.5초)이 지나도록 기다린다
+  await page.waitForTimeout(1600);
 }
 
 export async function simulateLeave(page: Page, how: 'hidden' | 'blur') {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ActiveTimer, focusReducer, initialFocus, type FocusState } from '../../src/features/focus/focusMachine';
+import { ActiveTimer, countsAsLock, focusReducer, initialFocus, lockNotice, type FocusState } from '../../src/features/focus/focusMachine';
 
 const on = { visible: true, hasFocus: true };
 const off = { visible: true, hasFocus: false };
@@ -73,5 +73,41 @@ describe('활성 시간 타이머', () => {
     t = 500;
     timer.stop();
     expect(timer.takeSeconds()).toBe(0);
+  });
+});
+
+describe('단원 집중 학습(strict)', () => {
+  it('시작은 항상 클릭 대기(gate), 클릭하면 active', () => {
+    let s = focusReducer(initialFocus, { type: 'start', env: on, strict: true });
+    expect(s).toMatchObject({ status: 'readyToResume', reason: 'gate' });
+    s = focusReducer(s, { type: 'resume', env: on });
+    expect(s.status).toBe('active');
+  });
+  it('시작 화면에서 창을 떠나도 gate 그대로(잠김 아님)', () => {
+    let s = focusReducer(initialFocus, { type: 'start', env: on, strict: true });
+    s = focusReducer(s, { type: 'blur' });
+    expect(s).toMatchObject({ status: 'paused', reason: 'gate' });
+  });
+  it('전체화면 나가기도 이탈로 처리', () => {
+    const s = focusReducer(focusReducer(initialFocus, { type: 'start', env: on }), { type: 'fullscreen' });
+    expect(s).toMatchObject({ status: 'paused', reason: 'fullscreen' });
+  });
+  it('학습 중(active)의 이탈만 잠김으로 센다(쉬기·시작 화면은 세지 않음)', () => {
+    expect(countsAsLock('active', 'blur')).toBe(true);
+    expect(countsAsLock('active', 'fullscreen')).toBe(true);
+    expect(countsAsLock('active', 'manualBreak')).toBe(false);
+    expect(countsAsLock('paused', 'blur')).toBe(false);
+    expect(countsAsLock('readyToResume', 'hidden')).toBe(false);
+  });
+  it('새 단원에 들어오면 gate로(학습 중이었어도)', () => {
+    const s = focusReducer(focusReducer(initialFocus, { type: 'start', env: on }), { type: 'gate' });
+    expect(s).toMatchObject({ status: 'paused', reason: 'gate', pauses: 0 });
+  });
+  it('안내: n/5, 마지막(4/5) 경고, 초기화', () => {
+    expect(lockNotice(2, 5, false)).toMatchObject({ title: '화면이 잠겼어요 (2/5)', last: false });
+    expect(lockNotice(2, 5, false).body).toContain('3번 남음');
+    expect(lockNotice(4, 5, false)).toMatchObject({ last: true });
+    expect(lockNotice(4, 5, false).body).toContain('한 번 더');
+    expect(lockNotice(5, 5, true).title).toContain('처음으로');
   });
 });

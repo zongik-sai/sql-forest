@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
-import { HashRouter, Link, MemoryRouter, NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { HashRouter, Link, MemoryRouter, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Garden } from '../components/Garden';
 import { useAuth } from '../features/auth/AuthContext';
-import { FocusGate, FocusProvider, markInAppNavigation, useFocusGate } from '../features/focus/FocusContext';
-import { addActiveSeconds } from '../features/progress/model';
+import { FocusGate, FocusProvider, markInAppNavigation, useFocusGate, type StrictScope } from '../features/focus/FocusContext';
+import { addActiveSeconds, unitLockCount, UNIT_LOCK_LIMIT } from '../features/progress/model';
+import type { UnitId } from '../content/types';
 import { stageOf } from '../features/growth/levels';
 import { ActivityPage, ChallengePage, CheckpointPage, UnitPage } from '../features/learning/pages';
 import { Dashboard, FinalPage, PrePage, ReportPage, ReviewPage } from '../features/progress/pages';
@@ -44,7 +45,7 @@ function TopBar({ learning }: { learning?: boolean }) {
       )}
       <span className="spacer" />
       <SaveStatus />
-      {learning && f.inSession && <button className="btn btn-small" onClick={f.manualBreak}>쉬기</button>}
+      {learning && f.inSession && !f.strict && <button className="btn btn-small" onClick={f.manualBreak}>쉬기</button>}
       {L.identity.kind === 'demo' ? (
         <button className="btn btn-small btn-quiet" onClick={auth.exitDemo}>데모 나가기</button>
       ) : (
@@ -147,18 +148,40 @@ function AppLayout() {
   );
 }
 
+/** 단원 화면(/learn/U03…, /challenge/CH-U03)이면 그 단원 */
+const unitOfPath = (path: string): UnitId | null => {
+  const m = /^\/(?:learn\/|challenge\/CH-)(U(?:0[1-9]|1[0-2]))(?:\/|$)/.exec(path);
+  return m && UNIT_BY_ID[m[1] as UnitId] ? (m[1] as UnitId) : null;
+};
+
 function LearningLayout() {
   const L = useLearner();
+  const loc = useLocation();
+  const nav = useNavigate();
+  const unit = unitOfPath(loc.pathname);
+  // 단원 학습은 전체화면 집중 학습: 포커스를 잃으면 잠기고, 한 단원에서 5번 잠기면 그 단원 진도·점수 초기화
+  const strict: StrictScope | null = unit ? {
+    key: `db:${unit}`,
+    label: `${UNIT_BY_ID[unit].order}단원`,
+    locks: unitLockCount(L.state, unit),
+    limit: UNIT_LOCK_LIMIT,
+    onLock: () => {
+      const r = L.lockUnit(unit);
+      if (r.reset) nav(`/learn/${unit}`, { replace: true });
+      return r;
+    },
+  } : null;
   return (
     <FocusProvider
       onActiveSeconds={(item, sec) => void L.commit((s) => addActiveSeconds(s, item, sec))}
       onPause={L.flushLocal}
+      strict={strict}
     >
       <div className="app-shell">
         <TopBar learning />
         <ConflictBanner />
-        <FocusGate>
-          <main id="main"><Outlet /></main>
+        <FocusGate exit={{ to: '/garden', label: '나의 정원으로 나가기' }}>
+          <main id="main" key={unit ? L.state.unitResets?.[unit]?.n ?? 0 : 0}><Outlet /></main>
         </FocusGate>
         <CelebrationLayer />
       </div>

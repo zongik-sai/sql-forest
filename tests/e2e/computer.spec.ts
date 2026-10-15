@@ -9,6 +9,20 @@ import { buildMock } from '../../src/features/computer/mock';
 const U1 = CG_UNITS[0];
 const GUEST_STATE = 'sqlforest:v1:guest:cg:state';
 
+/** 단원 화면의 집중 학습 시작 화면에서 시작을 누른다(전체화면 전환 직후 유예 1.5초를 기다림) */
+async function startUnit(page: Page) {
+  const overlay = page.getByTestId('focus-overlay');
+  await expect(overlay).toBeVisible();
+  await overlay.getByRole('button', { name: /학습 시작$|다시 시작$/ }).click();
+  await expect(overlay).toHaveCount(0);
+  await page.waitForTimeout(1600);
+}
+async function leaveAndReturn(page: Page) {
+  await page.evaluate(() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); });
+  await expect(page.getByTestId('focus-overlay')).toBeVisible();
+  await page.evaluate(() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); });
+}
+
 async function fresh(page: Page, path = '/') {
   await page.goto('./');
   await page.evaluate(() => localStorage.clear());
@@ -49,6 +63,9 @@ test('첫 화면은 과목명으로 고른다(자격증 이름 없음)', async (
 
 test('이론·개념 맞추기 → 전체 끼워맞추기 → 기초 객관식: 통과 기준·잠금·식물 성장·오답노트', async ({ page }) => {
   await fresh(page, `/computer/unit/${U1.id}`);
+  // 단원은 전체화면 집중 학습: 시작 화면에서 규칙(5번 잠기면 초기화)을 보여 주고 클릭으로 시작
+  await expect(page.getByTestId('focus-overlay')).toContainText('5번');
+  await startUnit(page);
   // 2단계는 잠김 → "그래도 풀어보기" 가능
   await page.goto(`./#/computer/unit/${U1.id}/2`);
   await expect(page.getByText('앞 단계 1단계 이론·개념 맞추기를 통과하면 열려요.')).toBeVisible();
@@ -202,4 +219,91 @@ test('휴대폰 너비에서도 가로 스크롤 없이 보인다', async ({ pag
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow, path).toBeLessThanOrEqual(1);
   }
+});
+
+test('단원 집중 학습: 시작 화면 → 전체화면 → 포커스 잃으면 잠김(n/5) → 쉬기는 세지 않음 → 5번째에 그 단원만 초기화', async ({ page }) => {
+  // U1·U2를 공부한 기록 + 오답노트 1문항
+  await page.goto('./');
+  await page.evaluate((k) => {
+    localStorage.clear();
+    const at = '2026-10-15T00:00:00.000Z';
+    localStorage.setItem(k, JSON.stringify({
+      v: 1, upd: at, mock: [], locks: {}, resets: {},
+      units: { U1: { lv1: { best: 14, total: 14, passedAt: at, lastAt: at }, lv2: { best: 26, total: 30, passedAt: at, lastAt: at } }, U2: { lv1: { passedAt: at, lastAt: at } } },
+      cards: { 'U1-t1': at, 'U1-t2': at, 'U2-t1': at },
+      wrong: { 'U1-b1': { at, n: 1 } },
+    }));
+  }, GUEST_STATE);
+  await page.goto('about:blank');
+  await page.goto(`./#/computer/unit/${U1.id}/2`);
+  const overlay = page.getByTestId('focus-overlay');
+  await expect(overlay.getByRole('heading')).toHaveText('1단원 집중 학습');
+  await expect(overlay).toContainText('지금까지 이 단원 잠김 0/5');
+  // 시작 화면에서는 아직 세지 않는다
+  await page.evaluate(() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); });
+  await page.evaluate(() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); });
+  await expect(overlay).toContainText('0/5');
+  await startUnit(page);
+  expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await expect(page.locator('.strict-bar')).toContainText('1단원 잠김 0/5');
+
+  // 1번째: 다른 창으로 → 잠김 1/5, 같은 이탈의 연속 이벤트(blur 뒤 hidden)는 한 번만
+  await page.evaluate(() => {
+    document.hasFocus = () => false;
+    window.dispatchEvent(new Event('blur'));
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(overlay.getByRole('heading')).toHaveText('화면이 잠겼어요 (1/5)');
+  await expect(page.locator('[data-focus-status]')).toHaveAttribute('inert', '');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    document.hasFocus = () => true;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await startUnit(page);
+  await expect(page.locator('.strict-bar')).toContainText('1/5');
+
+  // 2번째: 전체화면 나가기(Esc와 같음)
+  await page.evaluate(() => document.exitFullscreen());
+  await expect(overlay.getByRole('heading')).toHaveText('화면이 잠겼어요 (2/5)');
+  await startUnit(page);
+
+  // 쉬기는 세지 않는다
+  await page.locator('.strict-bar').getByRole('button', { name: '쉬기' }).click();
+  await expect(overlay.getByRole('heading')).toHaveText('쉬는 중이에요');
+  await page.evaluate(() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); });
+  await page.evaluate(() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); });
+  await startUnit(page);
+  await expect(page.locator('.strict-bar')).toContainText('2/5');
+
+  // 3·4번째(4번째는 마지막 경고)
+  await leaveAndReturn(page);
+  await startUnit(page);
+  await leaveAndReturn(page);
+  await expect(overlay.getByRole('heading')).toHaveText('화면이 잠겼어요 (4/5)');
+  await expect(overlay).toContainText('마지막 경고');
+  await startUnit(page);
+
+  // 5번째 → 1단원 진도·점수 초기화, 1단계로 이동. 2단원·오답노트는 그대로
+  await leaveAndReturn(page);
+  await expect(overlay.getByRole('heading')).toHaveText('이 단원 기록이 처음으로 돌아갔어요');
+  await expect(page).toHaveURL(new RegExp(`#/computer/unit/${U1.id}/1$`));
+  const saved = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{}'), GUEST_STATE);
+  expect(saved.units.U1).toBeUndefined();
+  expect(Object.keys(saved.cards)).toEqual(['U2-t1']);
+  expect(saved.units.U2.lv1.passedAt).toBeTruthy();
+  expect(Object.keys(saved.wrong)).toEqual(['U1-b1']);
+  expect(saved.resets.U1.n).toBe(1);
+  await startUnit(page);
+  await expect(page.locator('.strict-bar')).toContainText('0/5');
+  await expect(page.getByText(`맞춘 카드 0/${U1.cards.length}`)).toBeVisible();
+
+  // 단원 밖(모의고사)으로 나가면 전체화면이 끝나고, 세지 않는다
+  await page.locator('.topbar').getByRole('link', { name: '모의고사' }).click();
+  await expect(page).toHaveURL(/#\/computer\/mock$/);
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+  await expect(page.getByTestId('focus-overlay')).toHaveCount(0);
+  const after = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{}'), GUEST_STATE);
+  expect(after.locks.U1 ?? []).toHaveLength(0);
 });

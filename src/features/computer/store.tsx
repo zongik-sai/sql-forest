@@ -189,6 +189,23 @@ export function CgProvider({ children }: { children: ReactNode }) {
     };
   }, [mode, stateKey, revKey, pushNow, writeLocal]);
 
+  // 같은 기기의 다른 탭에서 기록이 바뀌면 합친다(한 탭의 오래된 기록이 단원 초기화 등을 덮어쓰지 않게)
+  useEffect(() => {
+    const on = (e: StorageEvent) => {
+      if (e.key !== stateKey || !e.newValue) return;
+      try {
+        const other = normalizeCgState(JSON.parse(e.newValue));
+        const merged = mergeCgStates(stateRef.current, other);
+        stateRef.current = merged;
+        setState(merged);
+      } catch {
+        /* 무시 */
+      }
+    };
+    window.addEventListener('storage', on);
+    return () => window.removeEventListener('storage', on);
+  }, [stateKey]);
+
   // 다시 온라인이 되거나 창을 떠날 때 저장
   useEffect(() => {
     const onOnline = () => void pushNow();

@@ -93,6 +93,15 @@ export class SupabaseLedger implements Ledger {
     }
   }
 
+  forget(ids: string[]): void {
+    for (const id of ids) {
+      delete this.snap.rewards[id];
+      delete this.snap.badges[id];
+    }
+    this.snap.pendingRewards = this.snap.pendingRewards.filter((p) => !ids.includes(p));
+    this.emit();
+  }
+
   /** 오프라인 대기 보상 재전송. 서버가 ON CONFLICT DO NOTHING으로 중복을 막는다. */
   async flush(): Promise<void> {
     if (this.flushing || !this.snap.pendingRewards.length) return;
@@ -172,9 +181,17 @@ export class RemoteProgress {
     this.schedule(immediate ? 0 : 1000);
   }
 
+  /** 바로 보내기로 한 저장(제출·완료·잠김)은 뒤이은 일반 저장이 미루지 못한다 */
+  private immediatePending = false;
   private schedule(ms: number) {
+    if (this.timer && this.immediatePending && ms > 0) return;
     if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => void this.flush(), ms);
+    this.immediatePending = ms === 0;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.immediatePending = false;
+      void this.flush();
+    }, ms);
   }
 
   onRevision?: (activityId: string, revision: number) => void;
@@ -263,6 +280,28 @@ export class RemoteProgress {
       await this.sb.rpc('record_mastery', { p_challenge_id: challengeId, p_status: status });
     } catch {
       /* best effort */
+    }
+  }
+
+  /** 단원 초기화로 지운 활동의 저장 대기분은 보내지 않는다 */
+  dropQueued(activityIds: string[]) {
+    for (const id of activityIds) {
+      this.queue.delete(id);
+      this.revs.delete(id);
+    }
+    this.conflicts = this.conflicts.filter((c) => !activityIds.includes(c.activityId));
+  }
+
+  /**
+   * 서버의 그 단원 기록(경험치·배지·활동 진도·단원 요약·도전 기록)을 지운다. 성공하면 true.
+   * keep: 지우지 말 항목(늦게 다시 보낼 때 초기화 뒤 새로 한 공부). 바로 보낼 때는 빈 배열.
+   */
+  async resetUnit(unitId: string, at: string, n: number, keep: string[]): Promise<boolean> {
+    try {
+      const { error } = await this.sb.rpc('reset_db_unit', { p_unit_id: unitId, p_at: at, p_n: n, p_keep: keep });
+      return !error;
+    } catch {
+      return false;
     }
   }
 

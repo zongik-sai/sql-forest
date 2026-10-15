@@ -1,4 +1,4 @@
-import { ACTIVITY_BY_ID, CHALLENGE_BY_ID, CHECKPOINTS, FINAL_DIAGNOSTIC, QUESTION_BY_ID, UNITS, UNIT_IDS, VARIANT_OF } from '../../content';
+import { ACTIVITY_BY_ID, CHALLENGE_BY_ID, CHECKPOINTS, FINAL_DIAGNOSTIC, QUESTION_BY_ID, UNITS, UNIT_BY_ID, UNIT_IDS, VARIANT_OF, challengeOf } from '../../content';
 import type { UnitId } from '../../content/types';
 
 /**
@@ -63,6 +63,10 @@ export interface LearnerState {
   totalActiveSeconds: number;
   lastLocation: string | null;
   wrongLog: { itemId: string; conceptTags: string[]; at: string }[];
+  /** 단원 집중 학습 중 잠긴 시각들(마지막 초기화 이후) */
+  unitLocks?: Partial<Record<UnitId, string[]>>;
+  /** 단원 초기화: 마지막 시각과 누적 횟수. 병합할 때 이 시각을 모르는(더 오래된) 쪽의 그 단원 기록은 버린다 */
+  unitResets?: Partial<Record<UnitId, { at: string; n: number }>>;
 }
 
 export function emptyLearnerState(learnerKey: string, now = new Date().toISOString()): LearnerState {
@@ -263,7 +267,14 @@ export function eligibleBadges(s: LearnerState): string[] {
 }
 
 /** 두 기기의 상태를 합친다: 완료는 합집합(단조 증가), 초안은 최신 updatedAt */
-export function mergeLearnerStates(local: LearnerState, remote: LearnerState): LearnerState {
+export function mergeLearnerStates(local0: LearnerState, remote0: LearnerState): LearnerState {
+  const resets = latestResets(local0, remote0) ?? {};
+  const local = dropStale(local0, resets), remote = dropStale(remote0, resets);
+  const unitLocks: NonNullable<LearnerState['unitLocks']> = {};
+  for (const u of UNIT_IDS) {
+    const l = [...new Set([...(local.unitLocks?.[u] ?? []), ...(remote.unitLocks?.[u] ?? [])])].sort();
+    if (l.length) unitLocks[u] = l.slice(-50);
+  }
   const activities: Record<string, ActivityProgress> = { ...remote.activities };
   for (const [id, la] of Object.entries(local.activities)) {
     const ra = activities[id];
@@ -303,5 +314,89 @@ export function mergeLearnerStates(local: LearnerState, remote: LearnerState): L
     celebratedUnits: [...new Set([...local.celebratedUnits, ...remote.celebratedUnits])],
     totalActiveSeconds: Math.max(local.totalActiveSeconds, remote.totalActiveSeconds),
     wrongLog: local.wrongLog.length >= remote.wrongLog.length ? local.wrongLog : remote.wrongLog,
+    unitLocks,
+    unitResets: resets,
   };
+}
+
+/* ---------------- 단원 집중 학습: 잠김·초기화 ---------------- */
+
+/** 한 단원에서 이만큼 잠기면 그 단원의 진도·점수를 초기화한다(선생님 결정) */
+export const UNIT_LOCK_LIMIT = 5;
+
+export const unitLockCount = (s: LearnerState, u: UnitId) => s.unitLocks?.[u]?.length ?? 0;
+
+/** 단원에 속한 진도 항목: 활동 4개·도전 과제, 체크포인트(+변형 문항) */
+export function unitItems(u: UnitId): { activityIds: string[]; questionIds: string[]; challengeId: string | null } {
+  const unit = UNIT_BY_ID[u];
+  const ch = challengeOf(u)?.id ?? null;
+  const qs = unit.checkpointIds.flatMap((q) => (VARIANT_OF[q] ? [q, VARIANT_OF[q].id] : [q]));
+  return { activityIds: [...unit.activityIds, ...(ch ? [ch] : [])], questionIds: qs, challengeId: ch };
+}
+
+/** 단원 초기화로 지워지는 보상·배지 ID(원장에서 함께 지운다) */
+export function unitRewardIds(u: UnitId): string[] {
+  const unit = UNIT_BY_ID[u];
+  return [...unit.activityIds.map((a) => `activity:${a}`), ...unit.checkpointIds.map((q) => `checkpoint:${q}`), `unit:${u}`, unit.badgeId];
+}
+
+function stripUnit(s: LearnerState, u: UnitId): LearnerState {
+  const { activityIds, questionIds, challengeId } = unitItems(u);
+  const activities = { ...s.activities };
+  for (const a of activityIds) delete activities[a];
+  const questions = { ...s.questions };
+  for (const q of questionIds) delete questions[q];
+  const challenges = { ...s.challenges };
+  if (challengeId) delete challenges[challengeId];
+  const unitLocks = { ...(s.unitLocks ?? {}) };
+  delete unitLocks[u];
+  return { ...s, activities, questions, challenges, unitLocks, celebratedUnits: s.celebratedUnits.filter((x) => x !== u) };
+}
+
+const later = (now: string, prev?: string) => (prev && prev >= now ? new Date(Date.parse(prev) + 1).toISOString() : now);
+
+/** 단원의 진도·점수(활동·체크포인트·도전 과제 기록)와 잠김 횟수를 지운다. 오답 기록(복습)·다른 단원은 그대로 */
+export function resetUnitProgress(s: LearnerState, u: UnitId, now = new Date().toISOString()): LearnerState {
+  const prev = s.unitResets?.[u];
+  return { ...stripUnit(s, u), unitResets: { ...(s.unitResets ?? {}), [u]: { at: later(now, prev?.at), n: (prev?.n ?? 0) + 1 } } };
+}
+
+/** 잠김 1회 기록. 한도에 닿으면 그 단원을 초기화한다 */
+export function addUnitLock(s: LearnerState, u: UnitId, now = new Date().toISOString()): { state: LearnerState; count: number; reset: boolean } {
+  const cur = s.unitLocks?.[u] ?? [];
+  const list = [...cur, later(now, cur[cur.length - 1])];
+  if (list.length >= UNIT_LOCK_LIMIT) return { state: resetUnitProgress(s, u, now), count: list.length, reset: true };
+  return { state: { ...s, unitLocks: { ...(s.unitLocks ?? {}), [u]: list } }, count: list.length, reset: false };
+}
+
+/** 병합 전: 상대가 아는 더 최근 초기화를 모르는 쪽이면 그 단원 기록을 버린다(초기화가 되살아나지 않게) */
+function latestResets(a: LearnerState, b: LearnerState): LearnerState['unitResets'] {
+  const out: NonNullable<LearnerState['unitResets']> = {};
+  for (const u of UNIT_IDS) {
+    const ra = a.unitResets?.[u], rb = b.unitResets?.[u];
+    if (!ra && !rb) continue;
+    out[u] = { at: (ra?.at ?? '') > (rb?.at ?? '') ? ra!.at : rb!.at, n: Math.max(ra?.n ?? 0, rb?.n ?? 0) };
+  }
+  return out;
+}
+function dropStale(x: LearnerState, latest: NonNullable<LearnerState['unitResets']>): LearnerState {
+  let out = x;
+  for (const u of UNIT_IDS) {
+    const r = latest[u];
+    if (r && (x.unitResets?.[u]?.at ?? '') < r.at) out = stripUnit(out, u);
+  }
+  return out;
+}
+
+/**
+ * 서버 단원 초기화를 늦게 다시 보낼 때 지우지 말 항목: 지금 학습 상태(초기화 뒤 새로 한 공부) 기준.
+ * 시각을 비교하지 않으므로 기기 시계가 서버와 달라도 된다.
+ */
+export function unitKeepList(s: LearnerState, u: UnitId): string[] {
+  const ids = new Set(unitRewardIds(u));
+  const { activityIds, challengeId } = unitItems(u);
+  const keep = [...eligibleRewards(s), ...eligibleBadges(s)].filter((r) => ids.has(r));
+  for (const a of activityIds) if (s.activities[a]) keep.push(a);
+  if (challengeId && s.challenges[challengeId]) keep.push(`mastery:${challengeId}`);
+  return keep;
 }
