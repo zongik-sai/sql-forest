@@ -1209,7 +1209,7 @@
         "low = mid - 1"
       ],
       "a": 0,
-      "exp": "a[mid]가 target보다 작으면 target은 mid 오른쪽에 있으므로 low를 mid + 1로 옮긴다. low = mid는 범위가 줄지 않아 무한 반복에 빠질 수 있고, low = mid - 1은 범위를 오히려 넓히며, high = mid + 1은 오른쪽에 있는 target을 범위 밖으로 잘라 낸다.",
+      "exp": "a[mid]가 target보다 작으면 target은 mid 오른쪽에 있으므로 low를 mid + 1로 옮긴다. low = mid는 범위가 줄지 않아 무한 반복에 빠질 수 있고, low = mid - 1은 범위를 오히려 넓히며, high = mid + 1은 오른쪽에 있는 target을 범위 밖으로 잘라 낼 수 있다.",
       "area": "ALGO",
       "type": "코드"
     },
