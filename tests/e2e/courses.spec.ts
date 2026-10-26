@@ -131,13 +131,12 @@ test('휴대폰 너비(390px): 과목 홈·코드가 있는 카드·코드가 �
   const prog = loadCourse('prog');
   const paper = buildMock(prog.units, 'set1', { seedPrefix: prog.mockSeed, areas: prog.areas.map((a) => a.id) });
   const qi = paper.items.findIndex((q) => q.code);
+  expect(qi, '프로그래밍 모의고사 1회에 코드가 있는 문항이 없음').toBeGreaterThanOrEqual(0);
   await fresh(page, '/programming/mock/set1');
   await expect(page.locator('.cg-exam-bar')).toBeVisible();
-  if (qi >= 0) {
-    await page.locator('.cg-qgrid').getByRole('button', { name: `${qi + 1}번`, exact: true }).click();
-    await expect(page.locator('.cg-q')).toContainText(paper.items[qi].question.slice(0, 15));
-    await expect(page.locator('main pre.codeblock')).toBeVisible();
-  }
+  await page.locator('.cg-qgrid').getByRole('button', { name: `${qi + 1}번`, exact: true }).click();
+  await expect(page.locator('.cg-q')).toContainText(paper.items[qi].question.slice(0, 15));
+  await expect(page.locator('main pre.codeblock')).toBeVisible();
   await page.waitForTimeout(200);
   expect(await overflowX(page), 'prog 모의고사').toBeLessThanOrEqual(1);
 });
