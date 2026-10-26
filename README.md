@@ -1,4 +1,4 @@
-# 배움 숲 (SQL 숲 키우기 v2 + 컴퓨터 일반)
+# 배움 숲 (SQL 숲 키우기 v2 + 컴퓨터 일반·네트워크·프로그래밍·Data)
 
 첫 화면에서 **과목**을 골라 공부하는 자기주도 학습 웹앱입니다.
 
@@ -6,10 +6,15 @@
 |---|---|---|
 | 데이터베이스 | SQL 12단원 × 4단계(이론·개념 맞추기 → 개념 점검 문제 → 실습 설명·실습 맞추기 → 실습 점검 문제), 브라우저 안에서 실제 SQL 실행, 자유 실습장(학교 예시 데이터·직접 표 만들기·ERD) | 레벨 0 씨앗 → 99 숲(경험치는 실습 점검에서) |
 | 컴퓨터 일반 | 8단원 × 5단계(이론·개념 맞추기(카드별)·전체 개념 끼워맞추기·기초 객관식·단원 요약·실력점검), 모의고사 50문항·50분, 오답노트 | 통과 단계 수로 씨앗 → 열매(7단계) |
+| 네트워크 (`/network`) | 컴퓨터 일반과 같은 구조: 8단원 × 5단계, 모의고사 50문항·50분, 오답노트, 반 학습 현황 | 컴퓨터 일반과 같음 |
+| 프로그래밍 (`/programming`) | 같은 구조(파이썬), 카드·문항에 코드 예시 | 컴퓨터 일반과 같음 |
+| Data (`/data`) | 같은 구조(데이터 이해·통계·pandas·시각화), 카드·문항에 코드 예시 | 컴퓨터 일반과 같음 |
 
 데이터베이스 단원 단계 콘텐츠(`src/content/stages/U01~U12.json`: 이론 카드·개념 맞추기, 개념 점검 10문항, 실습 예제·실습 맞추기)는 2026-10-15에 새로 만들었고 `tests/unit/dbStages.test.ts`가 형식·실습 SQL 실행을 검사합니다.
 
 컴퓨터 일반 문제은행(`src/features/computer/content/pc_bank.json`)은 선생님이 만든 'PC정비사 자기학습' 페이지의 데이터를 그대로 옮긴 것입니다(이론 카드 110·빈칸 240·기초 320·실력점검 200). 카드별 개념 맞추기(`card_match.json`, 카드마다 뜻 3개 + 함정 용어 1개)는 이 앱에서 새로 만든 것이라 따로 보관합니다.
+
+네트워크·프로그래밍·Data(2026-10-26)는 컴퓨터 일반과 같은 엔진(`src/features/computer/CourseApp.tsx`)을 씁니다. 과목 정의(이름·경로·영역·내용 범위·단원 계획)는 `src/features/computer/courses/defs.ts`, 단원 원본은 `courses/<net|prog|data>/U1~U8.json`(형식 검사 `tests/unit/courseBanks.test.ts`)이며 과목마다 따로 내려받습니다. 기록은 이 기기의 `<학습자>:net|prog|data:` 키와 서버 `course_progress`(학생 × 과목 한 행)에 저장됩니다.
 
 ---
 
@@ -55,6 +60,8 @@ docs/12_SETUP_GUIDE.md의 순서를 따릅니다. 요약:
 1. Supabase 프로젝트 생성 → SQL Editor에서 `supabase/migrations/`의 SQL을 **파일 이름 순서대로** 실행(여러 번 실행해도 안전).
    - `20261001000000_sql_forest_v2.sql`: 데이터베이스 과목(진도·XP 원장)
    - `20261007000000_computer_general.sql`: 컴퓨터 일반 기록(cg_progress)과 선생님 반 학습 현황
+   - `20261015000000_unit_reset.sql`, `20261016000000_unit_reset_stages.sql`: 데이터베이스 단원 초기화
+   - `20261026000000_courses.sql`: 네트워크·프로그래밍·Data 기록(course_progress, save_course_progress)과 과목별 반 학습 현황(course_class_overview)
    - 선생님 등록(공개 저장소에 이메일을 남기지 않도록 SQL Editor에서 따로): `insert into private.teachers(email) values ('선생님@학교.kr') on conflict do nothing;` 선생님은 그 이메일로 **Google 로그인**해야 반 학습 현황이 보입니다.
 2. Google Cloud Console에서 "웹 애플리케이션" OAuth 클라이언트 생성 → 승인된 리디렉션 URI에 **Supabase가 보여주는 callback URL**(`https://<project>.supabase.co/auth/v1/callback`)을 등록.
 3. Supabase Auth → Providers → Google에 client ID/secret 입력(secret은 Supabase에만).
@@ -94,7 +101,7 @@ src/content/        단원·활동(48)·도전(12)·문항(체크포인트 36+�
 src/sql/            SQLite 엔진·문장 판정기·결과 기반 채점기·Worker·데이터셋(main/alt seed)
 src/features/       learning(활동 13종 렌더러) · progress(진도 모델·XP 원장·보고서) · growth(레벨·정원)
                     focus(집중모드 상태기계) · auth(Supabase·OAuth·동기화) · playground
-                    computer(컴퓨터 일반: 문제은행·단계·모의고사·오답노트·선생님 현황)
+                    computer(단원 × 5단계 과목 엔진: 컴퓨터 일반 문제은행(content/)·새 과목(courses/)·단계·모의고사·오답노트·선생님 현황)
 src/app/SubjectHome.tsx  과목 선택 첫 화면
 supabase/migrations 테이블·RLS·RPC
 tests/unit, tests/db, tests/e2e

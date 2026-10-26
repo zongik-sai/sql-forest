@@ -64,7 +64,10 @@ export function CgHome() {
           {course.units.map((u, i) => {
             const lv = unitLevel(s, u.id);
             const nextLv = CG_LEVELS.find((l) => !isPassed(s, u.id, l));
-            const areas = [...new Set([...u.basic, ...u.check].map((q) => q.area))].map(course.areaLabel);
+            // 이 단원 문항이 가장 많이 속한 영역(최대 2개)
+            const cnt = new Map<string, number>();
+            for (const q of [...u.basic, ...u.check]) cnt.set(q.area, (cnt.get(q.area) ?? 0) + 1);
+            const areas = [...cnt.entries()].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([a]) => course.areaLabel(a));
             return (
               <Link key={u.id} to={`${base}/unit/${u.id}`} className="panel cg-unit">
                 <span className="cg-unit-num">{i + 1}</span>
@@ -77,7 +80,7 @@ export function CgHome() {
                   </span>
                   <span className="small muted">
                     {unitHasContent(u) ? <>레벨 {lv}/5{nextLv ? ` · 다음: ${CG_LEVEL_NAME[nextLv]}` : ' · 모두 통과'}</> : '내용 준비 중'}
-                    {course.id !== 'cg' && areas.length > 0 && ` · ${areas.join('·')}`}
+                    {course.id !== 'cg' && areas.length > 0 && ` · ${areas.join(', ')}`}
                   </span>
                 </span>
               </Link>

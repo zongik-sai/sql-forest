@@ -1,1 +1,1293 @@
-{"unit": 4, "title": "(작성 중)", "intro": "", "theory": [], "bank": [], "fill": [], "basic": [], "summary": {"keys": [], "compare": [], "traps": []}, "advanced": []}
+{
+  "unit": 4,
+  "title": "pandas 시작: Series와 DataFrame",
+  "intro": "pandas의 두 자료 구조인 Series와 DataFrame을 만들어 보고, read_csv로 CSV 파일을 읽어 head·shape·info·describe로 훑어본 뒤, 열을 골라 value_counts·nunique·mean 같은 메서드로 요약하는 첫걸음을 익힌다.",
+  "theory": [
+    {
+      "id": "t1",
+      "title": "pandas와 Series: 이름표가 붙은 한 줄 데이터",
+      "points": [
+        "pandas(판다스)는 표 모양 데이터를 읽고·고르고·요약하는 파이썬 라이브러리이다. 보통 import pandas as pd로 불러와 pd라는 별칭으로 쓴다.",
+        "Series(시리즈)는 값이 한 줄로 늘어선 1차원 데이터이다. 값마다 인덱스(index)라는 이름표가 붙는다. 예: pd.Series([80, 95, 70]).",
+        "인덱스를 따로 주지 않으면 0, 1, 2…가 자동으로 붙는다. index=['민수', '지아', '현우']처럼 이름표를 직접 정할 수도 있다.",
+        "딕셔너리로 만들면 키가 인덱스, 값이 데이터가 된다. c = pd.Series({'국어': 80, '수학': 90})이면 c['수학']은 90이다.",
+        "Series 하나에는 자료형(dtype)이 하나만 붙는다. 정수만 담으면 int64이고, s.sum()·len(s)처럼 바로 계산할 수 있다."
+      ],
+      "code": "import pandas as pd\ns = pd.Series([80, 95, 70], index=['민수', '지아', '현우'])\nprint(s['지아'])   # 95\nprint(len(s))      # 3\nprint(s.sum())     # 245\nc = pd.Series({'국어': 80, '수학': 90})\nprint(c['수학'])   # 90",
+      "tip": "Series = 값 + 인덱스(이름표). 인덱스를 안 주면 0부터",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "pandas",
+            "desc": "표 모양 데이터를 읽고·고르고·요약하는 파이썬 라이브러리"
+          },
+          {
+            "term": "Series",
+            "desc": "값이 한 줄로 늘어선 1차원 자료 구조"
+          },
+          {
+            "term": "인덱스",
+            "desc": "값마다 붙는 이름표로, 따로 정하지 않으면 0부터 매겨진다"
+          }
+        ],
+        "distractor": "DataFrame"
+      }
+    },
+    {
+      "id": "t2",
+      "title": "DataFrame: 딕셔너리로 표 만들기",
+      "points": [
+        "DataFrame(데이터프레임)은 행(가로줄)과 열(세로줄)로 이루어진 2차원 표이다. 엑셀 시트 한 장을 떠올리면 된다.",
+        "행 하나는 학생 한 명 같은 관측 한 건이고, 열 하나는 이름·점수 같은 항목 하나이다.",
+        "딕셔너리로 만들 때 키는 열 이름, 값 리스트는 그 열의 데이터가 된다. 행 인덱스는 따로 정하지 않으면 0부터 붙는다.",
+        "열 하나하나는 Series이다. 즉 DataFrame은 같은 행 인덱스를 함께 쓰는 Series 여러 개를 옆으로 붙인 것이다.",
+        "각 열의 리스트 길이는 모두 같아야 한다. {'a': [1, 2, 3], 'b': [4, 5]}처럼 길이가 다르면 ValueError가 난다."
+      ],
+      "code": "import pandas as pd\ndf = pd.DataFrame({\n    '이름': ['민수', '지아', '현우', '서연', '도윤'],\n    '반': ['A', 'B', 'A', 'C', 'A'],\n    '점수': [80, 95, 70, 85, 90]\n})\nprint(df)",
+      "table": {
+        "head": [
+          "(인덱스)",
+          "이름",
+          "반",
+          "점수"
+        ],
+        "rows": [
+          [
+            "0",
+            "민수",
+            "A",
+            "80"
+          ],
+          [
+            "1",
+            "지아",
+            "B",
+            "95"
+          ],
+          [
+            "2",
+            "현우",
+            "A",
+            "70"
+          ],
+          [
+            "3",
+            "서연",
+            "C",
+            "85"
+          ],
+          [
+            "4",
+            "도윤",
+            "A",
+            "90"
+          ]
+        ]
+      },
+      "tip": "딕셔너리 키 → 열 이름, 리스트 길이는 모두 같게. 이 학생 표 df를 계속 쓴다",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "DataFrame",
+            "desc": "가로줄과 세로줄로 이루어진 2차원 표 자료 구조"
+          },
+          {
+            "term": "열 이름",
+            "desc": "딕셔너리로 표를 만들 때 딕셔너리의 키가 맡는 역할"
+          },
+          {
+            "term": "ValueError",
+            "desc": "표를 만들 때 각 리스트의 길이가 서로 다르면 나는 오류"
+          }
+        ],
+        "distractor": "KeyError"
+      }
+    },
+    {
+      "id": "t3",
+      "title": "read_csv로 CSV 파일 읽기",
+      "points": [
+        "CSV(Comma-Separated Values)는 값을 쉼표로 구분해 적은 텍스트 파일이다. 한 줄이 한 행이고, 보통 첫 줄에 열 이름이 들어 있다.",
+        "pd.read_csv('scores.csv')는 CSV 파일을 읽어 DataFrame으로 돌려준다. df = pd.read_csv(...)처럼 변수에 담아 쓴다.",
+        "첫 줄은 기본으로 열 이름(header)이 된다. 첫 줄부터 바로 데이터라면 header=None을 주며, 이때 열 이름은 0, 1, 2…가 된다.",
+        "비어 있는 칸은 결측값 NaN(Not a Number)으로 읽힌다. 정수 열에 NaN이 하나라도 섞이면 그 열은 float64(실수)가 된다.",
+        "파일 이름이나 경로가 틀리면 FileNotFoundError가 난다."
+      ],
+      "code": "# scores.csv 파일 내용\n# 이름,반,점수\n# 민수,A,80\n# 지아,B,\n# 현우,A,70\nimport pandas as pd\ndf = pd.read_csv('scores.csv')\nprint(df.shape)          # (3, 3)\nprint(df['점수'].dtype)  # float64",
+      "tip": "첫 줄 = 열 이름(header), 빈칸 = NaN → 정수 열도 float64",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "CSV",
+            "desc": "값을 쉼표로 구분해 적은 텍스트 파일"
+          },
+          {
+            "term": "header=None",
+            "desc": "첫 줄부터 데이터일 때 주는 옵션으로, 열 이름이 0, 1, 2…가 된다"
+          },
+          {
+            "term": "NaN",
+            "desc": "비어 있는 칸을 읽었을 때 들어가는 결측값 표시"
+          }
+        ],
+        "distractor": "FileNotFoundError"
+      }
+    },
+    {
+      "id": "t4",
+      "title": "sep와 encoding: 구분자와 한글 깨짐",
+      "points": [
+        "sep는 값 사이의 구분자를 정하는 옵션이다. 기본값은 쉼표(,)이며, 세미콜론 파일은 sep=';', 탭으로 나뉜 파일(TSV)은 sep='\\t'를 준다.",
+        "구분자를 잘못 주면 한 줄 전체가 열 하나로 읽힌다. 예: '이름;점수' 모양 파일을 기본값으로 읽으면 열이 1개뿐이다.",
+        "encoding은 파일의 문자 인코딩(글자를 바이트로 저장한 방식)을 알려 주는 옵션이다. read_csv의 기본값은 'utf-8'이다.",
+        "한글 Windows 엑셀에서 저장한 CSV는 cp949(euc-kr 계열)인 경우가 많다. 기본값으로 읽으면 UnicodeDecodeError가 나므로 encoding='cp949'를 준다."
+      ],
+      "table": {
+        "head": [
+          "파일 모양",
+          "read_csv 옵션"
+        ],
+        "rows": [
+          [
+            "민수,80 (쉼표)",
+            "옵션 없이 기본값"
+          ],
+          [
+            "민수;80 (세미콜론)",
+            "sep=';'"
+          ],
+          [
+            "민수→탭→80 (탭, TSV)",
+            "sep='\\t'"
+          ],
+          [
+            "한글 엑셀 CSV(cp949)",
+            "encoding='cp949'"
+          ]
+        ]
+      },
+      "code": "import pandas as pd\n# 세미콜론으로 나뉜 파일\na = pd.read_csv('semi.csv', sep=';')\n# 탭으로 나뉜 파일\nb = pd.read_csv('tab.txt', sep='\\t')\n# 한글 Windows 엑셀에서 저장한 CSV\nc = pd.read_csv('excel.csv', encoding='cp949')",
+      "tip": "열이 1개로 뭉치면 sep, UnicodeDecodeError면 encoding을 의심",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "sep",
+            "desc": "값과 값을 나누는 구분 기호를 정하는 옵션(기본은 쉼표)"
+          },
+          {
+            "term": "encoding",
+            "desc": "파일의 글자 저장 방식을 알려 주는 옵션(기본 utf-8)"
+          },
+          {
+            "term": "UnicodeDecodeError",
+            "desc": "파일의 글자 저장 방식과 다른 방식으로 읽으려 할 때 나는 오류"
+          }
+        ],
+        "distractor": "header"
+      }
+    },
+    {
+      "id": "t5",
+      "title": "head·tail·shape·columns로 첫인상 보기",
+      "points": [
+        "head()는 위에서부터 5행, tail()은 아래에서부터 5행을 보여 준다. head(2)처럼 괄호 안에 보고 싶은 행 수를 줄 수 있다.",
+        "shape는 (행 수, 열 수)를 튜플로 알려 준다. 학생 표 df는 5행 3열이므로 df.shape는 (5, 3)이다.",
+        "shape는 메서드가 아니라 속성이라 괄호 없이 쓴다. df.shape()처럼 쓰면 TypeError가 난다.",
+        "len(df)는 행 수만 알려 준다. 열 수만 필요하면 df.shape[1]을 쓴다.",
+        "columns는 열 이름 목록을 담은 속성이다. list(df.columns)는 ['이름', '반', '점수']이다."
+      ],
+      "code": "# df: 학생 표(이름·반·점수, 5행 3열)\nprint(df.head(2))        # 위 2행\nprint(df.shape)          # (5, 3)\nprint(len(df))           # 5\nprint(df.shape[1])       # 3\nprint(list(df.columns))  # ['이름', '반', '점수']",
+      "tip": "shape는 (행, 열) 순서 — 괄호 없이 df.shape",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "head()",
+            "desc": "위에서부터 몇 행만 잘라 보여 주는 메서드(기본 5행)"
+          },
+          {
+            "term": "shape",
+            "desc": "(행 수, 열 수)를 튜플로 알려 주는 속성"
+          },
+          {
+            "term": "columns",
+            "desc": "표의 세로줄 이름들을 담은 속성"
+          }
+        ],
+        "distractor": "tail()"
+      }
+    },
+    {
+      "id": "t6",
+      "title": "dtypes·info()로 자료형과 결측 확인",
+      "points": [
+        "dtype은 열에 담긴 값의 자료형이다. 정수는 int64, 실수는 float64, 참·거짓은 bool로 표시된다.",
+        "문자열 열은 object로 표시된다(pandas 3.0부터는 str). 숫자가 문자열로 읽혔으면 평균 같은 계산을 바로 할 수 없으니 dtype부터 확인한다.",
+        "dtypes는 열마다 자료형을 보여 주는 속성이다. info()는 행 수, 열 이름, 열별 Non-Null Count(결측이 아닌 값 개수), dtype을 한 번에 요약하는 메서드이다.",
+        "info()에서 Non-Null Count가 전체 행 수보다 작으면 그 열에 결측값이 있다. 예: 3 entries인데 점수 열이 2 non-null이면 결측 1개이다."
+      ],
+      "table": {
+        "head": [
+          "dtype",
+          "담긴 값",
+          "예"
+        ],
+        "rows": [
+          [
+            "int64",
+            "정수",
+            "80, 95"
+          ],
+          [
+            "float64",
+            "실수(NaN이 섞인 숫자 열 포함)",
+            "84.5, NaN"
+          ],
+          [
+            "bool",
+            "참·거짓",
+            "True, False"
+          ],
+          [
+            "object (pandas 3: str)",
+            "문자열",
+            "'민수', 'A'"
+          ]
+        ]
+      },
+      "code": "import pandas as pd\ns1 = pd.Series([1, 2, 3])\ns2 = pd.Series([1, None, 3])\ns3 = pd.Series([True, False])\nprint(s1.dtype, s2.dtype, s3.dtype)  # int64 float64 bool\ndf.info()   # 학생 표 df의 행 수·Non-Null Count·Dtype",
+      "tip": "dtypes·shape·columns는 괄호 없음, info()·head()·describe()는 괄호 있음",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "int64",
+            "desc": "정수만 담긴 열에 붙는 자료형"
+          },
+          {
+            "term": "float64",
+            "desc": "실수가 담기거나, 정수에 결측값이 섞인 열에 붙는 자료형"
+          },
+          {
+            "term": "info()",
+            "desc": "행 수·열별 결측 아닌 값 개수·자료형을 한 번에 요약하는 메서드"
+          }
+        ],
+        "distractor": "bool"
+      }
+    },
+    {
+      "id": "t7",
+      "title": "describe()로 요약 통계 한 번에 보기",
+      "points": [
+        "describe()는 숫자 열마다 개수·평균·표준편차·최솟값·사분위수·최댓값을 표로 요약한다. 숫자 열과 문자열 열이 섞여 있으면 기본으로 숫자 열만 요약한다.",
+        "count는 결측값을 뺀 값의 개수, mean은 평균, std는 표준편차(값이 평균에서 흩어진 정도), min·max는 최솟값·최댓값이다.",
+        "25%·50%·75%는 사분위수이다. 50%는 크기순으로 놓았을 때 한가운데 값인 중앙값(median)과 같다.",
+        "학생 표의 점수 [80, 95, 70, 85, 90]이면 count 5, mean 84, min 70, 25% 80, 50% 85, 75% 90, max 95이다.",
+        "describe() 결과는 평균·표준편차 같은 실수와 한데 담기므로 모든 값이 실수로 표시된다. 그래서 count도 5가 아니라 5.0처럼 나온다."
+      ],
+      "table": {
+        "head": [
+          "행 이름",
+          "뜻",
+          "점수 열 값"
+        ],
+        "rows": [
+          [
+            "count",
+            "개수(결측 제외)",
+            "5.0"
+          ],
+          [
+            "mean",
+            "평균",
+            "84.0"
+          ],
+          [
+            "std",
+            "표준편차",
+            "약 9.62"
+          ],
+          [
+            "min",
+            "최솟값",
+            "70.0"
+          ],
+          [
+            "25%",
+            "1사분위수",
+            "80.0"
+          ],
+          [
+            "50%",
+            "중앙값",
+            "85.0"
+          ],
+          [
+            "75%",
+            "3사분위수",
+            "90.0"
+          ],
+          [
+            "max",
+            "최댓값",
+            "95.0"
+          ]
+        ]
+      },
+      "code": "d = df['점수'].describe()\nprint(d['count'], d['mean'], d['50%'])  # 5.0 84.0 85.0",
+      "tip": "describe의 50% = 중앙값(평균 아님), count는 결측 제외",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "describe()",
+            "desc": "숫자 열의 개수·평균·사분위수 등을 표 하나로 요약하는 메서드"
+          },
+          {
+            "term": "std",
+            "desc": "값들이 평균에서 얼마나 흩어져 있는지 나타내는 값"
+          },
+          {
+            "term": "50%",
+            "desc": "값을 크기순으로 놓았을 때 한가운데 오는 값"
+          }
+        ],
+        "distractor": "25%"
+      }
+    },
+    {
+      "id": "t8",
+      "title": "열 선택: df['열']과 df[['열1', '열2']]",
+      "points": [
+        "열 하나를 고를 때는 df['점수']처럼 대괄호 안에 열 이름을 쓴다. 결과는 Series이다.",
+        "여러 열을 고를 때는 열 이름 리스트를 넣어 df[['이름', '점수']]처럼 대괄호를 두 겹 쓴다. 결과는 DataFrame이다.",
+        "df[['점수']]처럼 열이 하나여도 리스트로 넣으면 결과는 DataFrame(5행 1열)이다.",
+        "df['이름', '점수']처럼 대괄호를 한 겹만 쓰거나, df['국어']처럼 없는 열 이름을 쓰면 KeyError가 난다.",
+        "df.점수처럼 점(.)으로도 열을 꺼낼 수 있지만, 열 이름에 공백이 있거나 count처럼 메서드 이름과 같으면 쓸 수 없어 대괄호 방식이 안전하다."
+      ],
+      "table": {
+        "head": [
+          "코드",
+          "결과",
+          "shape"
+        ],
+        "rows": [
+          [
+            "df['점수']",
+            "Series",
+            "(5,)"
+          ],
+          [
+            "df[['점수']]",
+            "DataFrame",
+            "(5, 1)"
+          ],
+          [
+            "df[['이름', '점수']]",
+            "DataFrame",
+            "(5, 2)"
+          ],
+          [
+            "df['이름', '점수']",
+            "KeyError",
+            "-"
+          ]
+        ]
+      },
+      "code": "s = df['점수']\nprint(type(s).__name__)               # Series\nsub = df[['이름', '점수']]\nprint(type(sub).__name__, sub.shape)  # DataFrame (5, 2)\nprint(df[['점수']].shape)             # (5, 1)",
+      "tip": "대괄호 한 겹 = Series, 두 겹(리스트) = DataFrame",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "df['점수']",
+            "desc": "열 하나를 꺼내 1차원 Series로 돌려받는 코드"
+          },
+          {
+            "term": "df[['이름', '점수']]",
+            "desc": "열 이름 리스트로 두 열을 골라 DataFrame으로 받는 코드"
+          },
+          {
+            "term": "KeyError",
+            "desc": "없는 열 이름을 쓰거나 한 겹 대괄호에 여러 열을 적으면 나는 오류"
+          }
+        ],
+        "distractor": "IndexError"
+      }
+    },
+    {
+      "id": "t9",
+      "title": "value_counts·unique·nunique로 범주 세기",
+      "points": [
+        "범주형 열(반·성별·지역처럼 종류를 나타내는 열)은 값마다 몇 개인지 세어 보는 것이 첫 분석이다.",
+        "value_counts()는 값마다 나온 횟수를 세어 많은 순서로 정렬한 Series를 돌려준다. df['반'].value_counts()는 A 3, B 1, C 1이다.",
+        "unique()는 중복을 뺀 값들을 처음 나온 순서대로 돌려주고, nunique()는 그 종류의 개수를 숫자 하나로 돌려준다. df['반'].nunique()는 3이다.",
+        "value_counts(normalize=True)는 개수 대신 비율을 돌려준다. A는 5명 중 3명이므로 0.6이다.",
+        "value_counts()와 nunique()는 결측값(NaN)을 빼고 센다. 반면 unique()의 결과에는 NaN도 한 값으로 들어간다."
+      ],
+      "table": {
+        "head": [
+          "메서드",
+          "돌려주는 것",
+          "df['반'] 결과"
+        ],
+        "rows": [
+          [
+            "value_counts()",
+            "값별 개수(많은 순)",
+            "A 3, B 1, C 1"
+          ],
+          [
+            "unique()",
+            "고유값 목록(나온 순)",
+            "A, B, C"
+          ],
+          [
+            "nunique()",
+            "고유값 개수",
+            "3"
+          ]
+        ]
+      },
+      "code": "vc = df['반'].value_counts()\nprint(vc['A'], vc['B'])           # 3 1\nprint(list(df['반'].unique()))    # ['A', 'B', 'C']\nprint(df['반'].nunique())         # 3\nprint(df['반'].value_counts(normalize=True)['A'])  # 0.6",
+      "tip": "unique는 '목록', nunique는 '개수'(number of unique)",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "value_counts()",
+            "desc": "값마다 나온 횟수를 세어 많은 순으로 정렬해 주는 메서드"
+          },
+          {
+            "term": "unique()",
+            "desc": "중복을 뺀 값들을 처음 나온 순서대로 돌려주는 메서드"
+          },
+          {
+            "term": "nunique()",
+            "desc": "중복을 뺀 값이 몇 종류인지 숫자 하나로 돌려주는 메서드"
+          }
+        ],
+        "distractor": "count()"
+      }
+    },
+    {
+      "id": "t10",
+      "title": "기본 통계 메서드: mean·sum·max·count",
+      "points": [
+        "열(Series)에 mean()을 쓰면 평균, sum()은 합계, max()·min()은 최댓값·최솟값, median()은 중앙값을 돌려준다.",
+        "df['점수']가 [80, 95, 70, 85, 90]이면 mean()은 84.0, sum()은 420, max()는 95, min()은 70이다.",
+        "count()는 결측값(NaN)을 뺀 값의 개수이다. len()은 결측값까지 포함한 전체 개수이므로 결측이 있으면 두 값이 다르다.",
+        "mean()·sum()도 NaN을 빼고 계산한다. [80, NaN, 70]의 평균은 (80 + 70) ÷ 2 = 75.0이다.",
+        "df.count()처럼 표 전체에 쓰면 열마다 결과가 나온다. 문자열 열이 섞인 표의 평균은 df['점수'].mean()처럼 숫자 열을 골라 구한다."
+      ],
+      "code": "import numpy as np\ns = pd.Series([80, np.nan, 70])\nprint(len(s), s.count())   # 3 2\nprint(s.sum(), s.mean())   # 150.0 75.0\nprint(df['점수'].max(), df['점수'].mean())  # 95 84.0",
+      "tip": "count는 NaN 빼고, len은 NaN까지 — 결측이 있으면 값이 다르다",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "mean()",
+            "desc": "결측값을 빼고 값들의 평균을 구하는 메서드"
+          },
+          {
+            "term": "count()",
+            "desc": "결측값을 뺀, 실제로 값이 들어 있는 칸의 개수를 세는 메서드"
+          },
+          {
+            "term": "len()",
+            "desc": "결측값까지 포함한 전체 개수를 알려 주는 파이썬 내장 함수"
+          }
+        ],
+        "distractor": "sum()"
+      }
+    }
+  ],
+  "bank": [
+    "pd",
+    "Series",
+    "DataFrame",
+    "열 이름",
+    "read_csv",
+    "NaN",
+    "sep",
+    "cp949",
+    "head",
+    "(5, 3)",
+    "dtypes",
+    "float64",
+    "info()",
+    "describe()",
+    "50%",
+    "두 겹",
+    "KeyError",
+    "value_counts()",
+    "nunique()",
+    "count()",
+    "np",
+    "ValueError",
+    "(3, 5)",
+    "tail",
+    "utf-8",
+    "unique()",
+    "len()",
+    "int64",
+    "한 겹",
+    "25%"
+  ],
+  "fill": [
+    {
+      "id": "f1",
+      "text": "pandas를 불러올 때는 보통 import pandas as ____처럼 짧은 별칭을 붙인다.",
+      "answer": "pd",
+      "exp": "관례상 pd라는 별칭을 쓰고, 이후 pd.Series·pd.read_csv처럼 부른다."
+    },
+    {
+      "id": "f2",
+      "text": "값마다 인덱스(이름표)가 붙어 한 줄로 늘어선 pandas의 1차원 자료 구조를 ____라고 한다.",
+      "answer": "Series",
+      "exp": "Series는 1차원, DataFrame은 2차원 표이다."
+    },
+    {
+      "id": "f3",
+      "text": "행과 열로 이루어진 pandas의 2차원 표 자료 구조를 ____이라고 한다.",
+      "answer": "DataFrame",
+      "exp": "DataFrame의 열 하나하나는 Series이다."
+    },
+    {
+      "id": "f4",
+      "text": "딕셔너리로 DataFrame을 만들면 딕셔너리의 키는 표의 ____이 되고, 값 리스트는 그 열의 데이터가 된다.",
+      "answer": "열 이름",
+      "exp": "{'이름': [...], '점수': [...]}이면 '이름'·'점수'가 열 이름이 된다."
+    },
+    {
+      "id": "f5",
+      "text": "CSV 파일을 읽어 DataFrame으로 돌려주는 함수는 pd.____이다.",
+      "answer": "read_csv",
+      "exp": "df = pd.read_csv('파일.csv')처럼 쓴다."
+    },
+    {
+      "id": "f6",
+      "text": "CSV 파일에서 비어 있는 칸은 결측값 ____으로 읽힌다.",
+      "answer": "NaN",
+      "exp": "NaN은 Not a Number의 줄임말로, 값이 없음을 뜻한다."
+    },
+    {
+      "id": "f7",
+      "text": "세미콜론으로 값을 나눈 파일은 pd.read_csv('a.csv', ____=';')처럼 구분자를 지정해 읽는다.",
+      "answer": "sep",
+      "exp": "sep의 기본값은 쉼표(,)이다. 탭이면 '\\t'를 준다."
+    },
+    {
+      "id": "f8",
+      "text": "한글 Windows 엑셀에서 저장한 CSV를 기본값으로 읽다 UnicodeDecodeError가 나면 encoding='____'을 준다.",
+      "answer": "cp949",
+      "exp": "한글 엑셀 CSV는 cp949로 저장된 경우가 많고, read_csv의 기본값은 utf-8이다."
+    },
+    {
+      "id": "f9",
+      "text": "df.____(3)은 표의 맨 위 3행을 보여 준다.",
+      "answer": "head",
+      "exp": "괄호를 비우면 5행을 보여 준다. 맨 아래는 tail이다."
+    },
+    {
+      "id": "f10",
+      "text": "5행 3열인 DataFrame df에서 df.shape의 값은 ____이다.",
+      "answer": "(5, 3)",
+      "exp": "shape는 (행 수, 열 수) 순서의 튜플이다."
+    },
+    {
+      "id": "f11",
+      "text": "열마다 자료형을 보여 주는 속성은 df.____이다.",
+      "answer": "dtypes",
+      "exp": "dtypes는 속성이라 괄호 없이 쓴다."
+    },
+    {
+      "id": "f12",
+      "text": "정수만 있던 열에 결측값이 하나라도 섞이면 그 열의 dtype은 ____가 된다.",
+      "answer": "float64",
+      "exp": "NaN은 실수로 취급되므로 열 전체가 실수형이 된다."
+    },
+    {
+      "id": "f13",
+      "text": "행 수, 열별 Non-Null Count, dtype을 한 번에 요약해 보여 주는 메서드는 ____이다.",
+      "answer": "info()",
+      "exp": "Non-Null Count가 행 수보다 작으면 결측값이 있다."
+    },
+    {
+      "id": "f14",
+      "text": "숫자 열의 개수·평균·표준편차·사분위수·최솟값·최댓값을 표 하나로 요약하는 메서드는 ____이다.",
+      "answer": "describe()",
+      "exp": "describe()는 기본으로 숫자 열만 요약한다."
+    },
+    {
+      "id": "f15",
+      "text": "describe() 결과에서 ____ 행의 값은 중앙값과 같다.",
+      "answer": "50%",
+      "exp": "50%는 2사분위수, 즉 한가운데 값이다. 평균은 mean 행이다."
+    },
+    {
+      "id": "f16",
+      "text": "여러 열을 고를 때는 df[['이름', '점수']]처럼 대괄호를 ____ 쓰고, 결과는 DataFrame이다.",
+      "answer": "두 겹",
+      "exp": "바깥 대괄호는 열 선택, 안쪽 대괄호는 열 이름 리스트이다."
+    },
+    {
+      "id": "f17",
+      "text": "df['국어']처럼 표에 없는 열 이름으로 열을 고르면 ____가 난다.",
+      "answer": "KeyError",
+      "exp": "열 이름은 딕셔너리의 키처럼 동작하므로 없는 이름이면 KeyError이다."
+    },
+    {
+      "id": "f18",
+      "text": "범주형 열에서 값마다 나온 횟수를 많은 순서로 세어 주는 메서드는 ____이다.",
+      "answer": "value_counts()",
+      "exp": "df['반'].value_counts()는 A 3, B 1, C 1처럼 많은 순으로 보여 준다."
+    },
+    {
+      "id": "f19",
+      "text": "중복을 뺀 값이 몇 종류인지 숫자 하나로 알려 주는 메서드는 ____이다.",
+      "answer": "nunique()",
+      "exp": "unique()는 값 목록, nunique()는 그 개수이다."
+    },
+    {
+      "id": "f20",
+      "text": "결측값을 뺀, 실제로 값이 있는 칸의 개수를 세는 메서드는 ____이다.",
+      "answer": "count()",
+      "exp": "len()은 결측값까지 세므로 결측이 있으면 count()보다 크다."
+    }
+  ],
+  "basic": [
+    {
+      "id": "b1",
+      "q": "pandas를 pd라는 별칭으로 불러오는 코드로 옳은 것은?",
+      "o": [
+        "import pd as pandas",
+        "import pandas as pd",
+        "from pandas import pd",
+        "import pandas(pd)"
+      ],
+      "a": 1,
+      "exp": "import 모듈 as 별칭 순서로 쓴다. import pd as pandas는 순서가 반대이고, pandas 안에 pd라는 이름은 없으며, import pandas(pd)는 문법 오류이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b2",
+      "q": "pandas에서 값마다 인덱스(이름표)가 붙은 1차원 자료 구조는?",
+      "o": [
+        "DataFrame",
+        "ndarray",
+        "dict",
+        "Series"
+      ],
+      "a": 3,
+      "exp": "Series는 값이 한 줄로 늘어선 1차원 구조이다. DataFrame은 2차원 표, ndarray는 NumPy 배열, dict는 파이썬 딕셔너리이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b3",
+      "q": "s = pd.Series([10, 20, 30])처럼 인덱스를 따로 정하지 않았을 때 자동으로 붙는 인덱스는?",
+      "o": [
+        "0, 1, 2",
+        "1, 2, 3",
+        "10, 20, 30",
+        "'a', 'b', 'c'"
+      ],
+      "a": 0,
+      "exp": "인덱스를 주지 않으면 리스트처럼 0부터 번호가 붙는다. 1부터 시작하지 않고, 값 자체가 인덱스가 되지도 않는다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b4",
+      "q": "c = pd.Series({'국어': 80, '수학': 90})일 때 c['수학']의 값은?",
+      "o": [
+        "80",
+        "'수학'",
+        "90",
+        "KeyError가 난다"
+      ],
+      "a": 2,
+      "exp": "딕셔너리로 Series를 만들면 키가 인덱스가 된다. 인덱스 '수학'에 붙은 값은 90이다. '수학'은 인덱스에 있으므로 KeyError가 나지 않는다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b5",
+      "q": "pd.DataFrame({'이름': ['민수', '지아'], '점수': [80, 95]})로 만든 표에 대한 설명으로 옳은 것은?",
+      "o": [
+        "2행 2열이고, 열 이름은 '이름'과 '점수'이다",
+        "2행 2열이고, 행 이름이 '이름'과 '점수'이다",
+        "4행 1열이다",
+        "1행 4열이다"
+      ],
+      "a": 0,
+      "exp": "딕셔너리의 키가 열 이름, 리스트가 열의 값이 된다. 리스트마다 값이 2개이므로 2행, 키가 2개이므로 2열이다. 행 인덱스는 0, 1이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b6",
+      "q": "pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5]})처럼 열마다 리스트 길이가 다르면 어떻게 되는가?",
+      "o": [
+        "짧은 열의 빈칸이 0으로 채워진다",
+        "짧은 열의 빈칸이 NaN으로 채워진다",
+        "ValueError가 난다",
+        "긴 열이 잘려 2행 표가 된다"
+      ],
+      "a": 2,
+      "exp": "리스트로 DataFrame을 만들 때는 모든 열의 길이가 같아야 한다. 길이가 다르면 빈칸을 채우거나 자르지 않고 ValueError(All arrays must be of the same length)가 난다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b7",
+      "q": "import pandas as pd 다음에 CSV 파일 'scores.csv'를 읽어 DataFrame df로 만드는 코드로 옳은 것은?",
+      "o": [
+        "df = pd.open_csv('scores.csv')",
+        "df = pd.DataFrame('scores.csv')",
+        "df = read_csv('scores.csv')",
+        "df = pd.read_csv('scores.csv')"
+      ],
+      "a": 3,
+      "exp": "CSV 파일은 pd.read_csv로 읽는다. open_csv라는 함수는 없고, pd.DataFrame에 파일 이름 문자열을 넣으면 파일을 읽지 않고 ValueError가 나며, pd. 없이 read_csv만 쓰면 NameError가 난다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b8",
+      "q": "값이 탭으로 나뉜 파일(TSV)을 read_csv로 읽을 때 알맞은 옵션은?",
+      "o": [
+        "sep=','",
+        "sep='\\t'",
+        "encoding='tab'",
+        "header='\\t'"
+      ],
+      "a": 1,
+      "exp": "구분자는 sep로 정하고 탭은 '\\t'로 쓴다. sep=','는 기본값(쉼표)이고, encoding은 글자 저장 방식, header는 열 이름 줄을 정하는 옵션이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b9",
+      "q": "한글 Windows 엑셀에서 저장한 CSV를 pd.read_csv('a.csv')로 읽었더니 UnicodeDecodeError가 났다. 가장 알맞은 해결 방법은?",
+      "o": [
+        "sep=';'를 준다",
+        "header=None을 준다",
+        "encoding='cp949'를 준다",
+        "head()로 앞부분만 읽는다"
+      ],
+      "a": 2,
+      "exp": "UnicodeDecodeError는 파일의 글자 저장 방식(인코딩)이 기본값 utf-8과 달라서 생긴다. 한글 엑셀 CSV는 cp949인 경우가 많으므로 encoding='cp949'를 준다. sep·header는 인코딩과 관계없다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b10",
+      "q": "df.head()에 대한 설명으로 옳은 것은?",
+      "o": [
+        "맨 아래 5행을 보여 준다",
+        "괄호 안 숫자를 생략하면 맨 위 5행을 보여 준다",
+        "열 이름 목록만 보여 준다",
+        "괄호 안 숫자를 생략하면 맨 위 10행을 보여 준다"
+      ],
+      "a": 1,
+      "exp": "head()의 기본값은 5행이고 위에서부터 보여 준다. 맨 아래는 tail(), 열 이름은 columns로 확인한다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b11",
+      "q": "10행 4열인 DataFrame df에서 df.shape의 값은?",
+      "o": [
+        "(4, 10)",
+        "40",
+        "(10, 4)",
+        "[10, 4]"
+      ],
+      "a": 2,
+      "exp": "shape는 (행 수, 열 수) 순서의 튜플이다. (4, 10)은 순서가 반대이고, 40은 전체 칸 수(size)이며, 결과는 리스트가 아니라 튜플이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b12",
+      "q": "다음 중 괄호 없이 쓰는 속성만 묶은 것은?",
+      "o": [
+        "shape, columns, dtypes",
+        "head, tail, info",
+        "shape, info, describe",
+        "columns, head, dtypes"
+      ],
+      "a": 0,
+      "exp": "shape·columns·dtypes는 속성이라 df.shape처럼 괄호 없이 쓴다. head()·tail()·info()·describe()는 메서드라 괄호를 붙여 실행한다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b13",
+      "q": "df.info()의 결과로 확인할 수 없는 것은?",
+      "o": [
+        "전체 행 수",
+        "열별 결측이 아닌 값의 개수",
+        "열별 자료형(dtype)",
+        "열별 평균과 표준편차"
+      ],
+      "a": 3,
+      "exp": "info()는 행 수(entries), 열 이름, Non-Null Count, Dtype, 메모리 사용량을 보여 준다. 평균·표준편차 같은 요약 통계는 describe()로 확인한다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b14",
+      "q": "정수만 들어 있던 '점수' 열에 결측값(NaN)이 하나 섞여 있다. 이 열의 dtype은?",
+      "o": [
+        "int64",
+        "float64",
+        "bool",
+        "category"
+      ],
+      "a": 1,
+      "exp": "NaN은 실수로 취급되므로 정수 열에 NaN이 섞이면 열 전체가 float64가 된다. 그래서 80이 80.0처럼 보인다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b15",
+      "q": "describe() 결과에서 50% 행이 나타내는 값은?",
+      "o": [
+        "평균",
+        "최빈값",
+        "모든 값의 합의 절반",
+        "중앙값"
+      ],
+      "a": 3,
+      "exp": "50%는 값을 크기순으로 놓았을 때 한가운데 값, 즉 중앙값(2사분위수)이다. 평균은 mean 행에 따로 나온다.",
+      "area": "STAT"
+    },
+    {
+      "id": "b16",
+      "q": "결측값이 1개 들어 있는 10행짜리 Series s에서 len(s)와 s.count()의 값을 차례로 쓴 것은?",
+      "o": [
+        "10, 10",
+        "10, 9",
+        "9, 10",
+        "9, 9"
+      ],
+      "a": 1,
+      "exp": "len()은 결측값까지 포함한 전체 개수 10이고, count()는 결측값을 뺀 개수 9이다.",
+      "area": "STAT"
+    },
+    {
+      "id": "b17",
+      "q": "df['점수']처럼 대괄호 한 겹에 열 이름 하나를 넣어 고른 결과의 자료 구조는?",
+      "o": [
+        "Series",
+        "DataFrame",
+        "list",
+        "dict"
+      ],
+      "a": 0,
+      "exp": "열 하나를 df['열'] 꼴로 고르면 1차원 Series가 나온다. df[['점수']]처럼 리스트로 넣어야 DataFrame이 된다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b18",
+      "q": "df에서 '이름'과 '점수' 두 열을 함께 골라 DataFrame으로 얻는 코드로 옳은 것은?",
+      "o": [
+        "df['이름', '점수']",
+        "df('이름', '점수')",
+        "df[['이름', '점수']]",
+        "df.['이름', '점수']"
+      ],
+      "a": 2,
+      "exp": "여러 열은 열 이름 리스트를 대괄호 안에 넣어 df[['이름', '점수']]처럼 쓴다. 한 겹 대괄호는 KeyError, 소괄호는 DataFrame을 함수처럼 부르는 것이라 TypeError, df.[...]는 문법 오류이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b19",
+      "q": "df['반']의 값이 A, B, A, C, A일 때 df['반'].nunique()의 결과는?",
+      "o": [
+        "5",
+        "['A', 'B', 'C']",
+        "A 3, B 1, C 1",
+        "3"
+      ],
+      "a": 3,
+      "exp": "nunique()는 중복을 뺀 값의 종류 수를 숫자 하나로 돌려준다. A·B·C 3종류이다. 값 목록은 unique(), 값별 개수는 value_counts()의 결과이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b20",
+      "q": "value_counts()에 대한 설명으로 옳은 것은?",
+      "o": [
+        "값마다 나온 횟수를 세어 기본으로 많은 순서대로 정렬한다",
+        "중복을 뺀 값의 개수를 숫자 하나로 돌려준다",
+        "결측값(NaN)도 기본으로 함께 센다",
+        "값의 종류를 가나다·알파벳 순으로만 정렬해 돌려준다"
+      ],
+      "a": 0,
+      "exp": "value_counts()는 값별 개수를 많은 순으로 정렬한 Series를 돌려준다. 종류 수 하나는 nunique()이고, NaN은 기본으로 빼고 센다(dropna=True).",
+      "area": "ANAL"
+    }
+  ],
+  "summary": {
+    "keys": [
+      {
+        "k": "Series",
+        "v": "인덱스(이름표)가 붙은 1차원 데이터. 인덱스를 안 주면 0부터, 딕셔너리로 만들면 키가 인덱스"
+      },
+      {
+        "k": "DataFrame",
+        "v": "행·열로 된 2차원 표. 딕셔너리 키 = 열 이름, 리스트 길이가 다르면 ValueError, 열 하나하나는 Series"
+      },
+      {
+        "k": "read_csv",
+        "v": "pd.read_csv('파일.csv') → DataFrame. 첫 줄은 열 이름(header), 빈칸은 NaN, 정수 열에 NaN이 섞이면 float64"
+      },
+      {
+        "k": "sep·encoding",
+        "v": "sep 기본 쉼표(세미콜론 ';', 탭 '\\t'), encoding 기본 'utf-8', 한글 엑셀 CSV는 'cp949'"
+      },
+      {
+        "k": "첫인상 보기",
+        "v": "head()·tail() 기본 5행, shape (행 수, 열 수), len(df) 행 수, columns 열 이름 목록"
+      },
+      {
+        "k": "dtypes·info()",
+        "v": "int64·float64·bool·object(pandas 3: str). info()는 행 수·Non-Null Count·Dtype을 한 번에"
+      },
+      {
+        "k": "describe()",
+        "v": "숫자 열의 count(결측 제외)·mean·std·min·25%·50%(중앙값)·75%·max"
+      },
+      {
+        "k": "열 선택",
+        "v": "df['열'] → Series, df[['열1', '열2']] → DataFrame, 없는 열·한 겹에 여러 열은 KeyError"
+      },
+      {
+        "k": "범주 세기",
+        "v": "value_counts() 값별 개수(많은 순), unique() 고유값 목록, nunique() 고유값 개수, normalize=True는 비율"
+      },
+      {
+        "k": "기본 통계 메서드",
+        "v": "mean·sum·max·min·median·count는 NaN을 빼고 계산. count는 NaN 제외, len은 NaN 포함"
+      }
+    ],
+    "compare": [
+      {
+        "title": "알고 싶은 것과 코드 (학생 표 df)",
+        "head": [
+          "알고 싶은 것",
+          "코드",
+          "결과"
+        ],
+        "rows": [
+          [
+            "행·열 수",
+            "df.shape",
+            "(5, 3)"
+          ],
+          [
+            "열 이름",
+            "list(df.columns)",
+            "['이름', '반', '점수']"
+          ],
+          [
+            "열별 자료형·결측",
+            "df.dtypes / df.info()",
+            "점수 int64, Non-Null Count"
+          ],
+          [
+            "숫자 열 요약",
+            "df.describe()",
+            "count·mean·std·사분위수·min·max"
+          ],
+          [
+            "반별 인원",
+            "df['반'].value_counts()",
+            "A 3, B 1, C 1"
+          ],
+          [
+            "반 종류 수",
+            "df['반'].nunique()",
+            "3"
+          ]
+        ]
+      },
+      {
+        "title": "열 선택 결과",
+        "head": [
+          "코드",
+          "결과",
+          "shape"
+        ],
+        "rows": [
+          [
+            "df['점수']",
+            "Series",
+            "(5,)"
+          ],
+          [
+            "df[['점수']]",
+            "DataFrame",
+            "(5, 1)"
+          ],
+          [
+            "df[['이름', '점수']]",
+            "DataFrame",
+            "(5, 2)"
+          ],
+          [
+            "df['이름', '점수']",
+            "KeyError",
+            "-"
+          ]
+        ]
+      },
+      {
+        "title": "속성과 메서드",
+        "head": [
+          "구분",
+          "예",
+          "쓰는 법"
+        ],
+        "rows": [
+          [
+            "속성(괄호 없음)",
+            "shape, columns, dtypes",
+            "df.shape"
+          ],
+          [
+            "메서드(괄호 있음)",
+            "head(), tail(), info(), describe()",
+            "df.head(3)"
+          ]
+        ]
+      }
+    ],
+    "traps": [
+      "shape·columns·dtypes는 속성이라 괄호 없이 쓴다. df.shape()처럼 쓰면 TypeError가 난다.",
+      "df.shape는 (열 수, 행 수)가 아니라 (행 수, 열 수) 순서이다.",
+      "여러 열은 df[['이름', '점수']]처럼 대괄호 두 겹으로 고른다. df['이름', '점수']는 KeyError이다.",
+      "df[['점수']]는 열이 하나여도 Series가 아니라 DataFrame(5행 1열)이다.",
+      "count()는 결측값을 빼고 세고, len()은 결측값까지 센다. 평균도 NaN을 빼고 남은 값의 개수로 나눈다.",
+      "unique()는 값 목록, nunique()는 종류 수(숫자 하나), value_counts()는 값별 개수를 많은 순으로 돌려준다.",
+      "정수 열에 NaN이 하나라도 섞이면 int64가 아니라 float64가 된다.",
+      "describe()의 50%는 평균이 아니라 중앙값이다. 열이 1개로 뭉쳐 읽히면 sep, 한글 오류는 encoding을 확인한다."
+    ]
+  },
+  "advanced": [
+    {
+      "id": "a1",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({\n    '상품': ['펜', '공책', '지우개', '자'],\n    '가격': [1000, 2500, 500, 1500],\n    '재고': [30, 12, 50, 8]\n})\nprint(df.shape, len(df), df.columns[-1])",
+      "o": [
+        "(3, 4) 4 재고",
+        "(4, 3) 3 재고",
+        "(4, 3) 4 재고",
+        "(4, 3) 4 상품"
+      ],
+      "a": 2,
+      "exp": "리스트마다 값이 4개이므로 4행, 열이 3개이므로 shape는 (4, 3)이다. len(df)는 행 수 4이고, columns[-1]은 마지막 열 이름 '재고'이다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a2",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'n': [5, 10, 15, 20, 25, 30, 35]})\nprint(df.head()['n'].sum(), df.tail(2)['n'].sum())",
+      "o": [
+        "75 65",
+        "105 65",
+        "75 30",
+        "15 65"
+      ],
+      "a": 0,
+      "exp": "head()는 괄호를 비우면 위 5행(5, 10, 15, 20, 25)이므로 합이 75이다. tail(2)는 아래 2행(30, 35)이므로 합이 65이다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a3",
+      "q": "점수 열의 값이 [60, 75, 90, 75, 100]일 때 df['점수'].describe()의 count, 50%, max를 차례로 쓴 것은? (소수점 표시는 생략)",
+      "o": [
+        "5, 80, 100",
+        "4, 75, 100",
+        "5, 90, 100",
+        "5, 75, 100"
+      ],
+      "a": 3,
+      "exp": "값이 5개이고 결측이 없으므로 count는 5이다. 크기순 60, 75, 75, 90, 100의 한가운데 값(중앙값)은 75이고 max는 100이다. 80은 평균(mean)이므로 50%와 헷갈리지 않는다.",
+      "area": "STAT",
+      "type": "계산"
+    },
+    {
+      "id": "a4",
+      "q": "다음 내용의 파일 p.csv를 pd.read_csv('p.csv')로 옵션 없이 읽었을 때 df.shape는?",
+      "code": "# p.csv 파일 내용\n이름;점수\n민수;80\n지아;90\n하늘;75",
+      "o": [
+        "(3, 2)",
+        "(3, 1)",
+        "(4, 2)",
+        "(4, 1)"
+      ],
+      "a": 1,
+      "exp": "구분자가 세미콜론인데 sep 기본값(쉼표)으로 읽으면 한 줄 전체가 열 하나가 된다. 첫 줄 '이름;점수'는 열 이름이 되고 데이터 3줄이 남아 (3, 1)이다. sep=';'를 주면 (3, 2)가 된다.",
+      "area": "PREP",
+      "type": "응용"
+    },
+    {
+      "id": "a5",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ns = pd.Series(['사과', '배', '사과', '귤', '사과', '배'])\nprint(s.value_counts()['배'], s.nunique(), len(s))",
+      "o": [
+        "2 6 6",
+        "3 3 6",
+        "2 3 6",
+        "2 3 3"
+      ],
+      "a": 2,
+      "exp": "'배'는 2번 나오므로 value_counts()['배']는 2이다. 종류는 사과·배·귤 3가지라 nunique()는 3이고, len(s)는 전체 값 개수 6이다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a6",
+      "q": "학생 표 df의 '반' 열에서 반마다 학생이 몇 명인지 알고 싶다. 가장 알맞은 코드는?",
+      "o": [
+        "df['반'].value_counts()",
+        "df['반'].nunique()",
+        "df['반'].unique()",
+        "df['반'].count()"
+      ],
+      "a": 0,
+      "exp": "값(반)마다 개수를 세는 것은 value_counts()이다. nunique()는 반의 종류 수, unique()는 반 이름 목록, count()는 결측을 뺀 전체 학생 수 하나만 알려 준다.",
+      "area": "ANAL",
+      "type": "응용"
+    },
+    {
+      "id": "a7",
+      "q": "학생 표 df(5행 3열: 이름·반·점수)에 대한 코드와 결과의 연결로 옳지 않은 것은?",
+      "o": [
+        "df.shape → (5, 3)",
+        "len(df) → 5",
+        "df['점수'] → 5행 1열 DataFrame",
+        "df[['이름', '점수']] → 5행 2열 DataFrame"
+      ],
+      "a": 2,
+      "exp": "df['점수']처럼 대괄호 한 겹으로 열 하나를 고르면 DataFrame이 아니라 Series(shape (5,))이다. 5행 1열 DataFrame을 얻으려면 df[['점수']]로 쓴다.",
+      "area": "PREP",
+      "type": "부정형"
+    },
+    {
+      "id": "a8",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6], 'c': [7, 8, 9]})\nx = df[['a', 'c']]\ny = df['b']\nprint(x.shape, y.sum())",
+      "o": [
+        "(2, 3) 15",
+        "(3, 2) 15",
+        "(3, 2) 6",
+        "(3, 1) 15"
+      ],
+      "a": 1,
+      "exp": "df[['a', 'c']]는 3행 2열 DataFrame이라 shape가 (3, 2)이다. df['b']는 4, 5, 6이 담긴 Series이므로 합은 15이다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a9",
+      "q": "파일 상황과 read_csv 옵션의 연결로 옳지 않은 것은?",
+      "o": [
+        "값이 세미콜론(;)으로 나뉜 파일 → sep=';'",
+        "한글 Windows 엑셀에서 저장해 cp949로 된 파일 → encoding='cp949'",
+        "첫 줄부터 바로 데이터인 파일 → header=None",
+        "값이 탭으로 나뉜 파일 → encoding='\\t'"
+      ],
+      "a": 3,
+      "exp": "탭 구분자는 구분자 옵션인 sep='\\t'로 지정한다. encoding은 글자 저장 방식(utf-8, cp949 등)을 정하는 옵션이라 탭과 관계없다. 나머지 연결은 모두 옳다.",
+      "area": "PREP",
+      "type": "부정형"
+    },
+    {
+      "id": "a10",
+      "q": "점수 열이 [70, 80, NaN, 90]일 때 mean(), count(), sum()의 결과를 차례로 쓴 것은?",
+      "o": [
+        "60.0, 4, 240.0",
+        "80.0, 3, 240.0",
+        "80.0, 4, 240.0",
+        "60.0, 3, 240.0"
+      ],
+      "a": 1,
+      "exp": "pandas의 통계 메서드는 NaN을 빼고 계산한다. 합계 240을 값이 있는 3개로 나누어 평균 80.0, count는 3이다. 240 ÷ 4 = 60.0으로 계산하면 틀린다.",
+      "area": "STAT",
+      "type": "계산"
+    },
+    {
+      "id": "a11",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ns = pd.Series(['남', '여', '여', '남', '여'])\nprint(s.value_counts(normalize=True)['여'])",
+      "o": [
+        "0.6",
+        "3",
+        "0.4",
+        "60"
+      ],
+      "a": 0,
+      "exp": "normalize=True를 주면 개수 대신 비율을 돌려준다. '여'는 5개 중 3개이므로 3 ÷ 5 = 0.6이다. 0.4는 '남'의 비율이고, 백분율(60)로 바꿔 주지는 않는다.",
+      "area": "ANAL",
+      "type": "확장"
+    },
+    {
+      "id": "a12",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ns = pd.Series(['A', 'B', None, 'A', None])\nprint(s.nunique(), s.count(), len(s))",
+      "o": [
+        "3 3 5",
+        "2 5 5",
+        "2 3 5",
+        "3 5 5"
+      ],
+      "a": 2,
+      "exp": "None은 결측값으로 처리된다. nunique()는 결측을 빼고 A·B 2종류, count()는 결측을 뺀 3개, len()은 결측까지 센 5이다.",
+      "area": "ANAL",
+      "type": "확장"
+    },
+    {
+      "id": "a13",
+      "q": "다음은 DataFrame df에 df.info()를 실행한 결과의 일부이다. 해석으로 옳지 않은 것은?",
+      "code": "RangeIndex: 8 entries, 0 to 7\nData columns (total 3 columns):\n #   Column  Non-Null Count  Dtype\n---  ------  --------------  -----\n 0   학년    8 non-null      int64\n 1   키      7 non-null      float64\n 2   몸무게  8 non-null      float64\ndtypes: float64(2), int64(1)",
+      "o": [
+        "전체 행은 8개이다",
+        "키 열에는 결측값이 1개 있다",
+        "학년 열은 정수 자료형이다",
+        "몸무게 열은 결측값이 섞여서 float64가 되었다"
+      ],
+      "a": 3,
+      "exp": "몸무게 열은 8 non-null로 결측이 없다. 결측 없이도 float64인 것은 값 자체가 50.5처럼 소수가 있는 실수이기 때문이다. 8 entries와 키 열 7 non-null을 비교하면 키에는 결측이 1개 있다.",
+      "area": "PREP",
+      "type": "부정형"
+    },
+    {
+      "id": "a14",
+      "q": "describe()와 info()를 비교한 설명으로 옳은 것은?",
+      "o": [
+        "info()는 열별 평균을, describe()는 열별 dtype을 보여 준다",
+        "describe()는 숫자 열의 요약 통계를, info()는 행 수·결측 아닌 값 개수·dtype을 보여 준다",
+        "둘 다 괄호 없이 쓰는 속성이다",
+        "describe()의 count는 결측값을 포함한 행 수이다"
+      ],
+      "a": 1,
+      "exp": "describe()는 count·mean·std·사분위수 같은 요약 통계를, info()는 표의 구조(행 수, Non-Null Count, Dtype)를 보여 준다. 둘 다 괄호를 붙이는 메서드이고, describe()의 count는 결측을 뺀 개수이다.",
+      "area": "STAT",
+      "type": "비교"
+    },
+    {
+      "id": "a15",
+      "q": "다음 코드를 실행한 결과로 옳은 것은?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'이름': ['민수', '지아'], '점수': [80, 95]})\nprint(df['이름', '점수'])",
+      "o": [
+        "KeyError가 난다",
+        "이름과 점수 두 열이 담긴 DataFrame이 출력된다",
+        "ValueError가 난다",
+        "'이름' 열만 Series로 출력된다"
+      ],
+      "a": 0,
+      "exp": "대괄호 한 겹에 '이름', '점수'를 쓰면 ('이름', '점수')라는 튜플 하나를 열 이름으로 찾다가 없으므로 KeyError가 난다. 두 열을 고르려면 df[['이름', '점수']]처럼 대괄호를 두 겹 쓴다.",
+      "area": "PREP",
+      "type": "코드"
+    }
+  ]
+}
