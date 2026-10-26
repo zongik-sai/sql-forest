@@ -13,6 +13,7 @@ import { STAGE_COUNTS, quizNeed } from '../../content/stages/meta';
 import { StageStatus } from './StageStatus';
 import { ActivityRunner } from './ActivityRunner';
 import { QuestionCard, type Graded } from './QuestionCard';
+import { useLiveDetail } from '../monitor/liveStore';
 
 const isUnitId = (u: string | undefined): u is UnitId => !!u && u in UNIT_BY_ID;
 
@@ -156,6 +157,9 @@ function ActivityPageInner() {
   const { unitId, activityId } = useParams();
   const { state } = useLearner();
   const nav = useNavigate();
+  // 선생님 화면 실시간 학습 위치: 단원의 몇 번째 활동인지
+  const actIds = isUnitId(unitId) ? UNIT_BY_ID[unitId].activityIds : [];
+  useLiveDetail(activityId && actIds.includes(activityId) ? `활동 ${actIds.indexOf(activityId) + 1}/${actIds.length}` : null);
   if (!isUnitId(unitId) || !activityId || !ACTIVITY_BY_ID[activityId] || ACTIVITY_BY_ID[activityId].unitId !== unitId) return <Navigate to="/garden" replace />;
   if (!isUnitUnlocked(state, unitId)) return <LockedNotice />;
   const a = ACTIVITY_BY_ID[activityId];
@@ -282,6 +286,7 @@ export function CheckpointPage() {
 function CheckpointPageInner() {
   const { unitId } = useParams();
   const { state } = useLearner();
+  useLiveDetail(isUnitId(unitId) ? `체크포인트 해결 ${unitCheckpointScore(state, unitId)}/3` : null);
   if (!isUnitId(unitId)) return <Navigate to="/garden" replace />;
   if (!isUnitUnlocked(state, unitId)) return <LockedNotice />;
   const u = UNIT_BY_ID[unitId];

@@ -511,3 +511,83 @@ pre.cg-code:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px;
 /* 과목 홈(네트워크·컴퓨터 일반): 기초가 어렵다면 보충 학습으로 — 눈에 띄지 않게 */
 .cg-bridge { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 0.45rem 0.75rem; color: var(--ink-soft); }
 .cg-bridge a, .cg-bridge-back a { color: var(--teal); font-weight: 600; }
+
+/* 선생님 화면·모니터링 */
+.t-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16rem; }
+.topbar .teacher-link { color: var(--teal-strong); font-weight: 700; }
+/* 학생 상단바: 학습 위치 공유 중 표시(누르면 설명) */
+.live-flag-wrap { position: relative; display: inline-flex; }
+.live-flag { display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink-soft); font-size: 0.78rem; font-weight: 600; padding: 0.15rem 0.6rem; min-height: 28px; white-space: nowrap; }
+.live-flag.sharing { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+.live-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--moss); flex: none; }
+.live-flag.sharing .live-dot, .share-banner .live-dot { background: var(--bad); }
+.live-tip { display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: min(18rem, calc(100vw - 2rem)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 0.5rem 0.65rem; font-size: 0.85rem; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15); }
+.live-tip.open, .live-flag:hover + .live-tip { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .live-flag.sharing .live-dot, .share-banner .live-dot { animation: live-pulse 1.6s ease-in-out infinite; }
+  @keyframes live-pulse { 50% { opacity: 0.35; } }
+}
+/* 화면 보기 요청 허락 창·공유 중 표시: 집중 학습 가림 화면(z 2147483000)보다 위 */
+.monitor-modal-back { position: fixed; inset: 0; z-index: 2147483300; background: rgba(10, 20, 15, 0.55); display: grid; place-items: center; padding: 1rem; }
+.monitor-modal { width: min(460px, 100%); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 1.25rem 1.2rem; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+.monitor-modal h2 { font-size: 1.2rem; }
+.share-banner { position: fixed; left: 0.75rem; bottom: 0.75rem; z-index: 2147483200; display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; max-width: calc(100vw - 1.5rem); background: var(--surface); color: var(--ink); border: 2px solid var(--bad); border-radius: 999px; padding: 0.35rem 0.5rem 0.35rem 0.85rem; font-weight: 700; font-size: 0.9rem; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2); }
+.share-banner.share-note { border-color: var(--line); font-weight: 600; border-radius: var(--radius-m); }
+/* 선생님 화면 */
+.t-hub { max-width: 1240px; }
+.t-tabs { gap: 0.3rem; }
+@media (max-width: 640px) { .t-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.3rem; } .t-tabs button { white-space: nowrap; } }
+.t-tabs button[aria-selected='true'] { border-color: var(--teal); background: var(--teal); color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .t-tabs button[aria-selected='true'] { color: #0e1a14; } }
+:root[data-theme='dark'] .t-tabs button[aria-selected='true'] { color: #0e1a14; }
+.kpi .kpi-small { font-size: 1rem; }
+.t-name { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--teal-strong); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; text-align: left; }
+.t-unit-table th[scope='row'] { max-width: 15rem; overflow: hidden; text-overflow: ellipsis; }
+.t-rate { background: color-mix(in srgb, var(--moss-soft) calc(var(--r, 0) * 100%), transparent); font-variant-numeric: tabular-nums; }
+.t-detail td { text-align: center; font-variant-numeric: tabular-nums; }
+.t-detail td.t-pass { background: var(--moss-soft); color: var(--moss-strong); font-weight: 700; }
+.t-detail td.t-tried { background: var(--warn-soft); color: var(--warn); }
+.t-detail td.t-none { color: var(--ink-soft); }
+.t-hist { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 0.25rem; align-items: end; height: 150px; }
+.t-hist-col { display: grid; grid-template-rows: auto 1fr auto; height: 100%; align-items: end; text-align: center; font-size: 0.75rem; }
+.t-hist-bar { display: block; background: var(--teal); border-radius: 3px 3px 0 0; min-height: 2px; align-self: end; }
+.t-hist-n { color: var(--ink-soft); }
+.t-hist-x { color: var(--ink-soft); border-top: 1px solid var(--line); }
+/* 학생 자세히 보기 서랍(휴대폰은 전체 화면) */
+.t-drawer-back { position: fixed; inset: 0; z-index: 60; background: rgba(10, 20, 15, 0.45); display: flex; justify-content: flex-end; }
+.t-drawer { width: min(720px, 100%); height: 100%; overflow-y: auto; background: var(--bg); border-left: 1px solid var(--line); padding: 1rem 1.1rem 2rem; }
+.t-drawer-head { display: flex; gap: 0.75rem; align-items: flex-start; justify-content: space-between; position: sticky; top: -1rem; background: var(--bg); padding: 0.5rem 0; margin-top: -0.5rem; z-index: 1; border-bottom: 1px solid var(--line); }
+.t-drawer-head h2 { margin: 0; font-size: 1.25rem; }
+.t-drawer h3 { font-size: 1rem; margin: 0 0 0.4rem; }
+/* 실시간 모니터링 */
+.t-live-tools select { font: inherit; padding: 0.3rem 0.4rem; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--ink); max-width: 100%; }
+.t-chip-sum { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.t-chip { display: inline-block; border-radius: 999px; padding: 0.05em 0.6em; font-size: 0.8rem; font-weight: 700; border: 1px solid; white-space: nowrap; }
+.chip-learning.t-chip { color: var(--moss-strong); border-color: var(--moss); background: var(--moss-soft); }
+.chip-locked.t-chip { color: var(--bad); border-color: var(--bad); background: var(--bad-soft); }
+.chip-break.t-chip { color: var(--teal-strong); border-color: var(--teal); background: var(--teal-soft); }
+.chip-menu.t-chip { color: var(--ink-soft); border-color: var(--line); background: var(--surface-2); }
+.chip-away.t-chip { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+.chip-offline.t-chip { color: var(--ink-soft); border-color: var(--line); background: transparent; border-style: dashed; }
+.t-live-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 0.6rem; }
+.t-live-card { display: grid; gap: 0.25rem; padding: 0.7rem 0.8rem; border-left-width: 4px; min-width: 0; }
+.t-live-card.chip-learning { border-left-color: var(--moss); }
+.t-live-card.chip-locked { border-left-color: var(--bad); }
+.t-live-card.chip-away { border-left-color: var(--warn); }
+.t-live-card.chip-break { border-left-color: var(--teal); }
+.t-live-card.chip-offline { opacity: 0.7; }
+.t-live-card .btn { justify-self: start; margin-top: 0.2rem; }
+.t-live-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-width: 0; }
+.t-live-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-live-where { overflow-wrap: anywhere; }
+.t-viewer { position: fixed; right: 1rem; bottom: 1rem; z-index: 55; width: min(720px, calc(100vw - 2rem)); display: grid; gap: 0.5rem; box-shadow: 0 10px 32px rgba(0, 0, 0, 0.25); }
+.t-viewer-head { display: flex; align-items: center; gap: 0.5rem; }
+.t-viewer-head .spacer { flex: 1; }
+.t-viewer-stage { background: #0b0f0d; border-radius: var(--radius-s); min-height: 180px; display: grid; place-items: center; overflow: hidden; }
+.t-viewer-stage video { width: 100%; max-height: 70vh; display: block; background: #000; }
+.t-viewer-msg { color: #e3ede6; margin: 0; padding: 1rem; text-align: center; }
+@media (max-width: 640px) { .t-viewer { right: 0.5rem; left: 0.5rem; bottom: 0.5rem; width: auto; } .t-ellipsis { max-width: 9rem; } }
+.cg-result-cols > .t-wide { grid-column: 1 / -1; }
+.t-drawer-head .btn { flex: none; white-space: nowrap; }
+.t-live-card .t-ellipsis { max-width: 100%; }
+@media (max-width: 640px) { .t-unit-table th[scope='row'] { max-width: 8.5rem; } }

@@ -1,5 +1,5 @@
-import { activeWrongIds, bestRegularMock, CG_SHAPE, normalizeCgState, passedCount, plantStage, unitLevel, type CgState, type CourseShape } from './model';
-import { CG_PASS, type CgUnitId } from './types';
+import { activeWrongIds, bestRegularMock, CG_SHAPE, mockSizeOf, normalizeCgState, passedCount, plantStage, unitLevel, type CgState, type CourseShape } from './model';
+import type { CgUnitId } from './types';
 
 /**
  * 선생님 반 학습 현황 집계(순수 함수, 테스트 대상). 과목 단원 목록은 shape로 받는다(생략하면 컴퓨터 일반).
@@ -31,10 +31,10 @@ export function toStudents(rows: CgClassRow[], shape: CourseShape = CG_SHAPE): C
   return rows.map((r) => {
     const s = normalizeCgState(r.state, shape);
     const levels = Object.fromEntries(shape.unitIds.map((u) => [u, unitLevel(s, u)])) as Record<CgUnitId, number>;
-    const best = bestRegularMock(s);
+    const best = bestRegularMock(s, shape);
     return {
       id: r.user_id, name: r.name || (r.email ?? '').split('@')[0] || '(이름 없음)', email: r.email ?? '', state: s,
-      plant: plantStage(s, shape), passed: passedCount(s, shape), levels, mockBest: best, mockPassed: best >= CG_PASS.mock.need,
+      plant: plantStage(s, shape), passed: passedCount(s, shape), levels, mockBest: best, mockPassed: best >= mockSizeOf(shape).need,
       wrong: activeWrongIds(s).length, lastAt: r.updated_at,
     };
   });

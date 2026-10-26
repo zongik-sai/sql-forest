@@ -15,6 +15,8 @@ import { LearnerProvider, useLearner } from './LearnerContext';
 import { AboutPage, SetupPage, StartPage } from './StartPage';
 import { LAST_SUBJECT_KEY, SubjectHome, subjectOfPath } from './SubjectHome';
 import { writeRaw } from '../lib/storage';
+import { LiveReporter } from '../features/monitor/LiveReporter';
+import { LiveIndicator, TeacherLink } from '../features/monitor/LiveIndicator';
 // 컴퓨터 일반은 문제은행이 커서 들어갈 때만 내려받는다
 const ComputerRoutes = lazy(() => import('../features/computer/ComputerApp'));
 // 같은 단원 × 5단계 엔진을 쓰는 과목들: 과목마다 자기 단원 8개만 담긴 chunk
@@ -24,6 +26,8 @@ const DataRoutes = lazy(() => import('../features/computer/courses/data'));
 const BinaryRoutes = lazy(() => import('../features/computer/courses/bin'));
 const IpRoutes = lazy(() => import('../features/computer/courses/ip'));
 const loadingCourse = <div className="page" role="status">불러오는 중…</div>;
+// 선생님 화면(실시간 모니터링·과목별 반 현황): 선생님만 쓰므로 들어갈 때만 내려받는다
+const TeacherHub = lazy(() => import('../features/monitor/TeacherHub'));
 // 데이터베이스 단원 단계 콘텐츠(이론 카드·개념 점검·실습 예제)도 단계 화면을 열 때만 내려받는다
 const StagePage = lazy(() => import('../features/learning/stages').then((m) => ({ default: m.StagePage })));
 
@@ -51,9 +55,11 @@ function TopBar({ learning }: { learning?: boolean }) {
           <NavLink to="/review">오답 복습</NavLink>
           <NavLink to="/practice">자유 실습장</NavLink>
           <NavLink to="/report">보고서</NavLink>
+          <TeacherLink subject="db" />
         </nav>
       )}
       <span className="spacer" />
+      <LiveIndicator />
       <SaveStatus />
       {learning && f.inSession && !f.strict && <button className="btn btn-small" onClick={f.manualBreak}>쉬기</button>}
       {L.identity.kind === 'demo' ? (
@@ -251,10 +257,12 @@ function PublicShell() {
       <header className="topbar">
         <Link to="/" className="brand"><Garden level={30} small className="garden-mini" title="배움 숲" /> 배움 숲</Link>
         {inDb && <span className="crumbs">데이터베이스</span>}
+        {loc.pathname !== '/teacher' && <nav aria-label="선생님 메뉴"><TeacherLink subject={inDb ? 'db' : undefined} /></nav>}
         <span className="spacer" />
+        <LiveIndicator />
         {auth.identity?.kind === 'user' && (
           <>
-            <span className="small muted">{auth.identity.name ?? auth.identity.email}</span>
+            <span className="small muted t-ellipsis">{auth.identity.name ?? auth.identity.email}</span>
             <LogoutButton />
           </>
         )}
@@ -277,6 +285,8 @@ export function App() {
   return (
     <Router>
       <NavTracker />
+      {/* 로그인한 학생의 실시간 학습 위치 보내기 + 선생님 화면 보기 요청 확인(데모·비로그인은 아무것도 안 함) */}
+      <LiveReporter />
       <Routes>
         <Route element={<PublicShell />}>
           <Route path="/" element={<SubjectHome />} />
@@ -284,6 +294,7 @@ export function App() {
           <Route path="/setup" element={<SetupPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/playground" element={<PlaygroundRoute />} />
+          <Route path="/teacher" element={<Suspense fallback={loadingCourse}><TeacherHub /></Suspense>} />
         </Route>
         <Route element={<Protected />}>
           <Route element={<AppLayout />}>
