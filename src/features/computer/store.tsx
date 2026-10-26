@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { learnerPrefix, readJson, removeWithPrefix, writeJson } from '../../lib/storage';
+import { learnerPrefix, readJson, removeRaw, removeWithPrefix, UNSYNCED_SUFFIX, writeJson, writeRaw } from '../../lib/storage';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../auth/supabase';
 import { useCourse, type CourseConfig } from './course';
@@ -76,6 +76,8 @@ export function CgProvider({ children }: { children: ReactNode }) {
   const learnerKey = id ? id.learnerKey : GUEST_KEY;
   const stateKey = stateKeyOf(learnerKey, seg);
   const revKey = revKeyOf(learnerKey, seg);
+  // 서버 저장이 확인될 때까지 남기는 표시: 다른 화면에서 로그아웃해도 저장 안 된 기록이 있음을 알 수 있게
+  const unsyncedKey = `${learnerPrefix(learnerKey)}${seg}${UNSYNCED_SUFFIX}`;
   const courseRef = useRef(course);
   courseRef.current = course;
   const norm = useCallback((raw: unknown) => normalizeCgState(raw, courseRef.current), []);
@@ -131,6 +133,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
           revRef.current = r.revision;
           writeJson(revKey, r.revision);
           if (!dirtyRef.current) {
+            removeRaw(unsyncedKey);
             setSaveStatus('saved');
             return;
           }
@@ -161,7 +164,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
         void pushNowRef.current();
       }, delay);
     } else if (!dirtyRef.current) retryRef.current.n = 0;
-  }, [mode, revKey, writeLocal, merge, norm]);
+  }, [mode, revKey, unsyncedKey, writeLocal, merge, norm]);
   const pushNowRef = useRef(pushNow);
   pushNowRef.current = pushNow;
 
@@ -206,7 +209,10 @@ export function CgProvider({ children }: { children: ReactNode }) {
       const differs = !remote || JSON.stringify(merged) !== JSON.stringify(remote);
       if (differs && (hasProgress(merged, courseRef.current) || !remote)) {
         dirtyRef.current = hasProgress(merged, courseRef.current);
-        if (dirtyRef.current) void pushNow();
+        if (dirtyRef.current) {
+          writeRaw(unsyncedKey, '1');
+          void pushNow();
+        }
         else setSaveStatus('saved');
       } else setSaveStatus('saved');
     })().catch(() => {
@@ -218,7 +224,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [mode, stateKey, revKey, pushNow, writeLocal, merge, norm]);
+  }, [mode, stateKey, revKey, unsyncedKey, pushNow, writeLocal, merge, norm]);
 
   // 같은 기기의 다른 탭에서 기록이 바뀌면 합친다(한 탭의 오래된 기록이 단원 초기화 등을 덮어쓰지 않게)
   useEffect(() => {
@@ -286,9 +292,10 @@ export function CgProvider({ children }: { children: ReactNode }) {
     writeLocal(next);
     if (mode === 'user') {
       dirtyRef.current = true;
+      writeRaw(unsyncedKey, '1');
       schedule();
     }
-  }, [mode, schedule, writeLocal]);
+  }, [mode, schedule, writeLocal, unsyncedKey]);
 
   // 로그인 없이 남긴 이 과목 기록(guest 키 `${seg}:` 아래 전부: 기록·풀던 초안·모의고사)만 가져오고 지운다
   const importGuest = useCallback(() => {

@@ -135,6 +135,13 @@ describe('선생님 과목별 반 학습 현황(읽기 전용)', () => {
     await expect(overview(null, 'net')).rejects.toThrow(/permission denied/);
   });
   it('트리거 함수는 클라이언트가 직접 부를 수 없다', async () => {
-    await expect(as(S1, (tx) => tx.query('select private.course_bump_revision()'))).rejects.toThrow(/permission denied|trigger functions can only be called as triggers/);
+    await expect(as(S1, (tx) => tx.query('select private.course_bump_revision()'))).rejects.toThrow(/permission denied/);
+    await expect(as(S1, (tx) => tx.query('select private.course_insert_defaults()'))).rejects.toThrow(/permission denied/);
+  });
+  it('직접 insert해도 revision·updated_at은 꾸밀 수 없다(1·지금으로 시작)', async () => {
+    await as(S2, (tx) => tx.query(`insert into public.course_progress (user_id, course, state, revision, updated_at) values ($1, 'prog', '{}', 2147483647, '2099-01-01')`, [S2]));
+    const row = await as(S2, async (tx) => (await tx.query<{ revision: number; future: boolean }>(`select revision, updated_at > now() + interval '1 minute' as future from public.course_progress where course = 'prog'`)).rows[0]);
+    expect(row).toEqual({ revision: 1, future: false });
+    expect(await save(S2, 'prog', { v: 1 }, 1)).toEqual({ status: 'ok', revision: 2 });
   });
 });

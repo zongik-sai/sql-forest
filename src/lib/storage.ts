@@ -77,6 +77,9 @@ export function removeWithPrefix(prefix: string): void {
 }
 
 export const STORAGE_PREFIX = 'sqlforest:v1:';
+/** 과목 기록이 이 기기에만 있고 아직 서버에 저장되지 않았다는 표시(`<learner prefix><과목>:unsynced`) */
+export const UNSYNCED_SUFFIX = ':unsynced';
+export const hasUnsynced = (prefix: string) => keysWithPrefix(prefix).some((k) => k.endsWith(UNSYNCED_SUFFIX));
 export const learnerPrefix = (learnerKey: string) => `${STORAGE_PREFIX}${learnerKey}:`;
 
 export function sessionGet(key: string): string | null {

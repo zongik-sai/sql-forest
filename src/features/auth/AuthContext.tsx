@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { isDemoEnabled, isSupabaseConfigured } from '../../lib/config';
-import { learnerPrefix, readRaw, removeRaw, removeWithPrefix, writeRaw } from '../../lib/storage';
+import { hasUnsynced, learnerPrefix, readRaw, removeRaw, removeWithPrefix, writeRaw } from '../../lib/storage';
 import { signInWithGoogle, supabase, takeAuthError } from './supabase';
 
 export type Identity =
@@ -14,7 +14,8 @@ interface AuthCtx {
   /** 세션 만료 등으로 로그아웃된 경우(초안은 보존) */
   expired: boolean;
   signIn: (returnPath: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  /** 서버에 저장되지 않은 과목 기록이 있으면 로그아웃하지 않고 false(force면 그래도 로그아웃) */
+  signOut: (force?: boolean) => Promise<boolean>;
   startDemo: () => void;
   exitDemo: () => void;
   clearError: () => void;
@@ -85,9 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (err) setAuthError(err);
   }, []);
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (force = false) => {
     const sb = supabase();
     const prev = identity;
+    if (!force && prev?.kind === 'user' && hasUnsynced(learnerPrefix(prev.learnerKey))) return false;
     explicitSignOut = true;
     if (sb) await sb.auth.signOut();
     // 로그아웃: 이 사용자의 로컬 캐시를 지워 다음 사용자에게 보이지 않게 한다.
@@ -95,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIdentity(null);
     setExpired(false);
     setStatus('signed-out');
+    return true;
   }, [identity]);
 
   const startDemo = useCallback(() => {

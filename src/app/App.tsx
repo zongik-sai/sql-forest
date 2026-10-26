@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import { HashRouter, Link, MemoryRouter, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Garden } from '../components/Garden';
 import { useAuth } from '../features/auth/AuthContext';
+import { LogoutButton } from '../features/auth/LogoutButton';
 import { FocusGate, FocusProvider, markInAppNavigation, useFocusGate, type StrictScope } from '../features/focus/FocusContext';
 import { addActiveSeconds, unitLockCount, UNIT_LOCK_LIMIT } from '../features/progress/model';
 import type { UnitId } from '../content/types';
@@ -56,7 +57,7 @@ function TopBar({ learning }: { learning?: boolean }) {
       {L.identity.kind === 'demo' ? (
         <button className="btn btn-small btn-quiet" onClick={auth.exitDemo}>데모 나가기</button>
       ) : (
-        <button className="btn btn-small btn-quiet" onClick={() => void auth.signOut()}>로그아웃</button>
+        <LogoutButton />
       )}
     </header>
   );
@@ -252,7 +253,7 @@ function PublicShell() {
         {auth.identity?.kind === 'user' && (
           <>
             <span className="small muted">{auth.identity.name ?? auth.identity.email}</span>
-            <button className="btn btn-small btn-quiet" onClick={() => void auth.signOut()}>로그아웃</button>
+            <LogoutButton />
           </>
         )}
       </header>

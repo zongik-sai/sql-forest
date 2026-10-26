@@ -39,6 +39,19 @@ drop trigger if exists course_progress_bump on public.course_progress;
 create trigger course_progress_bump before update on public.course_progress
   for each row execute function private.course_bump_revision();
 
+-- 새 행은 언제나 revision 1·지금 시각으로 시작(직접 insert로 revision·updated_at을 꾸미지 못하게)
+create or replace function private.course_insert_defaults() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  new.revision := 1;
+  new.updated_at := now();
+  return new;
+end $$;
+
+drop trigger if exists course_progress_insert on public.course_progress;
+create trigger course_progress_insert before insert on public.course_progress
+  for each row execute function private.course_insert_defaults();
+
 revoke all on public.course_progress from anon, authenticated;
 grant select, insert, update, delete on public.course_progress to authenticated;
 alter table public.course_progress enable row level security;
@@ -104,4 +117,4 @@ end $$;
 -- ---------------------------------------------------------------------
 revoke all on function public.save_course_progress(text, jsonb, integer), public.course_class_overview(text) from public, anon;
 grant execute on function public.save_course_progress(text, jsonb, integer), public.course_class_overview(text) to authenticated;
-revoke all on function private.course_bump_revision() from public, anon, authenticated;
+revoke all on function private.course_bump_revision(), private.course_insert_defaults() from public, anon, authenticated;

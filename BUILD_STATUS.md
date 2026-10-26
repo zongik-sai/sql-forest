@@ -90,7 +90,9 @@
   - 새 과목: 이 기기 `<학습자>:net|prog|data:state` 등, 서버 `course_progress`(학생 × 과목) + `save_course_progress(p_course, …)`(CAS) + `course_class_overview(p_course)`(선생님 읽기 전용) — `20261026000000_courses.sql`. 과목마다 자기 단원 8개만 든 chunk로 따로 내려받음(빌드 결과로 확인).
   - 새 원본 형식 어댑터(`content/adapt.ts`: 카드의 match·code, 문항 code, 모르는 영역 → 첫 영역, 빈 단원 방어), 코드 블록(카드·카드 다시 보기·문제·복습 카드·모의고사, 긴 줄은 블록 안 가로 스크롤). 식물 기준은 전체 단계 수에 비례(40단계는 1·8·16·28·40 그대로).
   - 첫 화면 과목 5개(자격증 이름 없음, 내용 범위 출처는 과목 화면 아래 작은 글씨로만).
-  - 검증: tsc·eslint 통과, Vitest(새 단위 테스트 14 + PGlite course_progress 14 포함) — `courseBanks.test.ts`의 Data U4~U8은 다른 작업이 아직 쓰는 중이라 실패(내용 미작성), Playwright dev 11(새 과목 4 포함)·pages 7 통과.
+  - 내용: 과목마다 8단원 × (이론 카드 10·개념 맞추기·빈칸 20·기초 20·실력점검 15·요약), 단원별로 코드 출력·계산(서브넷·권한·통계 등)을 스크립트로 실행해 맞춘 뒤 단원마다 별도 검토(사실·정답 2개·보기 위치 언급)를 한 번 더 함. `courseBanks.test.ts`(120)가 형식·길이·정답 번호 분포·보기 섞임과 충돌하는 ①~④ 표기를 검사.
+  - 검토 반영: 학생이 직접 insert로 revision·updated_at을 꾸미지 못하게 insert 트리거 추가, 다른 과목에 서버 저장 안 된 기록이 있으면 로그아웃 전에 알림(`<과목>:unsynced` 표시), 데이터베이스 '내 학습 기록 지우기'가 다른 과목의 이 기기 사본을 지우지 않게, 컴퓨터 일반 고정 모의고사 1~3회 지문 테스트(main과 같은 값 확인).
+  - 검증: tsc·eslint 통과, Vitest 전체(문제은행 120 + 새 단위 14 + PGlite course_progress 15 포함), Playwright 56(dev·pages) 통과.
   - 미검증: 운영 Supabase에 새 migration 적용 및 실제 로그인 학생의 새 과목 저장·가져오기 왕복, 새 과목 내용의 교과 정확성(선생님 검토 전).
 
 ## 미검증·한계(정직한 보고)

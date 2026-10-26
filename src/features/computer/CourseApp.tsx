@@ -30,8 +30,8 @@ function CourseTopBar() {
   const [unsaved, setUnsaved] = useState(false);
   const logout = async (force = false) => {
     if (!force && !(await cg.flush())) return setUnsaved(true);
+    if (!(await auth.signOut(force))) return setUnsaved(true); // 다른 과목에 저장 안 된 기록
     setUnsaved(false);
-    await auth.signOut();
   };
   const stage = plantStage(cg.state, course);
   const wrong = activeWrongIds(cg.state).length;
@@ -59,7 +59,7 @@ function CourseTopBar() {
       ) : null}
       {unsaved && (
         <div className="notice notice-warn row cg-unsaved" role="alert">
-          <span>아직 서버에 저장되지 않은 기록이 있어요(인터넷 연결 확인). 지금 로그아웃하면 이 기기의 기록이 지워져요.</span>
+          <span>아직 서버에 저장되지 않은 기록이 있어요(인터넷 연결 확인). 지금 로그아웃하면 이 기기의 기록이 지워져요. 다른 과목이라면 그 과목 화면을 한 번 열면 다시 저장돼요.</span>
           <button className="btn btn-small" onClick={() => void logout()}>다시 저장해 보기</button>
           <button className="btn btn-small btn-quiet" onClick={() => void logout(true)}>그래도 로그아웃</button>
           <button className="btn btn-small btn-quiet" onClick={() => setUnsaved(false)}>취소</button>
