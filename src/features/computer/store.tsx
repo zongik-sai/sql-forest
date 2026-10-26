@@ -1,14 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { learnerPrefix, readJson, removeWithPrefix, writeJson } from '../../lib/storage';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../auth/supabase';
+import { useCourse, type CourseConfig } from './course';
 import { hasProgress, mergeCgStates, normalizeCgState, plantStage, type CgState } from './model';
 
 /**
- * 컴퓨터 일반 기록 저장소.
- * - 로그인: 이 기기에 사본을 두고 Supabase cg_progress(본인 행)에 저장. revision이 다르면 서버본과 병합 후 다시 저장.
- * - 로그인 없이 둘러보기: 이 기기에만 저장(guest). 로그인하면 "내 계정으로 가져오기" 안내.
- * - 로그아웃하면 AuthContext가 이 사용자의 기기 사본을 지운다.
+ * 단원 × 5단계 과목 기록 저장소(지금 과목 = useCourse()).
+ * - 로그인: 이 기기에 사본을 두고 Supabase에 저장. 컴퓨터 일반은 cg_progress(본인 행)·save_cg_progress,
+ *   새 과목은 course_progress(본인 × 과목 행)·save_course_progress(p_course). revision이 다르면 서버본과 병합 후 다시 저장.
+ * - 로그인 없이 둘러보기: 이 기기에만 저장(guest). 로그인하면 "내 계정으로 가져오기" 안내(과목별).
+ * - 로그아웃하면 AuthContext가 이 사용자의 기기 사본(학습자 키로 시작하는 모든 키)을 지운다.
+ * 이 기기 저장 키: `${learnerPrefix}${course.storage}:state`·`:rev`(컴퓨터 일반 'cg:', 네트워크 'net:' …)
  */
 export type CgSaveStatus = 'local' | 'saving' | 'saved' | 'offline' | 'error';
 
@@ -38,19 +42,46 @@ export const useCg = () => {
 };
 
 const GUEST_KEY = 'guest';
-const stateKeyOf = (learnerKey: string) => `${learnerPrefix(learnerKey)}cg:state`;
-const revKeyOf = (learnerKey: string) => `${learnerPrefix(learnerKey)}cg:rev`;
+const stateKeyOf = (learnerKey: string, seg: string) => `${learnerPrefix(learnerKey)}${seg}:state`;
+const revKeyOf = (learnerKey: string, seg: string) => `${learnerPrefix(learnerKey)}${seg}:rev`;
 const SAVE_DELAY = 1200;
 
+type SaveResult = { status: 'ok' | 'conflict'; revision: number; state?: unknown };
+
+/** 서버 기록 읽기(본인 행) */
+export async function loadRemote(sb: SupabaseClient, course: CourseConfig) {
+  const r = course.remote;
+  const q = r.kind === 'cg'
+    ? sb.from('cg_progress').select('state, revision').maybeSingle()
+    : sb.from('course_progress').select('state, revision').eq('course', r.course).maybeSingle();
+  const { data, error } = await q;
+  return { data: data as { state: unknown; revision: number } | null, error };
+}
+
+/** 서버 저장(revision compare-and-set) */
+export async function saveRemote(sb: SupabaseClient, course: CourseConfig, state: CgState, expected: number) {
+  const r = course.remote;
+  const { data, error } = r.kind === 'cg'
+    ? await sb.rpc('save_cg_progress', { p_state: state, p_expected_revision: expected })
+    : await sb.rpc('save_course_progress', { p_course: r.course, p_state: state, p_expected_revision: expected });
+  return { data: data as SaveResult | null, error };
+}
+
 export function CgProvider({ children }: { children: ReactNode }) {
+  const course = useCourse();
+  const seg = course.storage;
   const auth = useAuth();
   const id = auth.identity;
   const mode: CgCtx['mode'] = !id ? 'guest' : id.kind === 'demo' ? 'demo' : 'user';
   const learnerKey = id ? id.learnerKey : GUEST_KEY;
-  const stateKey = stateKeyOf(learnerKey);
-  const revKey = revKeyOf(learnerKey);
+  const stateKey = stateKeyOf(learnerKey, seg);
+  const revKey = revKeyOf(learnerKey, seg);
+  const courseRef = useRef(course);
+  courseRef.current = course;
+  const norm = useCallback((raw: unknown) => normalizeCgState(raw, courseRef.current), []);
+  const merge = useCallback((a: CgState, b: CgState) => mergeCgStates(a, b, courseRef.current), []);
 
-  const [state, setState] = useState<CgState>(() => normalizeCgState(readJson(stateKey, null)));
+  const [state, setState] = useState<CgState>(() => normalizeCgState(readJson(stateKey, null), course));
   const [saveStatus, setSaveStatus] = useState<CgSaveStatus>('local');
   const [loading, setLoading] = useState(mode === 'user');
   const [isTeacher, setIsTeacher] = useState(false);
@@ -67,7 +98,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
 
   // 사용자 전환 시 다시 읽기
   useEffect(() => {
-    const s = normalizeCgState(readJson(stateKey, null));
+    const s = norm(readJson(stateKey, null));
     stateRef.current = s;
     setState(s);
     revRef.current = readJson<number>(revKey, 0);
@@ -76,10 +107,10 @@ export function CgProvider({ children }: { children: ReactNode }) {
     setSaveStatus(mode === 'user' ? 'saving' : 'local');
     setIsTeacher(false);
     if (mode === 'user') {
-      const g = normalizeCgState(readJson(stateKeyOf(GUEST_KEY), null));
-      setGuestToImport(hasProgress(g) ? g : null);
+      const g = norm(readJson(stateKeyOf(GUEST_KEY, seg), null));
+      setGuestToImport(hasProgress(g, courseRef.current) ? g : null);
     } else setGuestToImport(null);
-  }, [stateKey, revKey, mode]);
+  }, [stateKey, revKey, mode, seg, norm]);
 
   const writeLocal = useCallback((s: CgState) => writeJson(stateKey, s), [stateKey]);
 
@@ -93,9 +124,9 @@ export function CgProvider({ children }: { children: ReactNode }) {
       for (let attempt = 0; attempt < 4; attempt++) {
         dirtyRef.current = false;
         const snapshot = stateRef.current;
-        const { data, error } = await sb.rpc('save_cg_progress', { p_state: snapshot, p_expected_revision: revRef.current });
-        if (error) throw error;
-        const r = data as { status: 'ok' | 'conflict'; revision: number; state?: unknown };
+        const { data, error } = await saveRemote(sb, courseRef.current, snapshot, revRef.current);
+        if (error || !data) throw error ?? new Error('저장 응답 없음');
+        const r = data;
         if (r.status === 'ok') {
           revRef.current = r.revision;
           writeJson(revKey, r.revision);
@@ -107,7 +138,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
         }
         // 다른 기기가 먼저 저장: 병합 후 다시
         revRef.current = r.revision;
-        const merged = mergeCgStates(stateRef.current, normalizeCgState(r.state));
+        const merged = merge(stateRef.current, norm(r.state));
         stateRef.current = merged;
         setState(merged);
         writeLocal(merged);
@@ -130,7 +161,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
         void pushNowRef.current();
       }, delay);
     } else if (!dirtyRef.current) retryRef.current.n = 0;
-  }, [mode, revKey, writeLocal]);
+  }, [mode, revKey, writeLocal, merge, norm]);
   const pushNowRef = useRef(pushNow);
   pushNowRef.current = pushNow;
 
@@ -151,7 +182,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
     let alive = true;
     (async () => {
       const [row, teacher] = await Promise.all([
-        sb.from('cg_progress').select('state, revision').maybeSingle(),
+        loadRemote(sb, courseRef.current),
         sb.rpc('am_i_teacher'),
       ]);
       if (!alive) return;
@@ -162,19 +193,19 @@ export function CgProvider({ children }: { children: ReactNode }) {
         readyRef.current = true;
         return;
       }
-      const remote = row.data ? normalizeCgState(row.data.state) : null;
+      const remote = row.data ? norm(row.data.state) : null;
       revRef.current = row.data?.revision ?? 0;
       writeJson(revKey, revRef.current);
       const local = stateRef.current;
-      const merged = remote ? mergeCgStates(local, remote) : local;
+      const merged = remote ? merge(local, remote) : local;
       stateRef.current = merged;
       setState(merged);
       writeLocal(merged);
       readyRef.current = true;
       setLoading(false);
       const differs = !remote || JSON.stringify(merged) !== JSON.stringify(remote);
-      if (differs && (hasProgress(merged) || !remote)) {
-        dirtyRef.current = hasProgress(merged);
+      if (differs && (hasProgress(merged, courseRef.current) || !remote)) {
+        dirtyRef.current = hasProgress(merged, courseRef.current);
         if (dirtyRef.current) void pushNow();
         else setSaveStatus('saved');
       } else setSaveStatus('saved');
@@ -187,15 +218,15 @@ export function CgProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [mode, stateKey, revKey, pushNow, writeLocal]);
+  }, [mode, stateKey, revKey, pushNow, writeLocal, merge, norm]);
 
   // 같은 기기의 다른 탭에서 기록이 바뀌면 합친다(한 탭의 오래된 기록이 단원 초기화 등을 덮어쓰지 않게)
   useEffect(() => {
     const on = (e: StorageEvent) => {
       if (e.key !== stateKey || !e.newValue) return;
       try {
-        const other = normalizeCgState(JSON.parse(e.newValue));
-        const merged = mergeCgStates(stateRef.current, other);
+        const other = norm(JSON.parse(e.newValue));
+        const merged = merge(stateRef.current, other);
         stateRef.current = merged;
         setState(merged);
       } catch {
@@ -204,7 +235,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('storage', on);
     return () => window.removeEventListener('storage', on);
-  }, [stateKey]);
+  }, [stateKey, merge, norm]);
 
   // 다시 온라인이 되거나 창을 떠날 때 저장
   useEffect(() => {
@@ -248,7 +279,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
     const prev = stateRef.current;
     const next = fn(prev);
     if (next === prev) return;
-    const before = plantStage(prev), after = plantStage(next);
+    const before = plantStage(prev, courseRef.current), after = plantStage(next, courseRef.current);
     if (after > before) setGrewTo(after);
     stateRef.current = next;
     setState(next);
@@ -259,17 +290,18 @@ export function CgProvider({ children }: { children: ReactNode }) {
     }
   }, [mode, schedule, writeLocal]);
 
+  // 로그인 없이 남긴 이 과목 기록(guest 키 `${seg}:` 아래 전부: 기록·풀던 초안·모의고사)만 가져오고 지운다
   const importGuest = useCallback(() => {
     if (!guestToImport) return;
-    commit((s) => mergeCgStates(s, guestToImport));
-    removeWithPrefix(`${learnerPrefix(GUEST_KEY)}cg:`);
+    commit((s) => merge(s, guestToImport));
+    removeWithPrefix(`${learnerPrefix(GUEST_KEY)}${seg}:`);
     setGuestToImport(null);
-  }, [guestToImport, commit]);
+  }, [guestToImport, commit, merge, seg]);
 
   const discardGuest = useCallback(() => {
-    removeWithPrefix(`${learnerPrefix(GUEST_KEY)}cg:`);
+    removeWithPrefix(`${learnerPrefix(GUEST_KEY)}${seg}:`);
     setGuestToImport(null);
-  }, []);
+  }, [seg]);
 
   const value = useMemo<CgCtx>(() => ({
     state, commit, mode, saveStatus, loading, isTeacher, guestToImport, importGuest, discardGuest,

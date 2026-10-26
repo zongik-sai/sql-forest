@@ -1,7 +1,10 @@
-import { activeWrongIds, bestRegularMock, normalizeCgState, passedCount, plantStage, unitLevel, type CgState } from './model';
-import { CG_PASS, CG_UNIT_IDS, type CgUnitId } from './types';
+import { activeWrongIds, bestRegularMock, CG_SHAPE, normalizeCgState, passedCount, plantStage, unitLevel, type CgState, type CourseShape } from './model';
+import { CG_PASS, type CgUnitId } from './types';
 
-/** 선생님 반 학습 현황 집계(순수 함수, 테스트 대상) */
+/**
+ * 선생님 반 학습 현황 집계(순수 함수, 테스트 대상). 과목 단원 목록은 shape로 받는다(생략하면 컴퓨터 일반).
+ * 행 형식은 cg_class_overview()와 course_class_overview(p_course)가 같다.
+ */
 export interface CgClassRow {
   user_id: string;
   name: string | null;
@@ -24,26 +27,26 @@ export interface CgStudent {
   lastAt: string;
 }
 
-export function toStudents(rows: CgClassRow[]): CgStudent[] {
+export function toStudents(rows: CgClassRow[], shape: CourseShape = CG_SHAPE): CgStudent[] {
   return rows.map((r) => {
-    const s = normalizeCgState(r.state);
-    const levels = Object.fromEntries(CG_UNIT_IDS.map((u) => [u, unitLevel(s, u)])) as Record<CgUnitId, number>;
+    const s = normalizeCgState(r.state, shape);
+    const levels = Object.fromEntries(shape.unitIds.map((u) => [u, unitLevel(s, u)])) as Record<CgUnitId, number>;
     const best = bestRegularMock(s);
     return {
       id: r.user_id, name: r.name || (r.email ?? '').split('@')[0] || '(이름 없음)', email: r.email ?? '', state: s,
-      plant: plantStage(s), passed: passedCount(s), levels, mockBest: best, mockPassed: best >= CG_PASS.mock.need,
+      plant: plantStage(s, shape), passed: passedCount(s, shape), levels, mockBest: best, mockPassed: best >= CG_PASS.mock.need,
       wrong: activeWrongIds(s).length, lastAt: r.updated_at,
     };
   });
 }
 
-export function classSummary(students: CgStudent[], now = Date.now()) {
+export function classSummary(students: CgStudent[], now = Date.now(), shape: CourseShape = CG_SHAPE) {
   const n = students.length;
   const week = 7 * 24 * 3600 * 1000;
   const active7 = students.filter((s) => now - Date.parse(s.lastAt) <= week).length;
   const avgPassed = n ? students.reduce((a, s) => a + s.passed, 0) / n : 0;
   const mockPassed = students.filter((s) => s.mockPassed).length;
-  const unitAvg = Object.fromEntries(CG_UNIT_IDS.map((u) => [u, n ? students.reduce((a, s) => a + s.levels[u], 0) / n : 0])) as Record<CgUnitId, number>;
+  const unitAvg = Object.fromEntries(shape.unitIds.map((u) => [u, n ? students.reduce((a, s) => a + (s.levels[u] ?? 0), 0) / n : 0])) as Record<CgUnitId, number>;
   const wrongCount = new Map<string, number>();
   for (const s of students) for (const q of activeWrongIds(s.state)) wrongCount.set(q, (wrongCount.get(q) ?? 0) + 1);
   const topWrong = [...wrongCount.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 8);

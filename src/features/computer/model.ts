@@ -1,8 +1,10 @@
 import { CG_AREAS, CG_LEVELS, CG_PASS, CG_UNIT_IDS, type CgArea, type CgLevel, type CgUnitId } from './types';
 
 /**
- * 컴퓨터 일반 학습 기록(학생 한 명 = 문서 하나). Supabase cg_progress.state 또는 이 기기에 저장.
- * 모든 함수는 순수 함수다(입력 상태를 바꾸지 않는다).
+ * 단원 × 5단계 과목 학습 기록(학생 한 명 × 과목 = 문서 하나). 컴퓨터 일반은 Supabase cg_progress.state,
+ * 새 과목(네트워크·프로그래밍·Data)은 course_progress.state, 또는 이 기기에 저장.
+ * 모든 함수는 순수 함수다(입력 상태를 바꾸지 않는다). 과목마다 다른 단원 목록은 CourseShape로 받고,
+ * 생략하면 컴퓨터 일반(8단원·40단계)으로 계산한다.
  */
 export interface LevelRecord {
   /** 점수형 단계의 최고 점수(이론·요약은 없음) */
@@ -62,25 +64,40 @@ export interface CgState {
 export const MOCK_KEEP = 60;
 
 /** 문항 ID 형식: 단원 + 기초(b)/실력점검(a) 번호 */
-export const QID_RE = /^U[1-8]-[ab]\d{1,3}$/;
+export const QID_RE = /^U\d{1,2}-[ab]\d{1,3}$/;
 /** 이론 카드 ID 형식 */
-export const CARD_ID_RE = /^U[1-8]-t\d{1,3}$/;
+export const CARD_ID_RE = /^U\d{1,2}-t\d{1,3}$/;
+
+/** 과목의 모양: 단원 목록과 전체 단계 수(단원 수 × 5) */
+export interface CourseShape {
+  unitIds: readonly CgUnitId[];
+  totalSteps: number;
+}
+
+/** 이 과목 단원의 ID인지(형식 + 과목 단원 목록) */
+const unitOfId = (id: string) => id.slice(0, id.indexOf('-')) as CgUnitId;
+const inCourse = (shape: CourseShape, id: string) => shape.unitIds.includes(unitOfId(id));
 
 /** 기기 시계가 서로 달라도 사건 순서가 뒤집히지 않게: 앞 사건보다 최소 1ms 뒤 시각 */
 const after = (now: string, prev?: string) => (prev && prev >= now ? new Date(Date.parse(prev) + 1).toISOString() : now);
 
 export const emptyCgState = (): CgState => ({ v: 1, units: {}, mock: [], wrong: {}, cards: {}, locks: {}, resets: {}, upd: '' });
 
+/** 컴퓨터 일반: 8단원 × 5단계 = 40 */
+export const TOTAL_STEPS = CG_UNIT_IDS.length * CG_LEVELS.length; // 40
+export const CG_SHAPE: CourseShape = { unitIds: CG_UNIT_IDS, totalSteps: TOTAL_STEPS };
+
 /** 한 단원에서 이만큼 잠기면 그 단원의 진도·점수를 초기화한다(선생님 결정) */
 export const LOCK_LIMIT = 5;
 
 /** 저장된 JSON을 안전하게 읽는다(모르는 필드·잘못된 값은 버림) */
-export function normalizeCgState(raw: unknown): CgState {
+export function normalizeCgState(raw: unknown, shape: CourseShape = CG_SHAPE): CgState {
   const s = emptyCgState();
   if (!raw || typeof raw !== 'object') return s;
   const r = raw as Partial<CgState>;
   if (r.units && typeof r.units === 'object') {
-    for (const u of CG_UNIT_IDS) {
+    for (const u of shape.unitIds) {
+      if (!Object.hasOwn(r.units, u)) continue;
       const ur = (r.units as Record<string, UnitRecord>)[u];
       if (!ur || typeof ur !== 'object') continue;
       const out: UnitRecord = {};
@@ -98,19 +115,19 @@ export function normalizeCgState(raw: unknown): CgState {
   }
   if (Array.isArray(r.mock)) s.mock = r.mock.filter((m) => m && typeof m.id === 'string' && typeof m.score === 'number').slice(-MOCK_KEEP);
   if (r.wrong && typeof r.wrong === 'object') {
-    // 문항 ID 형식(U1-b1, U8-a25)만 받는다: 'constructor' 같은 키로 화면이 깨지지 않게
-    for (const [k, v] of Object.entries(r.wrong)) if (QID_RE.test(k) && v && typeof v.at === 'string') s.wrong[k] = { at: v.at, n: typeof v.n === 'number' ? v.n : 1, ...(typeof v.clearedAt === 'string' ? { clearedAt: v.clearedAt } : {}) };
+    // 이 과목 단원의 문항 ID 형식(U1-b1, U8-a25)만 받는다: 'constructor' 같은 키로 화면이 깨지지 않게
+    for (const [k, v] of Object.entries(r.wrong)) if (QID_RE.test(k) && inCourse(shape, k) && v && typeof v.at === 'string') s.wrong[k] = { at: v.at, n: typeof v.n === 'number' ? v.n : 1, ...(typeof v.clearedAt === 'string' ? { clearedAt: v.clearedAt } : {}) };
   }
   if (r.cards && typeof r.cards === 'object') {
-    for (const [k, v] of Object.entries(r.cards)) if (CARD_ID_RE.test(k) && typeof v === 'string') s.cards[k] = v;
+    for (const [k, v] of Object.entries(r.cards)) if (CARD_ID_RE.test(k) && inCourse(shape, k) && typeof v === 'string') s.cards[k] = v;
   }
-  for (const u of CG_UNIT_IDS) {
-    const l = r.locks && typeof r.locks === 'object' ? (r.locks as Record<string, unknown>)[u] : undefined;
+  for (const u of shape.unitIds) {
+    const l = r.locks && typeof r.locks === 'object' && Object.hasOwn(r.locks, u) ? (r.locks as Record<string, unknown>)[u] : undefined;
     if (Array.isArray(l)) {
       const ok = l.filter((x): x is string => typeof x === 'string').slice(-50);
       if (ok.length) s.locks[u] = ok;
     }
-    const z = r.resets && typeof r.resets === 'object' ? (r.resets as Record<string, unknown>)[u] : undefined;
+    const z = r.resets && typeof r.resets === 'object' && Object.hasOwn(r.resets, u) ? (r.resets as Record<string, unknown>)[u] : undefined;
     if (z && typeof z === 'object' && typeof (z as { at?: unknown }).at === 'string') {
       const n = (z as { n?: unknown }).n;
       s.resets[u] = { at: (z as { at: string }).at, n: typeof n === 'number' && n > 0 ? n : 1 };
@@ -138,32 +155,39 @@ export function unitLevel(s: CgState, u: CgUnitId): number {
   return CG_LEVELS.filter((lv) => isPassed(s, u, lv)).length;
 }
 
-/** 통과한 단계 수(전체 40) — 순서와 관계없이 센다 */
-export function passedCount(s: CgState): number {
+/** 통과한 단계 수(전체 = 단원 수 × 5, 컴퓨터 일반 40) — 순서와 관계없이 센다 */
+export function passedCount(s: CgState, shape: CourseShape = CG_SHAPE): number {
   let n = 0;
-  for (const u of CG_UNIT_IDS) for (const lv of CG_LEVELS) if (isPassed(s, u, lv)) n++;
+  for (const u of shape.unitIds) for (const lv of CG_LEVELS) if (isPassed(s, u, lv)) n++;
   return n;
 }
 
-export const TOTAL_STEPS = CG_UNIT_IDS.length * CG_LEVELS.length; // 40
+/**
+ * 새싹·줄기·어린 나무·큰 나무·꽃이 되는 통과 단계 수. 40단계 기준 1·8·16·28·40을 단계 수에 비례해 올림
+ * (작은 과목에서도 단계마다 최소 1씩 늘어나게).
+ */
+export function plantThresholds(totalSteps: number): number[] {
+  const t = Math.max(1, totalSteps);
+  const out = [1, Math.ceil((t * 8) / 40), Math.ceil((t * 16) / 40), Math.ceil((t * 28) / 40), t];
+  for (let i = 1; i < out.length - 1; i++) out[i] = Math.min(t, Math.max(out[i], out[i - 1] + 1));
+  return out;
+}
 
 /** 성장 식물 단계(0 씨앗 ~ 6 열매) */
-export function plantStage(s: CgState): number {
-  const n = passedCount(s);
-  if (n >= TOTAL_STEPS) return bestRegularMock(s) >= CG_PASS.mock.need ? 6 : 5;
-  if (n >= 28) return 4;
-  if (n >= 16) return 3;
-  if (n >= 8) return 2;
-  if (n >= 1) return 1;
+export function plantStage(s: CgState, shape: CourseShape = CG_SHAPE): number {
+  const n = passedCount(s, shape);
+  const th = plantThresholds(shape.totalSteps);
+  if (n >= th[4]) return bestRegularMock(s) >= CG_PASS.mock.need ? 6 : 5;
+  for (let st = 3; st >= 0; st--) if (n >= th[st]) return st + 1;
   return 0;
 }
 /** 다음 식물 단계까지 남은 조건 설명 */
-export function nextPlantGoal(s: CgState): string | null {
-  const n = passedCount(s);
-  const st = plantStage(s);
+export function nextPlantGoal(s: CgState, shape: CourseShape = CG_SHAPE): string | null {
+  const n = passedCount(s, shape);
+  const st = plantStage(s, shape);
   if (st === 6) return null;
   if (st === 5) return `정규 모의고사(1~3회·랜덤)에서 ${CG_PASS.mock.need}/${CG_PASS.mock.total} 이상이면 열매가 맺혀요.`;
-  const next = [1, 8, 16, 28, TOTAL_STEPS][st];
+  const next = plantThresholds(shape.totalSteps)[st];
   return `${next - n}단계 더 통과하면 다음 모습으로 자라요.`;
 }
 
@@ -207,9 +231,9 @@ export function addLock(s: CgState, u: CgUnitId, now = new Date().toISOString())
 }
 
 /** 병합 전: 상대가 아는 더 최근 초기화를 모르는 쪽이면 그 단원 기록을 버린다(초기화가 되살아나지 않게) */
-function dropStaleUnits(x: CgState, latest: CgState['resets']): CgState {
+function dropStaleUnits(x: CgState, latest: CgState['resets'], shape: CourseShape): CgState {
   let out = x;
-  for (const u of CG_UNIT_IDS) {
+  for (const u of shape.unitIds) {
     const r = latest[u];
     if (r && (x.resets[u]?.at ?? '') < r.at) {
       const units = { ...out.units };
@@ -289,22 +313,22 @@ const maxIso = (a?: string, b?: string) => (!a ? b : !b ? a : a > b ? a : b);
  * 두 기기의 기록 병합(같은 학생). 통과는 사라지지 않고, 최고 점수는 큰 쪽, 모의고사는 합집합,
  * 오답노트는 문항별로 더 최근 사건(틀림/다시 맞힘)을 따른다.
  */
-export function mergeCgStates(a0: CgState, b0: CgState): CgState {
+export function mergeCgStates(a0: CgState, b0: CgState, shape: CourseShape = CG_SHAPE): CgState {
   const resets: CgState['resets'] = {};
-  for (const u of CG_UNIT_IDS) {
+  for (const u of shape.unitIds) {
     const ra = a0.resets[u], rb = b0.resets[u];
     if (!ra && !rb) continue;
     const at = maxIso(ra?.at, rb?.at)!;
     resets[u] = { at, n: Math.max(ra?.n ?? 0, rb?.n ?? 0) };
   }
-  const a = dropStaleUnits(a0, resets), b = dropStaleUnits(b0, resets);
+  const a = dropStaleUnits(a0, resets, shape), b = dropStaleUnits(b0, resets, shape);
   const locks: CgState['locks'] = {};
-  for (const u of CG_UNIT_IDS) {
+  for (const u of shape.unitIds) {
     const l = [...new Set([...(a.locks[u] ?? []), ...(b.locks[u] ?? [])])].sort();
     if (l.length) locks[u] = l.slice(-50);
   }
   const units: CgState['units'] = {};
-  for (const u of CG_UNIT_IDS) {
+  for (const u of shape.unitIds) {
     const ua = a.units[u], ub = b.units[u];
     if (!ua && !ub) continue;
     const out: UnitRecord = {};
@@ -341,7 +365,7 @@ export function mergeCgStates(a0: CgState, b0: CgState): CgState {
 }
 
 /** 의미 있는 진행이 있는지(가져오기 안내용) */
-export const hasProgress = (s: CgState) => passedCount(s) > 0 || s.mock.length > 0 || Object.keys(s.wrong).length > 0 || Object.keys(s.cards).length > 0 || Object.values(s.units).some((u) => u && Object.keys(u).length > 0);
+export const hasProgress = (s: CgState, shape: CourseShape = CG_SHAPE) => passedCount(s, shape) > 0 || s.mock.length > 0 || Object.keys(s.wrong).length > 0 || Object.keys(s.cards).length > 0 || Object.values(s.units).some((u) => u && Object.keys(u).length > 0);
 
 /** 모의고사 결과 집계 */
 export function scoreMock(

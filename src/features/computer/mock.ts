@@ -1,4 +1,4 @@
-import { CG_AREAS, CG_PASS, CG_UNIT_IDS, type CgMcq, type CgUnit } from './types';
+import { CG_AREAS, CG_PASS, type CgMcq, type CgUnit } from './types';
 import type { MockKind } from './model';
 
 /** 문자열 시드 → 결정적 난수(mulberry32) */
@@ -30,12 +30,16 @@ export function shuffle<T>(arr: T[], rnd: () => number = Math.random): T[] {
 /** 보기 순서 섞기(화면 위치 ①~④ → 원래 보기 번호). 정답 위치를 외우지 않게 한다 */
 export const optionOrder = (n: number, rnd: () => number = Math.random) => shuffle(Array.from({ length: n }, (_, i) => i), rnd);
 
-const AREA_ORDER = Object.fromEntries(CG_AREAS.map((a, i) => [a, i])) as Record<string, number>;
-const UNIT_ORDER = Object.fromEntries(CG_UNIT_IDS.map((u, i) => [u, i])) as Record<string, number>;
+const unitNum = (id: string) => Number(id.slice(1)) || 0;
 
-/** 영역 순서(운영체제 → 주변기기 → 유지보수 → 네트워크 → 컴퓨터 일반)로 묶기. 같은 영역 안에서는 단원 순 */
-export function orderByArea(items: CgMcq[]): CgMcq[] {
-  return [...items].sort((x, y) => AREA_ORDER[x.area] - AREA_ORDER[y.area] || UNIT_ORDER[x.unitId] - UNIT_ORDER[y.unitId]);
+/**
+ * 영역 순서(컴퓨터 일반: 운영체제 → 주변기기 → 유지보수 → 네트워크 → 컴퓨터 일반, 다른 과목은 그 과목 영역 순)로 묶기.
+ * 같은 영역 안에서는 단원 순. 모르는 영역은 맨 뒤.
+ */
+export function orderByArea(items: CgMcq[], areas: readonly string[] = CG_AREAS): CgMcq[] {
+  const order = new Map(areas.map((a, i) => [a, i]));
+  const ai = (a: string) => order.get(a) ?? areas.length;
+  return [...items].sort((x, y) => ai(x.area) - ai(y.area) || unitNum(x.unitId) - unitNum(y.unitId));
 }
 
 /** 단원마다 실력점검 4 + 기초 2(=6), 나머지는 실력점검에서 채워 50문항(원래 페이지와 같은 구성) */
@@ -47,33 +51,46 @@ export interface MockPaper {
   orders: number[][];
 }
 
+export interface MockOptions {
+  wrongIds?: string[];
+  seed?: string;
+  /** 고정 회차 시드 앞부분(과목 ID). 컴퓨터 일반 'cg' → 'cg-mock-set1-v1' */
+  seedPrefix?: string;
+  /** 영역 출제 순서(기본: 컴퓨터 일반) */
+  areas?: readonly string[];
+}
+
+/** 고정 모의고사 시드 */
+export const mockSeedOf = (prefix: string, k: 'set1' | 'set2' | 'set3') => `${prefix}-mock-${k}-v1`;
+
 /**
  * 모의고사 문항 뽑기.
  * - set1~3: 고정 문항(같은 시드 → 같은 문항·같은 보기 순서). 세 회차는 서로 겹치지 않게 뽑는다.
  * - random: 볼 때마다 새로 뽑기
  * - wrong: 오답노트 문항(최대 50)
  */
-export function buildMock(units: CgUnit[], kind: MockKind, opts: { wrongIds?: string[]; seed?: string } = {}): MockPaper {
+export function buildMock(units: CgUnit[], kind: MockKind, opts: MockOptions = {}): MockPaper {
   const total = CG_PASS.mock.total;
+  const areas = opts.areas ?? CG_AREAS;
   if (kind === 'wrong') {
     const byId = new Map(units.flatMap((u) => [...u.basic, ...u.check]).map((q) => [q.id, q]));
     const rnd = opts.seed ? seededRandom(opts.seed) : Math.random;
-    const items = orderByArea(shuffle((opts.wrongIds ?? []).map((id) => byId.get(id)).filter((q): q is CgMcq => !!q), rnd).slice(0, total));
+    const items = orderByArea(shuffle((opts.wrongIds ?? []).map((id) => byId.get(id)).filter((q): q is CgMcq => !!q), rnd).slice(0, total), areas);
     return { items, orders: items.map((q) => optionOrder(q.options.length, rnd)) };
   }
-  if (kind === 'random') return pick(units, seededRandom(opts.seed ?? `${Date.now()}-${Math.random()}`), new Set());
+  if (kind === 'random') return pick(units, seededRandom(opts.seed ?? `${Date.now()}-${Math.random()}`), new Set(), areas);
   // 고정 회차: 1회부터 차례로 뽑으며 앞 회차 문항을 제외한다
   const used = new Set<string>();
   let paper: MockPaper = { items: [], orders: [] };
   for (const k of ['set1', 'set2', 'set3'] as const) {
-    paper = pick(units, seededRandom(`cg-mock-${k}-v1`), used);
+    paper = pick(units, seededRandom(mockSeedOf(opts.seedPrefix ?? 'cg', k)), used, areas);
     for (const q of paper.items) used.add(q.id);
     if (k === kind) break;
   }
   return paper;
 }
 
-function pick(units: CgUnit[], rnd: () => number, exclude: Set<string>): MockPaper {
+function pick(units: CgUnit[], rnd: () => number, exclude: Set<string>, areas: readonly string[]): MockPaper {
   const total = CG_PASS.mock.total;
   const take = (qs: CgMcq[], n: number) => {
     const fresh = shuffle(qs.filter((q) => !exclude.has(q.id)), rnd);
@@ -85,6 +102,6 @@ function pick(units: CgUnit[], rnd: () => number, exclude: Set<string>): MockPap
   const usedNow = new Set(picked.map((q) => q.id));
   const extraPool = units.flatMap((u) => u.check).filter((q) => !usedNow.has(q.id));
   picked.push(...take(extraPool, Math.max(0, total - picked.length)));
-  const items = orderByArea(shuffle(picked, rnd));
+  const items = orderByArea(shuffle(picked, rnd), areas);
   return { items, orders: items.map((q) => optionOrder(q.options.length, rnd)) };
 }

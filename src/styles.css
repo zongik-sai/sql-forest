@@ -491,3 +491,8 @@ input[type='search'] { font: inherit; padding: 0.35rem 0.6rem; border: 1px solid
 .erd-text summary { cursor: pointer; font-size: 0.9rem; color: var(--teal); }
 .erd-text ul { margin: 0.4rem 0; padding-left: 1.2rem; font-size: 0.88rem; overflow-wrap: anywhere; }
 .stack > * { min-width: 0; }
+
+/* 단원 × 5단계 과목의 코드(카드·문항): 줄바꿈·들여쓰기 그대로, 긴 줄은 블록 안에서만 가로 스크롤 */
+pre.cg-code { white-space: pre; word-break: normal; overflow-wrap: normal; overflow-x: auto; max-width: 100%; min-width: 0; tab-size: 4; line-height: 1.5; margin: 0.35rem 0; }
+pre.cg-code:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.cg-card, .cg-review, .cg-card-peek, .cg-wrong-list li { min-width: 0; max-width: 100%; }

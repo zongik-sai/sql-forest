@@ -1,12 +1,15 @@
 /**
- * 과목 "컴퓨터 일반" 콘텐츠 타입(앱 내부 표준 형태).
- * 원본 문제은행(pc_bank.json: 선생님의 'PC정비사 자기학습' 페이지 데이터)은 content/index.ts에서 이 형태로 바꾼다.
+ * 단원 × 5단계 과목(컴퓨터 일반·네트워크·프로그래밍·Data) 공통 콘텐츠 타입(앱 내부 표준 형태).
+ * 컴퓨터 일반 원본(pc_bank.json: 선생님의 'PC정비사 자기학습' 페이지 데이터)과 새 과목 원본(courses/<과목>/U1~U8.json)은
+ * content/adapt.ts에서 이 형태로 바꾼다. 과목별 단원 목록·영역은 course.tsx의 CourseConfig가 갖는다.
  */
-export type CgUnitId = 'U1' | 'U2' | 'U3' | 'U4' | 'U5' | 'U6' | 'U7' | 'U8';
+/** 단원 ID: 'U1'~'U12'(과목마다 단원 수가 다를 수 있음) */
+export type CgUnitId = `U${number}`;
+/** 컴퓨터 일반 8단원 */
 export const CG_UNIT_IDS: CgUnitId[] = ['U1', 'U2', 'U3', 'U4', 'U5', 'U6', 'U7', 'U8'];
 
-/** 시험 영역: PC 운영체제 · PC와 주변기기 · PC 유지보수 · PC 네트워크 · 컴퓨터 일반 */
-export type CgArea = 'OS' | 'HW' | 'MAINT' | 'NET' | 'GEN';
+/** 시험 영역 ID(과목마다 다름). 컴퓨터 일반: PC 운영체제 · PC와 주변기기 · PC 유지보수 · PC 네트워크 · 컴퓨터 일반 */
+export type CgArea = string;
 export const CG_AREAS: CgArea[] = ['OS', 'HW', 'MAINT', 'NET', 'GEN'];
 export const CG_AREA_LABEL: Record<CgArea, string> = {
   OS: 'PC 운영체제',
@@ -42,8 +45,10 @@ export interface CgCard {
   tip?: string;
   /** 시험 대비 확장 카드 */
   ext: boolean;
-  /** 카드를 읽은 뒤 푸는 개념 맞추기(card_match.json) */
+  /** 카드를 읽은 뒤 푸는 개념 맞추기(컴퓨터 일반은 card_match.json, 새 과목은 카드 원본의 match) */
   match?: CgCardMatch;
+  /** 코드 예시(새 과목, 선택) */
+  code?: string;
 }
 
 export interface CgBlank {
@@ -60,6 +65,8 @@ export interface CgMcq {
   /** 기초(3단계) / 실력점검(5단계) */
   set: 'basic' | 'check';
   question: string;
+  /** 문제에 딸린 코드(새 과목, 선택) */
+  code?: string;
   options: string[];
   answer: number;
   explanation: string;

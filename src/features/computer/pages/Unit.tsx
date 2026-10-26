@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { learnerPrefix, readJson, writeJson } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
-import { CG_UNIT_BY_ID } from '../content';
-import { McqRunner, ReviewCard, type McqResult } from '../McqRunner';
+import { unitHasContent, useCourse } from '../course';
+import { CodeBlock, McqRunner, ReviewCard, type McqResult } from '../McqRunner';
 import { CardMatch } from '../../../components/CardMatch';
 import { shuffle } from '../mock';
 import { cardsDone, isOpen, isPassed, markCard, markDone, noteAnswer, passNeed, recordScore, unitLevel } from '../model';
@@ -46,11 +46,12 @@ export function Lines({ lines }: { lines: string[] }) {
 
 function LevelStatus({ unitId, lv }: { unitId: CgUnitId; lv: CgLevel }) {
   const { state } = useCg();
+  const course = useCourse();
   const rec = state.units[unitId]?.[`lv${lv}`];
   if (rec?.passedAt) return <span className="badge badge-exec">통과{rec.best !== undefined ? ` ${rec.best}/${rec.total}` : ''}</span>;
   if (!isOpen(state, unitId, lv)) return <span className="badge badge-plain">잠김</span>;
   if (lv === 1) {
-    const ids = CG_UNIT_BY_ID[unitId]?.cards.map((c) => c.id) ?? [];
+    const ids = course.unitById(unitId)?.cards.map((c) => c.id) ?? [];
     const n = cardsDone(state, ids);
     if (n > 0) return <span className="badge badge-sim">카드 {n}/{ids.length}</span>;
   }
@@ -65,17 +66,25 @@ const levelDetail = (u: CgUnit, lv: CgLevel) =>
   lv === 4 ? '핵심 정리 · 비교표 · 자주 틀리는 포인트' :
   `${u.check.length}문항 · ${passNeed(5, u.check.length)}개 이상`;
 
+/** 다른 에이전트가 아직 쓰는 중인 빈 단원·단계 */
+function NotReady({ what }: { what: string }) {
+  return <p className="notice notice-warn" style={{ margin: 0 }}>{what} 내용을 준비하고 있어요. 잠시 후 다시 들어와 주세요.</p>;
+}
+
 export function UnitPage() {
   const { unitId } = useParams();
-  const u = CG_UNIT_BY_ID[unitId as CgUnitId];
+  const course = useCourse();
+  const base = course.basePath;
+  const u = course.unitById(unitId ?? '');
   const { state } = useCg();
-  if (!u) return <Navigate to="/computer" replace />;
+  if (!u) return <Navigate to={base} replace />;
   const lv = unitLevel(state, u.id);
   return (
     <div className="stack page-narrow" style={{ margin: '0 auto' }}>
-      <p className="crumbs" style={{ margin: 0 }}><Link to="/computer">컴퓨터 일반</Link> / {u.id.replace('U', '')}단원</p>
+      <p className="crumbs" style={{ margin: 0 }}><Link to={base}>{course.name}</Link> / {u.id.replace('U', '')}단원</p>
       <h1 style={{ margin: 0 }}>{u.title}</h1>
-      <p style={{ margin: 0 }}>{u.intro}</p>
+      {u.intro && <p style={{ margin: 0 }}>{u.intro}</p>}
+      {!unitHasContent(u) && <NotReady what="이 단원" />}
       <p className="muted" style={{ margin: 0 }}>레벨 {lv}/5 · 앞 단계를 통과하면 다음 단계가 열려요.</p>
       <ol className="cg-levels">
         {CG_LEVELS.map((l) => (
@@ -86,7 +95,7 @@ export function UnitPage() {
               <span className="small muted">{levelDetail(u, l)}</span>
             </span>
             <LevelStatus unitId={u.id} lv={l} />
-            <Link className={`btn btn-small ${isOpen(state, u.id, l) && !isPassed(state, u.id, l) ? 'btn-primary' : ''}`} to={`/computer/unit/${u.id}/${l}`}>
+            <Link className={`btn btn-small ${isOpen(state, u.id, l) && !isPassed(state, u.id, l) ? 'btn-primary' : ''}`} to={`${base}/unit/${u.id}/${l}`}>
               {isPassed(state, u.id, l) ? '다시 보기' : isOpen(state, u.id, l) ? '시작' : '살펴보기'}
             </Link>
           </li>
@@ -98,16 +107,18 @@ export function UnitPage() {
 
 export function LevelPage() {
   const { unitId, level } = useParams();
-  const u = CG_UNIT_BY_ID[unitId as CgUnitId];
+  const course = useCourse();
+  const base = course.basePath;
+  const u = course.unitById(unitId ?? '');
   const lv = Number(level) as CgLevel;
   const { state } = useCg();
   const [force, setForce] = useState(false);
-  if (!u || !CG_LEVELS.includes(lv)) return <Navigate to="/computer" replace />;
+  if (!u || !CG_LEVELS.includes(lv)) return <Navigate to={base} replace />;
   const open = isOpen(state, u.id, lv);
   return (
-    <div className="stack" style={{ maxWidth: 860, margin: '0 auto', width: '100%' }}>
+    <div className="stack" style={{ maxWidth: 860, margin: '0 auto', width: '100%', minWidth: 0 }}>
       <p className="crumbs" style={{ margin: 0 }}>
-        <Link to="/computer">컴퓨터 일반</Link> / <Link to={`/computer/unit/${u.id}`}>{u.id.replace('U', '')}단원 {u.title}</Link> / {lv}단계
+        <Link to={base}>{course.name}</Link> / <Link to={`${base}/unit/${u.id}`}>{u.id.replace('U', '')}단원 {u.title}</Link> / {lv}단계
       </p>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h1 style={{ margin: 0 }}>{lv}단계 {CG_LEVEL_NAME[lv]}</h1>
@@ -117,7 +128,7 @@ export function LevelPage() {
         <div className="panel stack">
           <p style={{ margin: 0 }}>앞 단계 <b>{lv - 1}단계 {CG_LEVEL_NAME[(lv - 1) as CgLevel]}</b>{objParticle(CG_LEVEL_NAME[(lv - 1) as CgLevel])} 통과하면 열려요.</p>
           <div className="row">
-            <Link className="btn btn-primary" to={`/computer/unit/${u.id}/${lv - 1}`}>앞 단계로</Link>
+            <Link className="btn btn-primary" to={`${base}/unit/${u.id}/${lv - 1}`}>앞 단계로</Link>
             <button className="btn" onClick={() => setForce(true)}>그래도 풀어보기</button>
           </div>
           <p className="small muted" style={{ margin: 0 }}>미리 풀어서 기준을 넘으면 이 단계도 통과로 기록돼요.</p>
@@ -129,10 +140,11 @@ export function LevelPage() {
 
 function NextStep({ u, lv }: { u: CgUnit; lv: CgLevel }) {
   const nav = useNavigate();
+  const base = useCourse().basePath;
   return (
     <div className="row">
-      {lv < 5 ? <button className="btn btn-grow" onClick={() => nav(`/computer/unit/${u.id}/${lv + 1}`)}>다음 단계: {CG_LEVEL_NAME[(lv + 1) as CgLevel]}</button> : <Link className="btn btn-grow" to="/computer">단원 목록으로</Link>}
-      <Link className="btn btn-quiet" to={`/computer/unit/${u.id}`}>단원 보기</Link>
+      {lv < 5 ? <button className="btn btn-grow" onClick={() => nav(`${base}/unit/${u.id}/${lv + 1}`)}>다음 단계: {CG_LEVEL_NAME[(lv + 1) as CgLevel]}</button> : <Link className="btn btn-grow" to={base}>단원 목록으로</Link>}
+      <Link className="btn btn-quiet" to={`${base}/unit/${u.id}`}>단원 보기</Link>
     </div>
   );
 }
@@ -144,6 +156,7 @@ function CardBody({ c, n }: { c: CgCard; n: number }) {
         <span className="cg-card-no">{String(n).padStart(2, '0')}</span> {c.title} {c.ext && <span className="badge badge-sim">확장</span>}
       </h2>
       <ul className="cg-points">{c.points.map((p, k) => <li key={k}>{p}</li>)}</ul>
+      {c.code && <CodeBlock code={c.code} />}
       {c.table && <Table t={c.table} />}
       {c.tip && <p className="cg-tip">💡 {c.tip}</p>}
     </>
@@ -151,8 +164,14 @@ function CardBody({ c, n }: { c: CgCard; n: number }) {
 }
 
 function Theory({ u }: { u: CgUnit }) {
+  if (!u.cards.length) return <NotReady what="이 단계" />;
+  return <TheoryCards u={u} />;
+}
+
+function TheoryCards({ u }: { u: CgUnit }) {
   const cg = useCg();
   const nav = useNavigate();
+  const base = useCourse().basePath;
   const ids = useMemo(() => u.cards.map((c) => c.id), [u]);
   const isDone = (id: string) => Object.hasOwn(cg.state.cards, id);
   const firstTodo = () => Math.max(0, u.cards.findIndex((c) => !isDone(c.id)));
@@ -222,7 +241,7 @@ function Theory({ u }: { u: CgUnit }) {
             <>
               <b>카드 {u.cards.length}장을 모두 마쳤어요. 1단계 통과!</b>
               <span>이제 단원 전체 개념을 훑어보는 끼워맞추기를 해 보세요.</span>
-              <div className="row"><button className="btn btn-primary" onClick={() => nav(`/computer/unit/${u.id}/2`)}>다음 단계: {CG_LEVEL_NAME[2]}</button></div>
+              <div className="row"><button className="btn btn-primary" onClick={() => nav(`${base}/unit/${u.id}/2`)}>다음 단계: {CG_LEVEL_NAME[2]}</button></div>
             </>
           ) : (
             <>
@@ -242,9 +261,14 @@ function Theory({ u }: { u: CgUnit }) {
 interface BlankDraft { ans: Record<string, string>; order: string[] }
 
 function Blanks({ u }: { u: CgUnit }) {
+  if (!u.blanks.length) return <NotReady what="이 단계" />;
+  return <BlankFill u={u} />;
+}
+
+function BlankFill({ u }: { u: CgUnit }) {
   const cg = useCg();
   const prefix = useLearnerPrefix();
-  const key = `${prefix}cg:blanks:${u.id}`;
+  const key = `${prefix}${useCourse().storage}:blanks:${u.id}`;
   const need = passNeed(2, u.blanks.length);
   const fresh = (): BlankDraft => ({ ans: {}, order: shuffle(u.wordBox) });
   const [draft, setDraft] = useState<BlankDraft>(() => {
@@ -348,6 +372,7 @@ function Blanks({ u }: { u: CgUnit }) {
 function Summary({ u }: { u: CgUnit }) {
   const cg = useCg();
   const done = isPassed(cg.state, u.id, 4);
+  if (!u.summary.keys.length && !u.summary.tables.length && !u.summary.traps.length) return <NotReady what="이 단계" />;
   return (
     <div className="stack">
       <section className="stack">
@@ -374,8 +399,14 @@ function Summary({ u }: { u: CgUnit }) {
 }
 
 function Quiz({ u, lv }: { u: CgUnit; lv: 3 | 5 }) {
+  if (!(lv === 3 ? u.basic : u.check).length) return <NotReady what="이 단계" />;
+  return <QuizRun u={u} lv={lv} />;
+}
+
+function QuizRun({ u, lv }: { u: CgUnit; lv: 3 | 5 }) {
   const cg = useCg();
   const prefix = useLearnerPrefix();
+  const course = useCourse();
   const all = lv === 3 ? u.basic : u.check;
   const need = passNeed(lv, all.length);
   const [items, setItems] = useState<CgMcq[]>(all);
@@ -395,7 +426,7 @@ function Quiz({ u, lv }: { u: CgUnit; lv: 3 | 5 }) {
         <div className="row">
           {wrong.length > 0 && <button className="btn btn-primary" onClick={() => { setItems(wrong); setResult(null); setRound((r) => r + 1); }}>틀린 {wrong.length}문항만 다시</button>}
           <button className="btn" onClick={() => { setItems(all); setResult(null); setRound((r) => r + 1); }}>처음부터 다시</button>
-          <Link className="btn btn-quiet" to="/computer/wrong">오답노트</Link>
+          <Link className="btn btn-quiet" to={`${course.basePath}/wrong`}>오답노트</Link>
         </div>
         {passed && <NextStep u={u} lv={lv} />}
         {wrong.length > 0 && (
@@ -416,7 +447,7 @@ function Quiz({ u, lv }: { u: CgUnit; lv: 3 | 5 }) {
       <McqRunner
         key={round}
         items={items}
-        storageKey={`${prefix}cg:run:${u.id}:${lv}${full ? '' : ':retry'}`}
+        storageKey={`${prefix}${course.storage}:run:${u.id}:${lv}${full ? '' : ':retry'}`}
         onAnswer={(q, correct) => cg.commit((s) => noteAnswer(s, q.id, correct))}
         onFinish={(r) => {
           if (full) cg.commit((s) => recordScore(s, u.id, lv, r.score, r.total).state);
