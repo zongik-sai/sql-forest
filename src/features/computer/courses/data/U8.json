@@ -288,20 +288,20 @@
    "id": "t8",
    "title": "pandas plot 접근자로 바로 그리기",
    "points": [
-    "pandas의 Series·DataFrame은 .plot으로 matplotlib 그래프를 바로 그린다. ser.plot.hist()처럼 .plot 뒤에 종류 메서드를 붙이는 방식을 plot 접근자(accessor)라 한다.",
+    "pandas의 Series·DataFrame은 .plot으로 matplotlib 그래프를 바로 그린다. .plot은 그리기 메서드를 모은 plot 접근자(accessor)로, ser.plot.hist()처럼 뒤에 종류 메서드를 붙인다.",
     "종류 메서드는 .line()·.bar()·.barh()·.hist()·.box()·.pie()·.scatter()이다. ser.plot(kind='hist')는 ser.plot.hist()와 같은 그래프이고, kind를 생략한 ser.plot()은 선 그래프이다.",
     "인덱스가 x축 눈금(막대·조각 이름)이 되고 값이 막대 높이·조각 크기가 된다. 막대 이름으로 쓸 열은 df.set_index('반')으로 인덱스로 옮긴 뒤 그린다.",
     "DataFrame은 수치형 열마다 선·막대를 하나씩 그리고 열 이름으로 범례를 단다. 산점도는 DataFrame 전용이라 df.plot.scatter(x='bed', y='bath')처럼 x·y 열을 꼭 정한다.",
     "꾸미기 인자는 괄호 안에 바로 준다: title='제목', bins=30(히스토그램 막대 개수), grid=True(격자). kind='boxplot'·'histogram'처럼 없는 종류는 ValueError이다."
    ],
-   "tip": "산점도만은 df.plot.scatter(x=, y=) — Series에서 ser.plot.scatter를 부르면 ValueError",
+   "tip": "산점도만은 df.plot.scatter(x=, y=) — Series에서 ser.plot.scatter(x=, y=)는 ValueError",
    "code": "import pandas as pd\nimport matplotlib.pyplot as plt\n\ndf = pd.DataFrame({'bed': [1, 2, 2, 3, 4],\n                   'bath': [1, 1, 2, 2, 3]})\ndf['bed'].plot.hist(bins=4)   # = df['bed'].plot(kind='hist', bins=4)\nplt.show()\ndf.plot.scatter(x='bed', y='bath', title='Rooms')\nplt.show()",
    "ext": false,
    "match": {
     "pairs": [
      {
       "term": "접근자",
-      "desc": ".plot 뒤에 hist·bar 같은 종류 메서드를 붙여 그리는 방식"
+      "desc": "그리기 메서드를 모아 두어 .plot 뒤에 hist·bar 등을 붙여 쓰게 하는 통로"
      },
      {
       "term": "kind",
@@ -321,7 +321,7 @@
    "points": [
     "범주별 개수는 ser.value_counts().plot.bar()로 그린다. value_counts는 개수가 많은 순으로 정렬하므로 막대도 많은 범주부터 놓인다.",
     "연도·월처럼 순서가 있는 값은 value_counts() 뒤에 .sort_index()를 붙여 연도 순으로 다시 정렬한 뒤 .plot.line()·.plot.bar()로 그린다. 정렬하지 않으면 선이 개수 순으로 뒤엉킨다.",
-    "df.isna().sum()은 열마다 결측치 개수를 담은 Series라 .plot.bar()를 붙이면 열 이름마다 막대가 선다. 결측치가 없는 열은 높이 0인 막대이다.",
+    "df.isna().sum()은 열마다 결측치 개수를 담은 Series라 .plot.bar()를 붙이면 열 이름마다 막대가 선다. 결측치가 없는 열도 x축에 남고 막대 높이가 0이다.",
     "두 집단 비율: (df['sales'] > 50000) + 0은 True/False를 1/0으로 바꾼다. 여기에 .value_counts().plot.pie(title='...')를 붙이면 1·0 두 조각 파이가 된다.",
     "조건에 맞는 행을 먼저 고른 뒤 그린다: df.loc[df['cust'] >= 500, 'sales'].plot.hist(bins=30). 날짜는 pd.to_datetime으로 바꾼 뒤 .dt.year == 2020처럼 연도로 고른다."
    ],
@@ -955,7 +955,7 @@
   "traps": [
    "막대 그래프(범주 비교, 틈 있음)와 히스토그램(수치 분포, 틈 없음)을 혼동하지 않는다. 키·점수 분포는 히스토그램이다.",
    "상자 안의 선은 평균이 아니라 중앙값이고, 수염은 최솟값·최댓값이 아니라 1.5×IQR 경계 안의 끝 값까지이다.",
-   "산점도는 DataFrame 전용이다. df.plot.scatter(x=, y=)처럼 x·y 열을 모두 정하고, Series에서 ser.plot.scatter를 부르면 ValueError이다.",
+   "산점도는 DataFrame 전용이다. df.plot.scatter(x=, y=)처럼 x·y 열을 모두 정하고, Series에서 ser.plot.scatter(x=, y=)를 부르면 ValueError이다.",
    "plt.hist에서 구간 경계와 같은 값은 오른쪽 구간에 들어간다. 단, 최댓값은 마지막 구간에 포함된다.",
    "범례는 label을 주고 plt.legend()까지 불러야 나타난다. label이 없는 선은 범례에 나오지 않는다.",
    "value_counts()는 개수 많은 순이라 연도·월 그래프는 sort_index()로 다시 정렬한다. kind는 'box'·'hist'이며 'boxplot'·'histogram'은 ValueError이다.",
@@ -1027,13 +1027,13 @@
    "q": "다음 코드로 그린 막대 그래프에 대한 설명으로 옳은 것은?",
    "code": "import numpy as np\nimport pandas as pd\ndf = pd.DataFrame({'name': ['가', '나', '다', '라', '마'],\n                   'height': [160, np.nan, 172, np.nan, np.nan],\n                   'club': ['축구', None, '미술', '독서', '축구']})\nna_cnt = df.isna().sum()\nna_cnt.plot.bar()",
    "o": [
-    "막대는 2개이고, 결측치가 없는 name 열은 빠진다",
-    "막대는 5개이고, 행마다 결측치 개수를 그린다",
-    "막대는 3개이고, height 막대가 3으로 가장 높다",
-    "막대는 3개이고, 각 열에서 결측이 아닌 값의 개수를 높이로 그린다"
+    "x축에 열 이름 2개만 놓이고, 결측치가 없는 name 열은 빠진다",
+    "x축에 행 번호 5개가 놓이고, 행마다 결측치 개수를 그린다",
+    "x축에 열 이름 3개가 놓이고, height 막대가 3으로 가장 높다",
+    "x축에 열 이름 3개가 놓이고, 결측이 아닌 값의 개수를 높이로 그린다"
    ],
    "a": 2,
-   "exp": "isna().sum()은 열마다 결측치를 세어 name 0, height 3, club 1인 Series를 만든다. 결측치가 없는 name도 높이 0인 막대 자리로 남아 막대는 열 개수인 3개이다. 행별 개수는 sum(axis=1), 결측이 아닌 값의 개수는 notna().sum()이다.",
+   "exp": "isna().sum()은 열마다 결측치를 세어 name 0, height 3, club 1인 Series를 만들고, .plot.bar()는 그 인덱스(열 이름)를 x축에 놓는다. 결측치가 없는 name도 x축에 남고 막대 높이가 0일 뿐이다. 행별 개수는 sum(axis=1), 결측이 아닌 값의 개수는 notna().sum()이다.",
    "area": "VIS",
    "type": "코드"
   },
