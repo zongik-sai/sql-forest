@@ -3,7 +3,7 @@ import { PGlite, type Transaction } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * 새 과목(네트워크·프로그래밍·Data) 기록(course_progress)·선생님 과목별 반 현황 RPC를 실제 Postgres 엔진(PGlite)에서 검사한다.
+ * 새 과목(네트워크·프로그래밍·Data, 보충 학습 2진법 이해·IP 이해) 기록(course_progress)·선생님 과목별 반 현황 RPC를 실제 Postgres 엔진(PGlite)에서 검사한다.
  * Supabase 방식(authenticated 역할 + JWT sub)을 흉내 내며, 실제 Supabase 프로젝트 검증은 별도.
  */
 const S1 = '11111111-1111-1111-1111-111111111111';
@@ -70,8 +70,21 @@ describe('course_progress: 본인 기록만, 과목마다 한 행', () => {
   });
   it('모르는 과목(cg 포함)은 거부', async () => {
     await expect(save(S1, 'cg', { v: 1 }, 0)).rejects.toThrow(/알 수 없는 과목/);
+    await expect(save(S1, 'xx', { v: 1 }, 0)).rejects.toThrow(/알 수 없는 과목/);
     await expect(save(S1, 'NET', { v: 1 }, 0)).rejects.toThrow(/알 수 없는 과목/);
+    await expect(save(S1, 'BIN', { v: 1 }, 0)).rejects.toThrow(/알 수 없는 과목/);
     await expect(as(S1, (tx) => tx.query(`insert into public.course_progress(user_id, course, state) values ($1, 'math', '{}')`, [S1]))).rejects.toThrow(/check constraint/);
+    await expect(as(S1, (tx) => tx.query(`insert into public.course_progress(user_id, course, state) values ($1, 'cg', '{}')`, [S1]))).rejects.toThrow(/check constraint/);
+  });
+  it('보충 학습 과목(bin·ip)도 과목마다 따로 저장', async () => {
+    expect(await save(S2, 'bin', { v: 1, units: { U1: {} } }, 0)).toEqual({ status: 'ok', revision: 1 });
+    expect(await save(S2, 'bin', { v: 1, units: { U1: {}, U3: {} } }, 1)).toEqual({ status: 'ok', revision: 2 });
+    expect(await save(S2, 'ip', { v: 1, units: { U2: {} } }, 0)).toEqual({ status: 'ok', revision: 1 });
+    // 직접 insert도 제약을 통과(목록에 있는 과목)
+    await as(S2, (tx) => tx.query(`delete from public.course_progress where course = 'ip'`));
+    await as(S2, (tx) => tx.query(`insert into public.course_progress(user_id, course, state) values ($1, 'ip', '{"v":1,"units":{"U2":{}}}')`, [S2]));
+    const rows = await as(S2, (tx) => tx.query<{ course: string; revision: number }>(`select course, revision from public.course_progress where course in ('bin', 'ip') order by course`));
+    expect(rows.rows).toEqual([{ course: 'bin', revision: 2 }, { course: 'ip', revision: 1 }]);
   });
   it('배열·너무 큰 기록은 거부', async () => {
     await expect(save(S2, 'net', [1, 2], 0)).rejects.toThrow(/check constraint/);
@@ -121,10 +134,31 @@ describe('선생님 과목별 반 학습 현황(읽기 전용)', () => {
     expect(byId[S2]).toMatchObject({ name: '나래', email: 's2@school.example', state: { v: 1, units: { U5: {} } } });
     expect((await overview(T, 'prog')).map((r) => r.user_id)).toEqual([S1]);
     expect((await overview(T, 'data')).map((r) => r.user_id)).toEqual([S1]);
+    // 보충 학습 과목
+    const bin = await overview(T, 'bin');
+    expect(bin.map((r) => [r.user_id, r.name, r.state])).toEqual([[S2, '나래', { v: 1, units: { U1: {}, U3: {} } }]]);
+    expect((await overview(T, 'ip')).map((r) => r.user_id)).toEqual([S2]);
   });
   it('모르는 과목은 거부', async () => {
     await expect(overview(T, 'cg')).rejects.toThrow(/알 수 없는 과목/);
+    await expect(overview(T, 'xx')).rejects.toThrow(/알 수 없는 과목/);
+    await expect(overview(T, null as unknown as string)).rejects.toThrow(/알 수 없는 과목/);
   });
+  it('예전 판(과목 3개 제약)으로 만든 표에 다시 적용해도 bin·ip가 열린다', async () => {
+    const old = new PGlite();
+    await old.exec(readFileSync('tests/db/supabase-shim.sql', 'utf8'));
+    for (const f of ['20261001000000_sql_forest_v2.sql', '20261007000000_computer_general.sql', '20261015000000_unit_reset.sql', '20261016000000_unit_reset_stages.sql']) {
+      await old.exec(readFileSync(`supabase/migrations/${f}`, 'utf8'));
+    }
+    await old.exec(`create table public.course_progress (user_id uuid not null references auth.users(id) on delete cascade,
+      course text not null check (course in ('net', 'prog', 'data')), state jsonb not null default '{}'::jsonb,
+      revision integer not null default 1, updated_at timestamptz not null default now(), primary key (user_id, course))`);
+    await old.exec(readFileSync('supabase/migrations/20261026000000_courses.sql', 'utf8'));
+    const cons = await old.query<{ def: string }>(`select pg_get_constraintdef(oid) as def from pg_constraint where conrelid = 'public.course_progress'::regclass and contype = 'c' and conname like '%course%'`);
+    expect(cons.rows).toHaveLength(1);
+    expect(cons.rows[0].def).toMatch(/'bin'.*'ip'/);
+    await old.close();
+  }, 60000);
   it('선생님도 학생 기록을 직접 수정·삭제할 수 없다(읽기만)', async () => {
     const upd = await as(T, (tx) => tx.query(`update public.course_progress set state = '{}' where user_id = $1`, [S1]));
     expect(upd.affectedRows).toBe(0);

@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { adaptUnits, type RawQ, type RawUnit } from '../../src/features/computer/content/adapt';
 import { makeCourse, unitHasContent } from '../../src/features/computer/course';
-import { buildNewCourse } from '../../src/features/computer/courses/build';
-import { NEW_COURSES } from '../../src/features/computer/courses/defs';
-import { buildMock, mockSeedOf, orderByArea } from '../../src/features/computer/mock';
+import { buildNewCourse, coursePass } from '../../src/features/computer/courses/build';
+import { MOCK_SIZE, NEW_COURSES, UNIT_COUNTS } from '../../src/features/computer/courses/defs';
+import { CG_COURSE } from '../../src/features/computer/content';
+import { buildMock, fixedSetCount, mockOptionsOf, mockSeedOf, orderByArea } from '../../src/features/computer/mock';
 import {
-  activeWrongIds, addLock, addMock, emptyCgState, hasProgress, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
-  passedCount, plantStage, plantThresholds, recordScore, resetUnit, TOTAL_STEPS, type CgState, type MockRecord,
+  activeWrongIds, addLock, addMock, bestRegularMock, emptyCgState, hasProgress, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
+  passedCount, passNeed, plantStage, plantThresholds, recordScore, resetUnit, TOTAL_STEPS, type CgState, type MockRecord,
 } from '../../src/features/computer/model';
 import { classSummary, toStudents } from '../../src/features/computer/teacher';
-import type { CgUnitId } from '../../src/features/computer/types';
+import { CG_PASS, type CgUnitId } from '../../src/features/computer/types';
 
 /**
  * 단원 × 5단계 엔진 일반화(새 과목: 네트워크·프로그래밍·Data) 검사.
@@ -19,8 +20,8 @@ const T = (n: number) => `2026-10-26T00:00:${String(n).padStart(2, '0')}.000Z`;
 const AREAS = [{ id: 'A', label: '영역 가' }, { id: 'B', label: '영역 나' }, { id: 'C', label: '영역 다' }];
 
 const q = (id: string, area: string, extra: Partial<RawQ> = {}): RawQ => ({ id, q: `질문 ${id}`, o: ['가', '나', '다', '라'], a: 1, exp: `해설 ${id}`, area, ...extra });
-function rawUnit(n: number, opts: { basic?: number; adv?: number } = {}): RawUnit {
-  const areas = ['A', 'B', 'C'];
+function rawUnit(n: number, opts: { basic?: number; adv?: number; areas?: string[] } = {}): RawUnit {
+  const areas = opts.areas ?? ['A', 'B', 'C'];
   return {
     unit: n, title: `단원 ${n}`, intro: `단원 ${n} 소개`,
     theory: [
@@ -87,7 +88,8 @@ describe('새 형식 원본 → 앱 표준 형태', () => {
       // 픽스처 영역(A·B·C)은 이 과목 영역이 아니므로 모두 첫 영역
       expect(new Set(c.units.flatMap((u) => u.basic.map((x) => x.area)))).toEqual(new Set([d.areas[0].id]));
     }
-    expect(NEW_COURSES.map((c) => c.path)).toEqual(['/network', '/programming', '/data']);
+    expect(NEW_COURSES.map((c) => c.path)).toEqual(['/network', '/programming', '/data', '/binary', '/ip']);
+    expect(NEW_COURSES.filter((c) => c.group === 'supplement').map((c) => [c.id, c.size, c.units.length])).toEqual([['bin', 'short', 3], ['ip', 'short', 3]]);
   });
 });
 
@@ -215,5 +217,103 @@ describe('선생님 반 현황(과목 단원 기준)', () => {
     expect(sum.unitAvg.U1).toBeCloseTo((5 + 3) / 2);
     expect(sum.unitAvg.U2).toBeCloseTo(5 / 2);
     expect(sum.topWrong).toEqual([['U2-a1', 1]]);
+  });
+});
+
+/** 짧은 과목(보충 학습) 픽스처: 단원마다 기초 10 · 실력점검 8, 단원별 영역은 그 과목 영역 순(1단원 → 첫 영역) */
+const BIN = NEW_COURSES.find((c) => c.id === 'bin')!;
+const binRaw = (n: number) => rawUnit(n, { basic: UNIT_COUNTS.short.basic, adv: UNIT_COUNTS.short.advanced, areas: [BIN.areas[n - 1].id] });
+const SHORT = buildNewCourse('bin', [binRaw(3), binRaw(1), binRaw(2)]);
+/** 화면(Mock.tsx)과 같은 옵션 */
+const shortOpts = mockOptionsOf(SHORT);
+
+describe('짧은 과목(보충 학습 3단원): 통과 기준', () => {
+  it('과목 크기와 통과 기준: 끼워맞추기 8/10 · 기초 7/10 · 실력점검 5/8 · 모의 12/20(20분)', () => {
+    expect(SHORT).toMatchObject({ id: 'bin', size: 'short', totalSteps: 15, unitIds: ['U1', 'U2', 'U3'] });
+    expect(SHORT.pass).toEqual({ blanks: { need: 8, total: 10 }, basic: { need: 7, total: 10 }, check: { need: 5, total: 8 }, mock: { need: 12, total: 20, minutes: 20 } });
+    expect(coursePass('short')).toEqual(SHORT.pass);
+    expect(SHORT.pass.mock).toEqual(MOCK_SIZE.short);
+    // 같은 비율(컴퓨터 일반 24/30 = 80%, 28/40 = 70%, 15/25 = 60%)을 올림
+    expect([passNeed(2, 10), passNeed(3, 10), passNeed(5, 8)]).toEqual([8, 7, 5]);
+    // full 과목(20·20·15문항)도 같은 비율, 모의고사는 예전 그대로 50문항
+    expect(coursePass('full')).toEqual({ blanks: { need: 16, total: 20 }, basic: { need: 14, total: 20 }, check: { need: 9, total: 15 }, mock: { need: 30, total: 50, minutes: 50 } });
+    expect(buildNewCourse('net', [rawUnit(1)])).toMatchObject({ size: 'full', pass: { mock: { total: 50, need: 30, minutes: 50 } } });
+    // 컴퓨터 일반은 기준 그대로
+    expect(CG_COURSE.size).toBe('full');
+    expect(CG_COURSE.pass).toBe(CG_PASS);
+  });
+  it('짧은 단원 기록: 기준 이상이면 통과, 미만이면 기록만', () => {
+    const at = (lv: 2 | 3 | 5, score: number, total: number) => recordScore(emptyCgState(), 'U1', lv, score, total, T(1)).passed;
+    expect([at(2, 8, 10), at(2, 7, 10)]).toEqual([true, false]);
+    expect([at(3, 7, 10), at(3, 6, 10)]).toEqual([true, false]);
+    expect([at(5, 5, 8), at(5, 4, 8)]).toEqual([true, false]);
+  });
+  it('식물: 15단계 기준 1·3·6·11·15, 열매는 이 과목 정규 모의고사(20문항) 12점 이상', () => {
+    expect(plantThresholds(SHORT.totalSteps)).toEqual([1, 3, 6, 11, 15]);
+    for (const [n, st] of [[0, 0], [1, 1], [2, 1], [3, 2], [5, 2], [6, 3], [10, 3], [11, 4], [14, 4], [15, 5]] as const) {
+      expect(plantStage(passSteps(emptyCgState(), n), SHORT), `${n}단계`).toBe(st);
+    }
+    const all = passSteps(emptyCgState(), 15);
+    const rec = (kind: MockRecord['kind'], score: number, total: number, id: string): MockRecord => ({ ...mock(kind, score, id), total });
+    expect(nextPlantGoal(all, SHORT)).toBe('정규 모의고사(고정 회차·랜덤)에서 12/20 이상이면 열매가 맺혀요.');
+    // 11/20, 오답 모의고사 20/20, 50문항 기록은 열매 조건이 아니다
+    let s = addMock(addMock(addMock(all, rec('set1', 11, 20, 'a')), rec('wrong', 20, 20, 'b')), rec('random', 45, 50, 'c'));
+    expect(bestRegularMock(s, SHORT)).toBe(11);
+    expect(plantStage(s, SHORT)).toBe(5);
+    s = addMock(s, rec('set2', 12, 20, 'd'));
+    expect(bestRegularMock(s, SHORT)).toBe(12);
+    expect(plantStage(s, SHORT)).toBe(6);
+    expect(nextPlantGoal(s, SHORT)).toBeNull();
+    // 컴퓨터 일반 기준(50문항 30점)으로는 20문항 기록을 세지 않는다
+    expect(bestRegularMock(s)).toBe(45);
+  });
+});
+
+describe('짧은 과목 모의고사: 20문항 · 20분', () => {
+  it('옵션: 과목 시드·영역 순서·20문항·남는 자리는 기초에서', () => {
+    expect(shortOpts).toEqual({ seedPrefix: 'bin', areas: ['NUM', 'CONV', 'BIT'], total: 20, fill: 'basic' });
+    expect(mockOptionsOf(CG_COURSE)).toEqual({ seedPrefix: 'cg', areas: ['OS', 'HW', 'MAINT', 'NET', 'GEN'], total: 50, fill: 'check' });
+  });
+  it('고정 1회: 단원마다 실력점검 4 + 기초 2, 남는 2문항은 기초 → 20문항, 중복 없음, 영역(=단원) 순서', () => {
+    const { items, orders } = buildMock(SHORT.units, 'set1', shortOpts);
+    expect(items).toHaveLength(20);
+    expect(orders).toHaveLength(20);
+    expect(new Set(items.map((x) => x.id)).size).toBe(20);
+    for (const u of SHORT.unitIds) {
+      expect(items.filter((x) => x.unitId === u && x.set === 'check')).toHaveLength(4);
+      expect(items.filter((x) => x.unitId === u && x.set === 'basic').length).toBeGreaterThanOrEqual(2);
+    }
+    expect(items.filter((x) => x.set === 'basic')).toHaveLength(8);
+    const idx = items.map((x) => ['NUM', 'CONV', 'BIT'].indexOf(x.area));
+    expect(idx.every((i) => i >= 0)).toBe(true);
+    expect([...idx].sort((a, b) => a - b)).toEqual(idx);
+    for (const o of orders) expect([...o].sort()).toEqual([0, 1, 2, 3]);
+    expect(buildMock(SHORT.units, 'set1', shortOpts)).toEqual({ items, orders });
+  });
+  it('고정 회차는 겹치지 않게 만들 수 있는 만큼만: 짧은 과목 2회(1·2회는 서로 다른 문항), full 과목·컴퓨터 일반 3회', () => {
+    const ids = (k: 'set1' | 'set2' | 'set3') => buildMock(SHORT.units, k, shortOpts).items.map((x) => x.id);
+    const [a, b, c] = [ids('set1'), ids('set2'), ids('set3')];
+    expect(b).toHaveLength(20);
+    expect(a.filter((x) => b.includes(x))).toEqual([]);
+    // 3회는 실력점검(단원마다 8문항)이 모자라 앞 회차 문항을 다시 쓴다 → 화면에 보이지 않음
+    expect(c.filter((x) => a.includes(x) || b.includes(x)).length).toBeGreaterThan(0);
+    expect(fixedSetCount(SHORT.units, shortOpts)).toBe(2);
+    const big = adaptUnits([1, 2, 3, 4, 5, 6, 7, 8].map((n) => rawUnit(n, { basic: 20, adv: 15 })), { areas: ['A', 'B', 'C'] });
+    expect(fixedSetCount(big, { seedPrefix: 'net', areas: ['A', 'B', 'C'] })).toBe(3);
+    expect(fixedSetCount(CG_COURSE.units, mockOptionsOf(CG_COURSE))).toBe(3);
+    // 아직 내용이 없는 과목은 1회만(시험 화면이 준비 중 안내)
+    expect(fixedSetCount(adaptUnits([{ unit: 1 } as unknown as RawUnit], { areas: ['A'] }), shortOpts)).toBe(1);
+  });
+  it('랜덤 20문항, 오답 모의고사는 최대 20문항', () => {
+    const r = buildMock(SHORT.units, 'random', { ...shortOpts, seed: 'x' });
+    expect(r.items).toHaveLength(20);
+    expect(new Set(r.items.map((x) => x.id)).size).toBe(20);
+    const many = SHORT.units.flatMap((u) => u.basic.map((x) => x.id));
+    expect(buildMock(SHORT.units, 'wrong', { ...shortOpts, wrongIds: many }).items).toHaveLength(20);
+  });
+  it('컴퓨터 일반 화면 옵션(mockOptionsOf)은 예전 옵션과 같은 회차를 만든다', () => {
+    for (const k of ['set1', 'set2', 'set3'] as const) {
+      expect(buildMock(CG_COURSE.units, k, mockOptionsOf(CG_COURSE))).toEqual(buildMock(CG_COURSE.units, k, { seedPrefix: 'cg', areas: CG_COURSE.areas.map((a) => a.id) }));
+    }
   });
 });
