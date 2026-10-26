@@ -1039,8 +1039,8 @@
   },
   {
    "id": "a6",
-   "q": "다음 코드로 그린 선 그래프에서 왼쪽부터 점의 y값을 차례로 나열한 것은?",
-   "code": "import pandas as pd\ndf = pd.DataFrame({'date': ['2021-03-02', '2019-07-15', '2021-11-30',\n                            '2020-01-05', '2021-06-11', '2019-12-24']})\ndf['year'] = pd.to_datetime(df['date']).dt.year\ncnt = df['year'].value_counts().sort_index()\ncnt.plot.line()",
+   "q": "다음 코드로 그린 막대 그래프에서 왼쪽부터 막대의 높이를 차례로 나열한 것은?",
+   "code": "import pandas as pd\ndf = pd.DataFrame({'date': ['2021-03-02', '2019-07-15', '2021-11-30',\n                            '2020-01-05', '2021-06-11', '2019-12-24']})\ndf['year'] = pd.to_datetime(df['date']).dt.year\ncnt = df['year'].value_counts().sort_index()\ncnt.plot.bar()",
    "o": [
     "3, 2, 1",
     "1, 2, 3",
@@ -1048,7 +1048,7 @@
     "2, 1, 3"
    ],
    "a": 3,
-   "exp": "pd.to_datetime으로 날짜로 바꾼 뒤 dt.year로 뽑은 연도는 2021이 3건, 2019가 2건, 2020이 1건이다. value_counts 결과는 개수 순(2021, 2019, 2020)으로 놓이지만 sort_index()로 2019 → 2020 → 2021 순서가 되어 선이 왼쪽부터 차례로 이어지고 y값은 2, 1, 3이다. 개수 순 3, 2, 1은 점의 위치가 아니라 정렬 전 Series의 값 순서이다.",
+   "exp": "pd.to_datetime으로 날짜로 바꾼 뒤 dt.year로 뽑은 연도는 2021이 3건, 2019가 2건, 2020이 1건이다. value_counts만 쓰면 개수 순이라 막대가 2021·2019·2020 순으로 놓여 3, 2, 1이 되지만, sort_index()로 연도 순 2019 → 2020 → 2021이 되어 높이는 2, 1, 3이다. 1, 2, 3은 개수를 오름차순으로 정렬하는 sort_values()의 결과이다.",
    "area": "VIS",
    "type": "코드"
   },
