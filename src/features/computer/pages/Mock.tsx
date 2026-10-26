@@ -8,6 +8,7 @@ import { activeWrongIds, addMock, isRegularMock, MOCK_LABEL, noteAnswer, scoreMo
 import { CodeBlock, MARK, ReviewCard } from '../McqRunner';
 import { useCg } from '../store';
 import type { CgMcq } from '../types';
+import { useLiveDetail } from '../../monitor/liveStore';
 
 const KINDS: MockKind[] = ['set1', 'set2', 'set3', 'random', 'wrong'];
 const isFixed = (k: MockKind): k is FixedSet => (FIXED_SETS as readonly string[]).includes(k);
@@ -150,6 +151,7 @@ function Exam({ kind }: { kind: MockKind }) {
   const [confirm, setConfirm] = useState(false);
   const submitted = useRef(false);
   const items = useMemo(() => (exam ? exam.ids.map((id) => mcqById(id)).filter((q): q is CgMcq => !!q) : []), [exam, mcqById]);
+  useLiveDetail(exam && !result ? `모의고사 문항 ${exam.idx + 1}/${items.length}` : null);
   const limit = course.pass.mock.minutes * 60;
   const elapsed = exam ? Math.floor((now - exam.startedAt) / 1000) : 0;
   const left = limit - elapsed;

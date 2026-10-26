@@ -22,6 +22,7 @@ function useLearnerPrefix() {
 }
 
 import { InfoTable as Table } from '../../../components/InfoTable';
+import { useLiveDetail } from '../../monitor/liveStore';
 export { Table };
 
 /** 줄 목록을 문단·글머리표로 */
@@ -179,6 +180,7 @@ function TheoryCards({ u }: { u: CgUnit }) {
   const firstTodo = () => Math.max(0, u.cards.findIndex((c) => !isDone(c.id)));
   const [idx, setIdx] = useState(firstTodo);
   const [phase, setPhase] = useState<'read' | 'match'>('read');
+  useLiveDetail(`카드 ${idx + 1}/${u.cards.length}${phase === 'match' ? ' · 개념 맞추기' : ''}`);
   const [round, setRound] = useState(0);
   const [justDone, setJustDone] = useState(false);
   const top = useRef<HTMLDivElement>(null);
@@ -285,6 +287,7 @@ function BlankFill({ u }: { u: CgUnit }) {
   }, [draft, key]);
   const used = new Set(Object.values(draft.ans));
   const filled = u.blanks.filter((b) => draft.ans[b.id]).length;
+  useLiveDetail(`빈칸 ${filled}/${u.blanks.length} 채움`);
 
   const place = (word: string) => {
     if (!sel || graded) return;
