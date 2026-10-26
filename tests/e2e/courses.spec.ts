@@ -11,6 +11,8 @@ import { buildMock } from '../../src/features/computer/mock';
  */
 interface RawCard { id: string; title: string; code?: string; match?: { pairs: { term: string; desc: string }[]; distractor: string } }
 const rawUnit = (c: NewCourseId, n: number) => JSON.parse(readFileSync(`src/features/computer/courses/${c}/U${n}.json`, 'utf8')) as { title: string; theory: RawCard[] };
+/** 정규 과목(8단원). 보충 학습(2진법 이해·IP 이해, 3단원)은 supplement.spec.ts */
+const MAIN_COURSES = NEW_COURSES.filter((c) => (c.group ?? 'main') === 'main');
 const loadCourse = (c: NewCourseId) => buildNewCourse(c, [1, 2, 3, 4, 5, 6, 7, 8].map((n) => JSON.parse(readFileSync(`src/features/computer/courses/${c}/U${n}.json`, 'utf8'))));
 
 async function fresh(page: Page, path = '/') {
@@ -37,7 +39,7 @@ test('첫 화면: 과목 5개(과목 이름만, 자격증 이름 없음), 새 �
   expect(names).toEqual(['데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data']);
   const main = await page.locator('main').innerText();
   expect(main).not.toMatch(/SQLD|PC정비사|정보처리기사|네트워크관리사|정보기기운용|COS ?Pro|YBM/);
-  for (const c of NEW_COURSES) await expect(page.locator('.subject-card', { hasText: c.name }).first()).toContainText('8단원 × 5단계');
+  for (const c of MAIN_COURSES) await expect(page.locator('.subject-card', { hasText: c.name }).first()).toContainText('8단원 × 5단계');
   // Data(/data)는 데이터베이스 과목(/db)과 다른 과목
   await page.locator('.subject-card', { has: page.getByRole('heading', { name: 'Data', exact: true }) }).click();
   await expect(page).toHaveURL(/#\/data$/);
@@ -47,7 +49,7 @@ test('첫 화면: 과목 5개(과목 이름만, 자격증 이름 없음), 새 �
   await expect(page.locator('.subject-card', { hasText: '데이터베이스' }).first().getByText('최근 공부')).toHaveCount(0);
 });
 
-for (const def of NEW_COURSES) {
+for (const def of MAIN_COURSES) {
   test(`${def.name}: 과목 홈 → 1단원 집중 학습 → 첫 카드 개념 맞추기 → 모의고사 1회 50문항`, async ({ page }) => {
     const u1 = rawUnit(def.id, 1);
     expect(u1.theory.length, `${def.id}/U1.json 내용이 아직 없음(다른 작업이 쓰는 중)`).toBeGreaterThan(0);
@@ -104,7 +106,7 @@ for (const def of NEW_COURSES) {
 
 test('휴대폰 너비(390px): 과목 홈·코드가 있는 카드·코드가 있는 모의고사 문항에서 가로 스크롤 없음', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const c of NEW_COURSES) {
+  for (const c of MAIN_COURSES) {
     await fresh(page, c.path);
     await expect(page.locator('.cg-unit').first()).toBeVisible();
     await page.waitForTimeout(200);
