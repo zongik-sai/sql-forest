@@ -290,7 +290,7 @@
    "points": [
     "pandas의 Series·DataFrame은 .plot으로 matplotlib 그래프를 바로 그린다. .plot은 그리기 메서드를 모은 plot 접근자(accessor)로, ser.plot.hist()처럼 뒤에 종류 메서드를 붙인다.",
     "종류 메서드는 .line()·.bar()·.barh()·.hist()·.box()·.pie()·.scatter()이다. ser.plot(kind='hist')는 ser.plot.hist()와 같은 그래프이고, kind를 생략한 ser.plot()은 선 그래프이다.",
-    "인덱스가 x축 눈금(막대·조각 이름)이 되고 값이 막대 높이·조각 크기가 된다. 막대 이름으로 쓸 열은 df.set_index('반')으로 인덱스로 옮긴 뒤 그린다.",
+    "인덱스는 x축 눈금(막대 이름)이나 파이 조각 이름이 되고, 값은 막대 높이·조각 크기가 된다. 막대 이름으로 쓸 열은 df.set_index('반')으로 인덱스로 옮긴 뒤 그린다.",
     "DataFrame은 수치형 열마다 선·막대를 하나씩 그리고 열 이름으로 범례를 단다. 산점도는 DataFrame 전용이라 df.plot.scatter(x='bed', y='bath')처럼 x·y 열을 꼭 정한다.",
     "꾸미기 인자는 괄호 안에 바로 준다: title='제목', bins=30(히스토그램 막대 개수), grid=True(격자). kind='boxplot'·'histogram'처럼 없는 종류는 ValueError이다."
    ],
