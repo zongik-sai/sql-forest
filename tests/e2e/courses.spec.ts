@@ -6,14 +6,14 @@ import { buildMock } from '../../src/features/computer/mock';
 
 /**
  * 컴퓨터 일반과 같은 엔진을 쓰는 새 과목(네트워크·프로그래밍·Data): 로그인 없이 둘러보기(이 기기에만 저장).
- * 정답·카드 제목은 테스트할 때 과목 원본(courses/<과목>/U1~U8.json)에서 읽는다.
+ * 정답·카드 제목은 테스트할 때 과목 원본(courses/<과목>/U1~U<n>.json)에서 읽는다.
  * 원본을 다른 작업이 아직 쓰는 중이면(빈 단원) 그 단원 검사는 "내용 없음"으로 실패한다.
  */
 interface RawCard { id: string; title: string; code?: string; match?: { pairs: { term: string; desc: string }[]; distractor: string } }
 const rawUnit = (c: NewCourseId, n: number) => JSON.parse(readFileSync(`src/features/computer/courses/${c}/U${n}.json`, 'utf8')) as { title: string; theory: RawCard[] };
-/** 정규 과목(8단원). 보충 학습(2진법 이해·IP 이해, 3단원)은 supplement.spec.ts */
+/** 정규 과목(네트워크·프로그래밍 8단원, Data 11단원). 보충 학습(2진법 이해·IP 이해, 3단원)은 supplement.spec.ts */
 const MAIN_COURSES = NEW_COURSES.filter((c) => (c.group ?? 'main') === 'main');
-const loadCourse = (c: NewCourseId) => buildNewCourse(c, [1, 2, 3, 4, 5, 6, 7, 8].map((n) => JSON.parse(readFileSync(`src/features/computer/courses/${c}/U${n}.json`, 'utf8'))));
+const loadCourse = (c: NewCourseId) => buildNewCourse(c, NEW_COURSES.find((d) => d.id === c)!.units.map((u) => JSON.parse(readFileSync(`src/features/computer/courses/${c}/U${u.num}.json`, 'utf8'))));
 
 async function fresh(page: Page, path = '/') {
   await page.goto('./');
@@ -39,7 +39,7 @@ test('첫 화면: 과목 5개(과목 이름만, 자격증 이름 없음), 새 �
   expect(names).toEqual(['데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data']);
   const main = await page.locator('main').innerText();
   expect(main).not.toMatch(/SQLD|PC정비사|정보처리기사|네트워크관리사|정보기기운용|COS ?Pro|YBM/);
-  for (const c of MAIN_COURSES) await expect(page.locator('.subject-card', { hasText: c.name }).first()).toContainText('8단원 × 5단계');
+  for (const c of MAIN_COURSES) await expect(page.locator('.subject-card', { hasText: c.name }).first()).toContainText(`${c.units.length}단원 × 5단계`);
   // Data(/data)는 데이터베이스 과목(/db)과 다른 과목
   await page.locator('.subject-card', { has: page.getByRole('heading', { name: 'Data', exact: true }) }).click();
   await expect(page).toHaveURL(/#\/data$/);

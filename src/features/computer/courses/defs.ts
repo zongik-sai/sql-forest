@@ -1,6 +1,6 @@
 /**
  * 컴퓨터 일반과 같은 구조(단원 × 5단계 · 모의고사 · 오답노트)로 만드는 새 과목들(2026-10-26).
- * 내용은 courses/<과목>/U1~U8.json(원본 형식은 컴퓨터 일반 pc_bank.json 단원과 같고,
+ * 내용은 courses/<과목>/U1~U<n>.json(원본 형식은 컴퓨터 일반 pc_bank.json 단원과 같고,
  * 이론 카드에 개념 맞추기 match·선택 code, 문항에 선택 code가 더 있다).
  */
 export type NewCourseId = 'net' | 'prog' | 'data' | 'bin' | 'ip';
