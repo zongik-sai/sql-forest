@@ -4,7 +4,7 @@ import { Garden } from '../components/Garden';
 import { InAppNotice } from '../components/InAppNotice';
 import { Plant } from '../components/Plant';
 import { useAuth } from '../features/auth/AuthContext';
-import { NEW_COURSES, type NewCourseId } from '../features/computer/courses/defs';
+import { MOCK_SIZE, NEW_COURSES, type NewCourseId } from '../features/computer/courses/defs';
 import { readRaw } from '../lib/storage';
 
 export const LAST_SUBJECT_KEY = 'sqlforest:last-subject';
@@ -45,15 +45,21 @@ const SUBJECTS: SubjectCard[] = [
     art: <Plant stage={5} size={150} title="컴퓨터 일반: 꽃 핀 식물" />,
   },
   // 같은 단원 × 5단계 구조의 새 과목들. 첫 화면에는 과목 이름·소개만(자격증 이름은 각 과목 화면에서 작게만)
-  ...NEW_COURSES.map((c, i): SubjectCard => ({
-    id: c.id,
-    name: c.name,
-    summary: c.summary,
-    facts: [`${c.units.length}단원 × 5단계`, '모의고사 50문항 · 50분', '오답노트 자동 정리'],
-    to: () => c.path,
-    art: <Plant stage={[3, 4, 6][i] ?? 4} size={150} title={`${c.name}: 자라는 식물`} />,
-  })),
+  ...NEW_COURSES.filter((c) => (c.group ?? 'main') === 'main').map((c, i): SubjectCard => {
+    const m = MOCK_SIZE[c.size ?? 'full'];
+    return {
+      id: c.id,
+      name: c.name,
+      summary: c.summary,
+      facts: [`${c.units.length}단원 × 5단계`, `모의고사 ${m.total}문항 · ${m.minutes}분`, '오답노트 자동 정리'],
+      to: () => c.path,
+      art: <Plant stage={[3, 4, 6][i] ?? 4} size={150} title={`${c.name}: 자라는 식물`} />,
+    };
+  }),
 ];
+
+/** 보충 학습: 다른 과목 앞에서 기초를 짧게 익히는 과목(작은 카드, 자격증 이름 없음) */
+const SUPPLEMENTS = NEW_COURSES.filter((c) => c.group === 'supplement');
 
 export function SubjectHome() {
   const auth = useAuth();
@@ -90,6 +96,27 @@ export function SubjectHome() {
           </Link>
         ))}
       </div>
+      {SUPPLEMENTS.length > 0 && (
+        <section className="supplement" aria-labelledby="supplement-h">
+          <h2 id="supplement-h">보충 학습</h2>
+          <p className="small muted">기초가 어려울 때 짧게 먼저 익혀요. 다른 과목을 공부하다 막히면 들러 보세요.</p>
+          <div className="supplement-grid">
+            {SUPPLEMENTS.map((c) => (
+              <Link key={c.id} to={c.path} className="supplement-card panel" aria-describedby={`subj-${c.id}`}>
+                <span className="supplement-art" aria-hidden="true"><Plant stage={1} size={56} title={`${c.name}: 새싹`} /></span>
+                <span className="stack" style={{ gap: '0.3rem' }}>
+                  <span className="row" style={{ justifyContent: 'space-between', gap: '0.4rem' }}>
+                    <h3 style={{ margin: 0 }}>{c.name}</h3>
+                    {last === c.id && <span className="badge badge-exec">최근 공부</span>}
+                  </span>
+                  <span id={`subj-${c.id}`} className="small">{c.summary}</span>
+                  <span className="small muted supplement-facts">{c.units.length}단원 · 짧게</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       <p className="small muted" style={{ marginTop: '1.5rem' }}><Link to="/about">저장 방식·도구의 한계 안내</Link> · <a href={`${import.meta.env.BASE_URL}privacy.html`}>개인정보처리방침</a></p>
     </div>
   );

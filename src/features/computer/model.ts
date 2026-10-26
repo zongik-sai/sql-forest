@@ -21,7 +21,7 @@ export type UnitRecord = Partial<Record<`lv${CgLevel}`, LevelRecord>>;
 
 export type MockKind = 'set1' | 'set2' | 'set3' | 'random' | 'wrong';
 export const MOCK_LABEL: Record<MockKind, string> = { set1: '모의고사 1회', set2: '모의고사 2회', set3: '모의고사 3회', random: '랜덤 모의고사', wrong: '오답 모의고사' };
-/** 정규 모의고사(열매 조건): 고정 1~3회와 랜덤. 오답 모의고사는 제외 */
+/** 정규 모의고사(열매 조건): 고정 회차(1~3회, 짧은 과목은 문항 수에 맞는 회차까지)와 랜덤. 오답 모의고사는 제외 */
 export const isRegularMock = (k: MockKind) => k !== 'wrong';
 
 export interface MockRecord {
@@ -68,11 +68,25 @@ export const QID_RE = /^U\d{1,2}-[ab]\d{1,3}$/;
 /** 이론 카드 ID 형식 */
 export const CARD_ID_RE = /^U\d{1,2}-t\d{1,3}$/;
 
-/** 과목의 모양: 단원 목록과 전체 단계 수(단원 수 × 5) */
+/** 단계별 통과 기준(정답 수 / 문항 수) */
+export interface PassRule { need: number; total: number }
+/** 모의고사 크기: 문항 수·합격 기준·제한 시간(분) */
+export interface MockSize { need: number; total: number; minutes: number }
+/**
+ * 과목의 통과 기준. 컴퓨터 일반은 CG_PASS(24/30·28/40·15/25, 모의 30/50·50분).
+ * 다른 과목의 단계 기준은 같은 비율(passNeed)로 계산하고, 모의고사는 과목 크기(courses/defs.ts MOCK_SIZE)를 따른다.
+ */
+export interface CoursePass { blanks: PassRule; basic: PassRule; check: PassRule; mock: MockSize }
+
+/** 과목의 모양: 단원 목록과 전체 단계 수(단원 수 × 5), 통과 기준(생략하면 컴퓨터 일반) */
 export interface CourseShape {
   unitIds: readonly CgUnitId[];
   totalSteps: number;
+  pass?: CoursePass;
 }
+
+/** 과목의 모의고사 크기(생략하면 컴퓨터 일반 50문항·30문항 합격·50분) */
+export const mockSizeOf = (shape?: CourseShape): MockSize => shape?.pass?.mock ?? CG_PASS.mock;
 
 /** 이 과목 단원의 ID인지(형식 + 과목 단원 목록) */
 const unitOfId = (id: string) => id.slice(0, id.indexOf('-')) as CgUnitId;
@@ -137,7 +151,10 @@ export function normalizeCgState(raw: unknown, shape: CourseShape = CG_SHAPE): C
   return s;
 }
 
-/** 단계별 통과에 필요한 정답 수(문항 수가 기준과 다르면 같은 비율로 올림) */
+/**
+ * 단계별 통과에 필요한 정답 수(문항 수가 기준과 다르면 같은 비율로 올림).
+ * 컴퓨터 일반 24/30·28/40·15/25 → 새 과목(20·20·15문항) 16·14·9, 짧은 과목(10·10·8문항) 8·7·5
+ */
 export function passNeed(level: CgLevel, count: number): number {
   const base = level === 2 ? CG_PASS.blanks : level === 3 ? CG_PASS.basic : level === 5 ? CG_PASS.check : null;
   if (!base) return 0;
@@ -177,7 +194,7 @@ export function plantThresholds(totalSteps: number): number[] {
 export function plantStage(s: CgState, shape: CourseShape = CG_SHAPE): number {
   const n = passedCount(s, shape);
   const th = plantThresholds(shape.totalSteps);
-  if (n >= th[4]) return bestRegularMock(s) >= CG_PASS.mock.need ? 6 : 5;
+  if (n >= th[4]) return bestRegularMock(s, shape) >= mockSizeOf(shape).need ? 6 : 5;
   for (let st = 3; st >= 0; st--) if (n >= th[st]) return st + 1;
   return 0;
 }
@@ -186,14 +203,18 @@ export function nextPlantGoal(s: CgState, shape: CourseShape = CG_SHAPE): string
   const n = passedCount(s, shape);
   const st = plantStage(s, shape);
   if (st === 6) return null;
-  if (st === 5) return `정규 모의고사(1~3회·랜덤)에서 ${CG_PASS.mock.need}/${CG_PASS.mock.total} 이상이면 열매가 맺혀요.`;
+  if (st === 5) {
+    const m = mockSizeOf(shape);
+    return `정규 모의고사(고정 회차·랜덤)에서 ${m.need}/${m.total} 이상이면 열매가 맺혀요.`;
+  }
   const next = plantThresholds(shape.totalSteps)[st];
   return `${next - n}단계 더 통과하면 다음 모습으로 자라요.`;
 }
 
-/** 정규 모의고사(50문항 전체) 최고 점수 */
-export function bestRegularMock(s: CgState): number {
-  return s.mock.filter((m) => isRegularMock(m.kind) && m.total === CG_PASS.mock.total).reduce((b, m) => Math.max(b, m.score), 0);
+/** 정규 모의고사(과목 모의고사 전체 문항: 컴퓨터 일반 50, 짧은 과목 20) 최고 점수 */
+export function bestRegularMock(s: CgState, shape: CourseShape = CG_SHAPE): number {
+  const total = mockSizeOf(shape).total;
+  return s.mock.filter((m) => isRegularMock(m.kind) && m.total === total).reduce((b, m) => Math.max(b, m.score), 0);
 }
 
 /** 오답 모의고사를 열 수 있는 최소 오답 수 */

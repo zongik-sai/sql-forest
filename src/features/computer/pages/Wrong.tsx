@@ -60,7 +60,7 @@ export function WrongNotePage() {
             <button className="btn btn-primary" onClick={() => { setDone(null); setRetry(shown.slice(0, 40)); }}>
               {shown.length > 40 ? '최근 40문항 다시 풀기' : `${shown.length}문항 다시 풀기`}
             </button>
-            {all.length >= WRONG_MOCK_MIN ? <Link className="btn" to={`${base}/mock/wrong`}>오답 모의고사(50분)</Link> : <span className="small muted">오답 {WRONG_MOCK_MIN}문항부터 오답 모의고사</span>}
+            {all.length >= WRONG_MOCK_MIN ? <Link className="btn" to={`${base}/mock/wrong`}>오답 모의고사({course.pass.mock.minutes}분)</Link> : <span className="small muted">오답 {WRONG_MOCK_MIN}문항부터 오답 모의고사</span>}
           </div>
           <ol className="cg-wrong-list">
             {shown.map((q) => {

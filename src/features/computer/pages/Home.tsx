@@ -2,12 +2,44 @@ import { Link } from 'react-router-dom';
 import { Plant, PLANT_STAGES } from '../../../components/Plant';
 import { isSupabaseConfigured } from '../../../lib/config';
 import { useAuth } from '../../auth/AuthContext';
-import { unitHasContent, useCourse } from '../course';
+import { unitHasContent, useCourse, type CourseId } from '../course';
+import { NEW_COURSES } from '../courses/defs';
 import { activeWrongIds, bestRegularMock, isPassed, nextPlantGoal, passedCount, plantStage, plantThresholds, unitLevel } from '../model';
 import { useCg } from '../store';
-import { CG_LEVELS, CG_LEVEL_NAME, CG_PASS } from '../types';
+import { CG_LEVELS, CG_LEVEL_NAME } from '../types';
 
-const stageRule = (total: number) => ['시작', ...plantThresholds(total).map((n) => `${n}단계`), `꽃 + 모의 ${CG_PASS.mock.need}점`];
+const stageRule = (total: number, mockNeed: number) => ['시작', ...plantThresholds(total).map((n) => `${n}단계`), `꽃 + 모의 ${mockNeed}점`];
+
+/** 보충 학습 과목(2진법 이해·IP 이해) */
+const SUPPLEMENTS = NEW_COURSES.filter((c) => c.group === 'supplement');
+/** 기초(2진법·IP 주소)가 필요한 과목: 과목 홈에 보충 학습 안내를 작게 둔다 */
+const NEEDS_SUPPLEMENT: readonly CourseId[] = ['net', 'cg'];
+/** 네트워크 3단원(IP 주소와 서브네팅): 보충 학습을 마치고 이어 갈 곳 */
+const NET_IP_UNIT = '/network/unit/U3';
+
+/** 기초가 어려운 학생에게 보충 학습 과목 안내(네트워크·컴퓨터 일반 홈) */
+function SupplementBridge() {
+  if (!SUPPLEMENTS.length) return null;
+  return (
+    <p className="small cg-bridge" style={{ margin: 0 }}>
+      기초가 어렵다면:{' '}
+      {SUPPLEMENTS.map((c, i) => (
+        <span key={c.id}>{i > 0 && ' · '}<Link to={c.path}>{c.name}</Link></span>
+      ))}{' '}
+      <span className="muted">(보충 학습)</span>
+    </p>
+  );
+}
+
+/** 보충 학습 과목 홈: 다 익힌 뒤 이어 갈 곳 */
+function SupplementNext({ id }: { id: CourseId }) {
+  const ip = NEW_COURSES.find((c) => c.id === 'ip');
+  return (
+    <p className="small muted cg-bridge-back" style={{ margin: 0 }}>
+      다 익혔다면 {id === 'bin' && ip && <><Link to={ip.path}>{ip.name}</Link>나 </>}<Link to={NET_IP_UNIT}>네트워크 3단원</Link>으로
+    </p>
+  );
+}
 
 export function CgHome() {
   const cg = useCg();
@@ -19,8 +51,9 @@ export function CgHome() {
   const stage = plantStage(s, course);
   const passed = passedCount(s, course);
   const wrong = activeWrongIds(s).length;
-  const best = bestRegularMock(s);
-  const rule = stageRule(total);
+  const mock = course.pass.mock;
+  const best = bestRegularMock(s, course);
+  const rule = stageRule(total, mock.need);
   return (
     <div className="stack" style={{ gap: '1.25rem' }}>
       <p className="crumbs" style={{ margin: 0 }}><Link to="/">과목 선택</Link> / {course.name}</p>
@@ -30,7 +63,7 @@ export function CgHome() {
         <div className="stack" style={{ gap: '0.5rem' }}>
           <p className="step-label" style={{ margin: 0 }}>나의 식물</p>
           <h1 style={{ margin: 0 }}>{PLANT_STAGES[stage]}</h1>
-          <p style={{ margin: 0 }}>통과한 단계 <b>{passed}</b> / {total} · 오답노트 {wrong}문항 · 모의고사 최고 {best}/{CG_PASS.mock.total}</p>
+          <p style={{ margin: 0 }}>통과한 단계 <b>{passed}</b> / {total} · 오답노트 {wrong}문항 · 모의고사 최고 {best}/{mock.total}</p>
           <div className="xpbar" role="progressbar" aria-label="통과한 단계" aria-valuemin={0} aria-valuemax={total} aria-valuenow={passed}><span style={{ width: `${total ? (passed / total) * 100 : 0}%` }} /></div>
           <p className="small muted" style={{ margin: 0 }}>{nextPlantGoal(s, course) ?? '열매까지 맺었어요! 오답노트와 모의고사로 실력을 다져 보세요.'}</p>
           {cg.mode === 'guest' && (
@@ -88,6 +121,9 @@ export function CgHome() {
           })}
         </div>
       </section>
+
+      {NEEDS_SUPPLEMENT.includes(course.id) && <SupplementBridge />}
+      {SUPPLEMENTS.some((c) => c.id === course.id) && <SupplementNext id={course.id} />}
 
       <section className="row">
         <Link className="btn btn-primary" to={`${base}/mock`}>모의고사 보기</Link>
