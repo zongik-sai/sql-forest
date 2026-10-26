@@ -13,9 +13,15 @@
 --    선생님(private.is_teacher)만 class_live_status(p_minutes)로 최근 1~240분 안에 갱신된 행을 읽는다.
 --  * screen_share: 선생님이 요청 → 학생이 그때마다 허락 → 브라우저끼리 WebRTC로 직접 연결.
 --    서버를 거치는 것은 연결 정보(SDP 텍스트)뿐이고 영상은 서버를 거치지 않으며 녹화·저장하지 않는다.
---    끝나거나(ended) 거절되면(declined) SDP를 지운다(null, 표 제약으로도 강제). 끝난 행은 하루 뒤 정리.
+--    SDP에는 양쪽 기기의 네트워크 주소(IP, ICE 후보)가 들어 있다. 끝나거나(ended) 거절되면(declined) 지운다
+--    (null, 표 제약으로도 강제). 모든 화면 공유 RPC가 먼저 정리(private.screen_sweep)를 한다:
+--    만료된 열린 행은 끝내고 SDP를 지우며, 끝난 지 하루가 지난 행은 지운다.
 --    테이블 직접 접근은 없고, 모든 RPC가 호출한 사람이 그 행의 선생님/학생인지 확인한다.
---    만료: 요청(requested)은 2분이 지나면 무시, 진행 중인 공유는 마지막 단계 변화 뒤 1시간이 지나면 끝난 것으로 본다.
+--    만료: 요청(requested)은 2분, 수락(accepted, 화면 고르는 중)·제안(offered)은 마지막 변화 뒤 3분,
+--    연결된 공유(answered)는 연결 뒤 1시간이 지나면 끝난 것으로 본다(한 번에 최대 약 1시간, 다시 요청하면 됨).
+--  * 여러 기기: 학생 한 명 = 한 행이라 마지막 보고가 이긴다. 다른 기기(state.dev, 기기마다 임의 번호)의
+--    '자리 비움(hidden·idle)' 보고는 45초 안에 받은 학습 중 보고를 덮어쓰지 않는다(휴대폰으로 공부 중인데
+--    PC의 숨은 탭이 덮어쓰지 않게). 같은 브라우저의 여러 탭은 클라이언트가 앞에 있는 탭 하나만 보낸다.
 -- =====================================================================
 
 create schema if not exists private;
@@ -53,6 +59,8 @@ begin
       if t <> 'number' or (r.value #>> '{}')::numeric not between 0 and 99 then return false; end if;
     elsif r.key in ('path', 'label') then
       if t <> 'string' or char_length(r.value #>> '{}') > (case r.key when 'path' then 200 else 120 end) then return false; end if;
+    elsif r.key = 'dev' then
+      if t <> 'string' or (r.value #>> '{}') !~ '^[a-z0-9]{1,16}$' then return false; end if;
     elsif r.key in ('subject', 'unit', 'step', 'detail') then
       if t = 'null' then continue; end if;
       if t <> 'string' or char_length(r.value #>> '{}') > (case r.key when 'subject' then 16 when 'unit' then 32 when 'step' then 64 else 80 end) then return false; end if;
@@ -72,7 +80,14 @@ begin
     raise exception '학습 위치 형식이 올바르지 않아요' using errcode = '22023';
   end if;
   insert into public.live_status as l (user_id, state, updated_at) values (v_uid, p_state, now())
-    on conflict on constraint live_status_pkey do update set state = excluded.state, updated_at = now();
+    on conflict on constraint live_status_pkey do update set state = excluded.state, updated_at = now()
+    -- 다른 기기의 '자리 비움' 보고는 45초 안의 학습 중(자리 비움이 아닌) 보고를 덮어쓰지 않는다
+    where not (
+      excluded.state ->> 'focus' in ('hidden', 'idle')
+      and coalesce(l.state ->> 'focus', '') not in ('hidden', 'idle')
+      and coalesce(l.state ->> 'dev', '') <> coalesce(excluded.state ->> 'dev', '')
+      and l.updated_at > now() - interval '45 seconds'
+    );
 end $$;
 
 -- 선생님: 최근 p_minutes분(1~240) 안에 갱신된 학생들의 학습 위치(읽기 전용)
@@ -114,15 +129,21 @@ create table if not exists public.screen_share (
 create unique index if not exists screen_share_one_open on public.screen_share (student_id)
   where status in ('requested', 'accepted', 'offered', 'answered');
 create index if not exists screen_share_teacher on public.screen_share (teacher_id);
+-- 정리(screen_sweep)용: 열린 행·끝난 행을 마지막 변화 시각으로 찾는다
+create index if not exists screen_share_open_at on public.screen_share (updated_at)
+  where status in ('requested', 'accepted', 'offered', 'answered');
+create index if not exists screen_share_closed_at on public.screen_share (updated_at)
+  where status in ('declined', 'ended');
 revoke all on public.screen_share from public, anon, authenticated;
 alter table public.screen_share enable row level security;
 
--- 아직 유효한 열린 공유인지: 요청은 2분, 진행 중(수락·제안·응답)은 마지막 변화 뒤 1시간
+-- 아직 유효한 열린 공유인지: 요청 2분, 수락(화면 고르는 중)·제안 3분, 연결된 공유는 연결 뒤 1시간
 create or replace function private.screen_live(p_status text, p_created timestamptz, p_updated timestamptz) returns boolean
 language sql stable set search_path = '' as $$
   select case
     when p_status = 'requested' then p_created >= now() - interval '2 minutes'
-    when p_status in ('accepted', 'offered', 'answered') then p_updated >= now() - interval '1 hour'
+    when p_status in ('accepted', 'offered') then p_updated >= now() - interval '3 minutes'
+    when p_status = 'answered' then p_updated >= now() - interval '1 hour'
     else false
   end;
 $$;
@@ -142,6 +163,18 @@ language sql set search_path = '' as $$
   returning s.*;
 $$;
 
+-- 정리: 만료된 열린 행은 끝내고 연결 정보(SDP)를 지우며, 끝난 지 하루가 지난 행은 지운다.
+-- 모든 화면 공유 RPC가 먼저 부른다(가장 짧은 만료가 2분이라 updated_at 2분 전보다 오래된 열린 행만 살펴봄, 인덱스 사용)
+create or replace function private.screen_sweep() returns void
+language sql set search_path = '' as $$
+  update public.screen_share s set status = 'ended', offer = null, answer = null, updated_at = now()
+   where s.status in ('requested', 'accepted', 'offered', 'answered')
+     and s.updated_at < now() - interval '2 minutes'
+     and not private.screen_live(s.status, s.created_at, s.updated_at);
+  delete from public.screen_share s
+   where s.status in ('declined', 'ended') and s.updated_at < now() - interval '1 day';
+$$;
+
 -- 선생님: 학생에게 화면 보기 요청. 같은 학생에게 내가 열어 둔 요청·만료된 요청은 끝내고 새로 연다
 create or replace function public.request_screen(p_student uuid) returns uuid
 language plpgsql security definer set search_path = '' as $$
@@ -154,15 +187,19 @@ begin
   if p_student is null or p_student = v_uid or not exists (select 1 from auth.users u where u.id = p_student) then
     raise exception '학생을 찾을 수 없어요' using errcode = '22023';
   end if;
-  -- 끝난 지 하루가 지난 행은 지운다(연결 정보는 이미 지워져 있음)
-  delete from public.screen_share s where s.status in ('declined', 'ended') and s.updated_at < now() - interval '1 day';
+  perform private.screen_sweep();
   update public.screen_share s set status = 'ended', offer = null, answer = null, updated_at = now()
    where s.student_id = p_student and s.status in ('requested', 'accepted', 'offered', 'answered')
      and (s.teacher_id = v_uid or not private.screen_live(s.status, s.created_at, s.updated_at));
   if exists (select 1 from public.screen_share s where s.student_id = p_student and s.status in ('requested', 'accepted', 'offered', 'answered')) then
     raise exception '다른 선생님이 이 학생과 화면 공유 중이에요' using errcode = '55000';
   end if;
-  insert into public.screen_share (teacher_id, student_id) values (v_uid, p_student) returning id into v_id;
+  begin
+    insert into public.screen_share (teacher_id, student_id) values (v_uid, p_student) returning id into v_id;
+  exception when unique_violation then
+    -- 같은 학생에게 동시에 들어온 다른 요청이 먼저 열렸다(학생 한 명에게 열린 공유는 하나)
+    raise exception '다른 요청이 동시에 처리되고 있어요. 잠시 뒤 다시 시도해 주세요' using errcode = '55000';
+  end;
   return v_id;
 end $$;
 
@@ -172,6 +209,7 @@ language plpgsql security definer set search_path = '' as $$
 #variable_conflict use_column
 declare v_uid uuid := private.require_uid(); r public.screen_share%rowtype;
 begin
+  perform private.screen_sweep();
   select * into r from public.screen_share s where s.id = p_id and s.teacher_id = v_uid for update;
   if not found or not private.is_teacher() then
     raise exception '화면 공유 요청을 찾을 수 없어요' using errcode = '42501';
@@ -188,6 +226,7 @@ language plpgsql security definer set search_path = '' as $$
 #variable_conflict use_column
 declare v_uid uuid := private.require_uid(); r public.screen_share%rowtype;
 begin
+  perform private.screen_sweep();
   select * into r from public.screen_share s where s.id = p_id and s.teacher_id = v_uid for update;
   if not found or not private.is_teacher() then
     raise exception '화면 공유 요청을 찾을 수 없어요' using errcode = '42501';
@@ -208,9 +247,10 @@ end $$;
 
 -- 학생: 나에게 온 최근 요청(2분 안, 응답 전) 하나와 요청한 선생님 이름
 create or replace function public.my_screen_request() returns table (id uuid, teacher_name text)
-language plpgsql stable security definer set search_path = '' as $$
+language plpgsql volatile security definer set search_path = '' as $$
 declare v_uid uuid := private.require_uid();
 begin
+  perform private.screen_sweep();
   return query
     select s.id, private.display_name(s.teacher_id, u.email)
     from public.screen_share s join auth.users u on u.id = s.teacher_id
@@ -225,6 +265,7 @@ language plpgsql security definer set search_path = '' as $$
 #variable_conflict use_column
 declare v_uid uuid := private.require_uid(); r public.screen_share%rowtype;
 begin
+  perform private.screen_sweep();
   select * into r from public.screen_share s where s.id = p_id and s.student_id = v_uid for update;
   if not found then
     raise exception '화면 공유 요청을 찾을 수 없어요' using errcode = '42501';
@@ -250,6 +291,7 @@ language plpgsql security definer set search_path = '' as $$
 #variable_conflict use_column
 declare v_uid uuid := private.require_uid(); r public.screen_share%rowtype;
 begin
+  perform private.screen_sweep();
   select * into r from public.screen_share s where s.id = p_id and s.student_id = v_uid for update;
   if not found then
     raise exception '화면 공유 요청을 찾을 수 없어요' using errcode = '42501';
@@ -274,6 +316,7 @@ language plpgsql security definer set search_path = '' as $$
 #variable_conflict use_column
 declare v_uid uuid := private.require_uid(); r public.screen_share%rowtype;
 begin
+  perform private.screen_sweep();
   select * into r from public.screen_share s where s.id = p_id and s.student_id = v_uid for update;
   if not found then
     raise exception '화면 공유 요청을 찾을 수 없어요' using errcode = '42501';
@@ -289,6 +332,7 @@ create or replace function public.end_screen(p_id uuid) returns void
 language plpgsql security definer set search_path = '' as $$
 declare v_uid uuid := private.require_uid();
 begin
+  perform private.screen_sweep();
   if not exists (select 1 from public.screen_share s where s.id = p_id and (s.teacher_id = v_uid or s.student_id = v_uid)) then
     raise exception '화면 공유 요청을 찾을 수 없어요' using errcode = '42501';
   end if;
@@ -307,4 +351,4 @@ grant execute on function public.report_live_status(jsonb), public.class_live_st
   public.my_screen_request(), public.respond_screen(uuid, boolean), public.offer_screen(uuid, text),
   public.get_screen_answer(uuid), public.end_screen(uuid) to authenticated;
 revoke all on function private.live_state_ok(jsonb), private.screen_live(text, timestamptz, timestamptz),
-  private.sdp_ok(text), private.screen_close(uuid) from public, anon, authenticated;
+  private.sdp_ok(text), private.screen_close(uuid), private.screen_sweep() from public, anon, authenticated;

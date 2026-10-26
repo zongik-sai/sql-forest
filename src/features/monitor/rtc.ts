@@ -6,7 +6,11 @@ import { rpcErrorText, type MonitorApi, type ScreenStatus } from './api';
  * 흐름: 선생님 request_screen → 학생 허락(브라우저 자체 선택 창 getDisplayMedia) → 학생 offer(ICE를 다 모은 뒤 한 번에, 최대 4초)
  *   → 선생님이 1초마다 확인해 answer → 학생이 1초마다 확인해 연결. 연결 뒤에는 3초마다 상대가 끝냈는지 확인.
  * 한계: TURN 서버가 없어 일부 네트워크(대칭형 NAT 등)에서는 연결되지 않는다 → 15초 뒤 안내.
+ * 서버 만료(마이그레이션과 같음): 요청 2분, 화면 고르는 중·제안 3분, 연결 뒤 1시간이 지나면 끝(다시 요청하면 됨).
  */
+export const CHOOSE_TTL_MS = 3 * 60_000;
+export const SESSION_CAP_MS = 60 * 60_000;
+const CAP_TEXT = '공유가 1시간이 지나 자동으로 끝났어요. 계속 보려면 다시 요청하세요.';
 export const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
 export const FAIL_TEXT = '연결하지 못했어요(학교 네트워크 설정 때문일 수 있어요)';
 
@@ -69,8 +73,9 @@ export class ViewerSession extends Observable<ViewerState> {
   private pc: RTCPeerConnection | null = null;
   private closed = false;
   private wasLive = false;
+  private endP: Promise<void> = Promise.resolve();
 
-  constructor(private api: MonitorApi, private studentId: string, private t: Timing & { requestTtlMs?: number } = {}) {
+  constructor(private api: MonitorApi, private studentId: string, private t: Timing & { requestTtlMs?: number; chooseTtlMs?: number } = {}) {
     super({ phase: 'requesting', stream: null, message: null });
   }
 
@@ -91,6 +96,7 @@ export class ViewerSession extends Observable<ViewerState> {
     }
     this.set({ phase: 'waiting' });
     const started = Date.now();
+    let acceptedAt = 0;
     let answeredAt = 0;
     let misses = 0;
     while (!this.closed) {
@@ -107,7 +113,9 @@ export class ViewerSession extends Observable<ViewerState> {
       if (r.status === 'requested') {
         if (Date.now() - started > (this.t.requestTtlMs ?? 120_000)) return this.finish('expired', '학생이 2분 안에 응답하지 않았어요.');
       } else if (r.status === 'accepted') {
+        acceptedAt ||= Date.now();
         if (this.state.phase === 'waiting') this.set({ phase: 'choosing' });
+        if (Date.now() - acceptedAt > (this.t.chooseTtlMs ?? CHOOSE_TTL_MS)) return this.finish('expired', '학생이 3분 안에 보여 줄 화면을 고르지 않았어요.');
       } else if (r.status === 'offered') {
         if (!this.pc && r.offer) {
           try {
@@ -122,7 +130,8 @@ export class ViewerSession extends Observable<ViewerState> {
       } else if (r.status === 'declined') {
         return this.finish('declined', '학생이 화면 공유를 거절했어요.');
       } else {
-        return this.finish('ended', this.wasLive ? '학생이 화면 공유를 멈췄어요.' : '화면 공유가 끝났어요.');
+        const capped = this.wasLive && answeredAt && Date.now() - answeredAt >= SESSION_CAP_MS - 60_000;
+        return this.finish('ended', capped ? CAP_TEXT : this.wasLive ? '학생이 화면 공유를 멈췄어요.' : '화면 공유가 끝났어요.');
       }
       if (this.done) return;
       await sleep(this.state.phase === 'live' ? this.t.livePollMs ?? 3000 : this.t.pollMs ?? 1000);
@@ -158,13 +167,19 @@ export class ViewerSession extends Observable<ViewerState> {
     if (this.closed) return;
     this.closed = true;
     this.set({ phase, message, stream: null });
-    if (this.id) void this.api.endScreen(this.id).catch(() => {});
+    if (this.id) this.endP = this.api.endScreen(this.id).catch(() => {});
   }
 
   /** 선생님이 '중지'를 누름(또는 화면을 떠남) */
   close() {
     if (this.closed) return;
     this.finish('ended', null);
+  }
+
+  /** 끝내고 서버 정리(end_screen)까지 기다린다(로그아웃 전: 로그인한 채로 끝내야 함) */
+  async closeAndWait() {
+    this.close();
+    await this.endP;
   }
 }
 
@@ -179,6 +194,7 @@ export class ShareSession extends Observable<ShareState> {
   private stream: MediaStream | null = null;
   private closed = false;
   private wasLive = false;
+  private endP: Promise<void> = Promise.resolve();
 
   constructor(
     private api: MonitorApi,
@@ -200,47 +216,63 @@ export class ShareSession extends Observable<ShareState> {
   /** 클릭 처리기 안에서 바로 부른다(선택 창은 사용자 클릭이 있어야 열림) */
   async start(): Promise<void> {
     const endGrace = this.o.grace?.() ?? (() => {});
-    let captureP: Promise<MediaStream>;
+    let raw: Promise<MediaStream>;
     try {
-      captureP = this.o.capture();
+      raw = this.o.capture();
     } catch (e) {
-      captureP = Promise.reject(e);
+      raw = Promise.reject(e);
     }
+    // 화면 고르기가 끝나면(성공·취소) 바로 유예를 끝낸다. 고른 순간부터 '공유 중'(공유 중지 버튼 표시)
+    const captureP = raw.then(
+      (stream) => {
+        endGrace();
+        if (this.closed) stream.getTracks().forEach((t) => t.stop());
+        else {
+          this.stream = stream;
+          this.set({ phase: 'connecting' });
+        }
+        return stream;
+      },
+      (e: unknown) => {
+        endGrace();
+        throw e;
+      },
+    );
     const [m, r] = await Promise.allSettled([captureP, this.api.respond(this.id, true)]);
-    endGrace();
     if (m.status === 'rejected') {
       const name = (m.reason as { name?: string } | null)?.name;
       return this.finish('cancelled', name === 'NotAllowedError' || name === 'AbortError' ? '화면 공유를 취소했어요.' : '화면 공유를 시작하지 못했어요.');
     }
     const stream = m.value;
-    this.stream = stream;
-    if (r.status === 'rejected' || r.value !== 'accepted') return this.finish('ended', '요청이 이미 끝났어요.');
     if (this.closed) return this.finish('ended', null);
+    if (r.status === 'rejected' || r.value !== 'accepted') return this.finish('ended', '요청이 이미 끝났어요.');
     // 브라우저의 '공유 중지' 버튼(트랙 종료) → 공유 끝
     for (const tr of stream.getTracks()) tr.addEventListener('ended', () => this.close('화면 공유를 멈췄어요.'));
-    const pc = (this.o.makePc ?? defaultPc)();
-    this.pc = pc;
-    for (const tr of stream.getTracks()) pc.addTrack(tr, stream);
-    pc.onconnectionstatechange = () => {
-      if (this.closed) return;
-      if (pc.connectionState === 'connected') {
-        this.wasLive = true;
-        this.set({ phase: 'live', message: null });
-      } else if (pc.connectionState === 'failed') {
-        this.finish(this.wasLive ? 'ended' : 'failed', this.wasLive ? '연결이 끊겨 화면 공유를 멈췄어요.' : FAIL_TEXT);
-      }
-    };
+    let pc: RTCPeerConnection;
     try {
+      pc = (this.o.makePc ?? defaultPc)();
+      this.pc = pc;
+      for (const tr of stream.getTracks()) pc.addTrack(tr, stream);
+      pc.onconnectionstatechange = () => {
+        if (this.closed) return;
+        if (pc.connectionState === 'connected') {
+          this.wasLive = true;
+          this.set({ phase: 'live', message: null });
+        } else if (pc.connectionState === 'failed') {
+          this.finish(this.wasLive ? 'ended' : 'failed', this.wasLive ? '연결이 끊겨 화면 공유를 멈췄어요.' : FAIL_TEXT);
+        }
+      };
       await pc.setLocalDescription(await pc.createOffer());
       await waitIceComplete(pc, this.o.iceMs ?? 4000);
       if (this.closed) return this.finish('ended', null);
-      this.set({ phase: 'connecting' });
       const st = await this.api.offerScreen(this.id, pc.localDescription!.sdp);
       if (st !== 'offered') return this.finish('ended', '선생님이 화면 보기를 끝냈어요.');
     } catch (e) {
-      return this.finish('error', rpcErrorText('offer_screen', e));
+      // 연결을 만들지 못함: 화면 캡처를 멈추고 공유를 끝낸다
+      return this.finish('error', (e as { fn?: string } | null)?.fn ? rpcErrorText('offer_screen', e) : '화면 공유 연결을 만들지 못했어요.');
     }
     const t0 = Date.now();
+    let answeredAt = 0;
     let remoteSet = false;
     let misses = 0;
     while (!this.closed) {
@@ -250,9 +282,11 @@ export class ShareSession extends Observable<ShareState> {
         if (this.closed) return this.finish('ended', null);
         if (a.status === 'answered' && a.answer && !remoteSet) {
           remoteSet = true;
+          answeredAt = Date.now();
           await pc.setRemoteDescription({ type: 'answer', sdp: a.answer });
         } else if (a.status === 'ended' || a.status === 'declined') {
-          return this.finish('ended', '선생님이 화면 보기를 끝냈어요.');
+          const capped = this.wasLive && answeredAt && Date.now() - answeredAt >= SESSION_CAP_MS - 60_000;
+          return this.finish('ended', capped ? CAP_TEXT : '선생님이 화면 보기를 끝냈어요.');
         }
       } catch {
         if (++misses >= 5) return this.finish('error', '서버에 연결하지 못해 화면 공유를 멈췄어요.');
@@ -271,13 +305,19 @@ export class ShareSession extends Observable<ShareState> {
     if (this.closed) return;
     this.closed = true;
     this.set({ phase, message });
-    void this.api.endScreen(this.id).catch(() => {});
+    this.endP = this.api.endScreen(this.id).catch(() => {});
   }
 
   /** 학생이 '공유 중지'를 누름(또는 브라우저 중지 버튼) */
   close(message: string | null = '화면 공유를 멈췄어요.') {
     if (this.closed) return;
     this.finish('ended', message);
+  }
+
+  /** 끝내고 서버 정리(end_screen)까지 기다린다(로그아웃 전: 로그인한 채로 끝내야 함) */
+  async closeAndWait(message: string | null = null) {
+    this.close(message);
+    await this.endP;
   }
 }
 

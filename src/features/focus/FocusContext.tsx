@@ -129,6 +129,7 @@ export function FocusProvider({ children, onActiveSeconds, onPause, strict = nul
       fsGrace: performance.now() < graceUntil.current,
       counted: countedRef.current,
     });
+    if (decision === 'system') return systemPauseRef.current();
     if (decision === 'defer') {
       if (systemDialogActive()) return;
       // 전체화면 전환 직후의 흔들림일 수 있다: 유예가 끝나면 실제로 떠나 있는지 다시 확인
@@ -153,6 +154,18 @@ export function FocusProvider({ children, onActiveSeconds, onPause, strict = nul
   }, []);
   const leaveRef = useRef(leave);
   leaveRef.current = leave;
+  /** 세지 않고 멈춤(화면 공유 선택 창 때문): 전체화면도 끝내고, 다시 시작 클릭으로 돌아온다 */
+  const systemPause = () => {
+    countedRef.current = true; // 곧 이어질 같은 이탈의 이벤트를 세지 않음(다시 시작하면 지움)
+    if (fsWanted.current) {
+      fsWanted.current = false;
+      unlockEscapeKey();
+      exitFullscreen();
+    }
+    dispatch({ type: 'systemPause' });
+  };
+  const systemPauseRef = useRef(systemPause);
+  systemPauseRef.current = systemPause;
 
   // 시작
   useEffect(() => {
@@ -262,13 +275,7 @@ export function FocusProvider({ children, onActiveSeconds, onPause, strict = nul
     const e = env();
     const fullscreenOk = !(strictRef.current && fsWanted.current && !fullscreenElement());
     if (afterSystemDialog({ ...e, fullscreenOk }) === 'continue') return;
-    countedRef.current = true; // 곧 이어질 같은 이탈의 이벤트를 세지 않음(다시 시작하면 지움)
-    if (fsWanted.current) {
-      fsWanted.current = false;
-      unlockEscapeKey();
-      exitFullscreen();
-    }
-    dispatch({ type: 'systemPause' });
+    systemPauseRef.current();
   }), []);
 
   // 실시간 학습 위치(선생님 화면)용: 지금 집중 학습 상태를 알린다(화면 내용은 아님)
@@ -380,8 +387,8 @@ export function FocusGate({ children, exit }: { children: ReactNode; exit?: { to
   useEffect(() => {
     if (!paused) return;
     const block = (e: KeyboardEvent) => {
-      // 가림 화면 자체와 선생님 화면 공유 허락 창(.monitor-modal)의 키 입력은 그대로
-      if (e.target instanceof Node && (e.target as HTMLElement).closest?.('.focus-overlay, .monitor-modal')) return;
+      // 가림 화면 자체, 화면 공유 허락 창(.monitor-modal)·공유 중 표시(.share-banner, '공유 중지')의 키 입력은 그대로
+      if (e.target instanceof Node && (e.target as HTMLElement).closest?.('.focus-overlay, .monitor-modal, .share-banner')) return;
       e.preventDefault();
       e.stopPropagation();
     };

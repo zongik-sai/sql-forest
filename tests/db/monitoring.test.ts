@@ -87,6 +87,7 @@ describe('live_status: 학생은 자기 위치만 보낸다', () => {
     await expect(report(S2, { ...STATE, locks: 100 })).rejects.toThrow(/형식이 올바르지/);
     await expect(report(S2, { ...STATE, fs: 'yes' })).rejects.toThrow(/형식이 올바르지/);
     await expect(report(S2, { ...STATE, detail: 'x'.repeat(81) })).rejects.toThrow(/형식이 올바르지/);
+    await expect(report(S2, { ...STATE, dev: 'Bad Device!' })).rejects.toThrow(/형식이 올바르지/);
     // 표 제약도 4KB를 막는다(직접 넣을 수 있는 관리자 경로도)
     await expect(db.query(`insert into public.live_status(user_id, state) values ($1, $2::jsonb)`, [S2, JSON.stringify({ big: 'x'.repeat(5000) })])).rejects.toThrow(/check constraint/);
     await report(S2, { v: 1, focus: 'menu', subject: null, unit: null, step: null, detail: null, locks: null, fs: false, sharing: false, path: '/', label: '과목 선택' });
@@ -121,6 +122,32 @@ describe('live_status: 학생은 자기 위치만 보낸다', () => {
     expect((await live(T)).map((r) => r.user_id)).toEqual([S1]); // 기본 10분
     expect((await live(T, 60)).map((r) => r.user_id).sort()).toEqual([S1, S2]);
     expect((await live(T, 1)).map((r) => r.user_id)).toEqual([S1]);
+  });
+});
+
+describe('live_status: 여러 기기', () => {
+  const S3 = '77777777-7777-7777-7777-777777777777';
+  const focusOf = async () => (await db.query<{ f: string; dev: string }>(`select state->>'focus' as f, state->>'dev' as dev from public.live_status where user_id = $1`, [S3])).rows[0];
+  beforeAll(async () => {
+    await db.query(`insert into auth.users(id, email, email_confirmed_at) values ($1, 's3@school.example', now())`, [S3]);
+  });
+  it('다른 기기의 자리 비움 보고는 45초 안의 학습 중 보고를 덮어쓰지 않는다', async () => {
+    await report(S3, { ...STATE, dev: 'phone1', focus: 'learning' });
+    await report(S3, { ...STATE, dev: 'pc1', focus: 'hidden' });
+    expect(await focusOf()).toEqual({ f: 'learning', dev: 'phone1' });
+    await report(S3, { ...STATE, dev: 'pc1', focus: 'idle' });
+    expect(await focusOf()).toEqual({ f: 'learning', dev: 'phone1' });
+    // 다른 기기라도 학습 중 보고는 덮어쓴다
+    await report(S3, { ...STATE, dev: 'pc1', focus: 'menu' });
+    expect(await focusOf()).toEqual({ f: 'menu', dev: 'pc1' });
+  });
+  it('같은 기기의 자리 비움, 45초가 지난 뒤의 다른 기기 자리 비움은 덮어쓴다', async () => {
+    await report(S3, { ...STATE, dev: 'pc1', focus: 'hidden' });
+    expect(await focusOf()).toEqual({ f: 'hidden', dev: 'pc1' });
+    await report(S3, { ...STATE, dev: 'phone1', focus: 'learning' });
+    await db.query(`update public.live_status set updated_at = now() - interval '50 seconds' where user_id = $1`, [S3]);
+    await report(S3, { ...STATE, dev: 'pc1', focus: 'hidden' });
+    expect(await focusOf()).toEqual({ f: 'hidden', dev: 'pc1' });
   });
 });
 
@@ -221,6 +248,28 @@ describe('screen_share: 학생이 허락할 때만', () => {
     expect(await row(r)).toEqual({ status: 'ended', offer: null, answer: null });
     await endScreen(S2, r2);
   });
+  it('수락(화면 고르는 중)·제안 상태는 3분이 지나면 끝나 다른 선생님을 오래 막지 않는다', async () => {
+    const r = await request(T, S2);
+    await respond(S2, r, true);
+    await db.query(`update public.screen_share set updated_at = now() - interval '2 minutes 30 seconds' where id = $1`, [r]);
+    await expect(request(T2, S2)).rejects.toThrow(/다른 선생님이/); // 아직 3분 전
+    await db.query(`update public.screen_share set updated_at = now() - interval '4 minutes' where id = $1`, [r]);
+    const r2 = await request(T2, S2);
+    expect(await row(r)).toEqual({ status: 'ended', offer: null, answer: null });
+    await respond(S2, r2, true);
+    await offer(S2, r2, SDP_OFFER);
+    await db.query(`update public.screen_share set updated_at = now() - interval '4 minutes' where id = $1`, [r2]);
+    expect(await getScreen(T2, r2)).toEqual({ status: 'ended', offer: null });
+  });
+  it('만료된 열린 행의 연결 정보는 아무 화면 공유 RPC에서나 지워진다(당사자가 다시 오지 않아도)', async () => {
+    const r = await request(T, S1);
+    await respond(S1, r, true);
+    await offer(S1, r, SDP_OFFER);
+    await db.query(`update public.screen_share set updated_at = now() - interval '5 minutes' where id = $1`, [r]);
+    expect((await row(r)).offer).toBe(SDP_OFFER);
+    await myRequest(S2); // 다른 학생의 요청 확인만으로도 정리
+    expect(await row(r)).toEqual({ status: 'ended', offer: null, answer: null });
+  });
   it('1시간 넘게 변화가 없는 공유는 끝난 것으로 보고 연결 정보를 지운다', async () => {
     const r = await request(T, S1);
     await respond(S1, r, true);
@@ -232,11 +281,12 @@ describe('screen_share: 학생이 허락할 때만', () => {
     // 끝난 행에는 연결 정보를 다시 넣을 수 없다(표 제약)
     await expect(db.query(`update public.screen_share set offer = 'v=0 x' where id = $1`, [r])).rejects.toThrow(/check constraint/);
   });
-  it('끝난 지 하루가 지난 행은 다음 요청 때 정리된다', async () => {
+  it('끝난 지 하루가 지난 행은 다음 화면 공유 RPC 때 정리된다', async () => {
     await db.query(`update public.screen_share set updated_at = now() - interval '2 days' where status in ('ended','declined')`);
-    const r = await request(T, S2);
+    await myRequest(S1);
     const n = await db.query<{ n: number }>(`select count(*)::int as n from public.screen_share`);
-    expect(n.rows[0].n).toBe(1);
+    expect(n.rows[0].n).toBe(0);
+    const r = await request(T, S2);
     await endScreen(T, r);
   });
   it('선생님 자격을 잃으면 요청·조회·응답을 못 하지만 끝내기는 할 수 있다', async () => {

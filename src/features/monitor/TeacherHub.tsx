@@ -74,7 +74,7 @@ export function TeacherHub() {
       <section id="t-panel" role="tabpanel" aria-labelledby={`t-tab-${tab}`}>
         {tab === 'live' ? <LiveMonitor api={api} /> : tab === 'db' ? <DbClass /> : <CourseTab key={tab} id={tab} />}
       </section>
-      <p className="small muted">점수는 학생 브라우저가 저장한 자기 학습 기록이라 조작될 수 있어요. 평가 근거가 아니라 학습 지원용으로 활용해 주세요.</p>
+      <p className="small muted">점수와 실시간 상태(위치·집중 상태·잠김 횟수)는 모두 학생 브라우저가 스스로 보내는 기록이라 조작될 수 있어요. 평가 근거가 아니라 학습 지원용으로 활용해 주세요.</p>
     </div>
   );
 }

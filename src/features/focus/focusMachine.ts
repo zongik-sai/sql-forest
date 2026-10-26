@@ -138,15 +138,18 @@ export function lockNotice(count: number, limit: number, reset: boolean): { titl
 /**
  * 이탈 이벤트를 어떻게 처리할지(순수 함수, 테스트 대상).
  * - defer: 지금은 세지도 멈추지도 않고, 유예가 끝난 뒤 실제로 떠나 있는지 다시 확인한다.
- *   · 브라우저 자체 창(화면 공유 선택 창 등, allowSystemDialog)이 열려 있는 동안의 blur·hidden·전체화면 나감
- *     (창 닫기·새로고침인 pagehide는 바로 처리)
+ *   · 브라우저 자체 창(화면 공유 선택 창, allowSystemDialog)이 열려 있는 동안의 blur·전체화면 나감
  *   · 단원 집중 학습 시작 직후(전체화면 전환 흔들림)의 blur·전체화면 나감
- * - lock: 단원 집중 학습 중(active) 이번 이탈의 첫 이벤트 → 잠김 1회로 센다
+ * - system: 선택 창이 열려 있는데 탭이 숨겨짐(다른 탭·앱으로 감) → 유예하지 않고 바로 멈춘다(잠김으로는 세지 않음)
+ * - lock: 단원 집중 학습 중(active) 이번 이탈의 첫 이벤트 → 잠김 1회로 센다(창 닫기·새로고침 pagehide는 언제나)
  * - pause: 세지 않고 상태기계에만 전달(이미 멈춤·같은 이탈의 연속 이벤트·단원 밖 학습)
  */
-export type LeaveDecision = 'defer' | 'lock' | 'pause';
+export type LeaveDecision = 'defer' | 'system' | 'lock' | 'pause';
 export function classifyLeave(ev: LockEvent, o: { strict: boolean; status: FocusStatus; systemDialog: boolean; fsGrace: boolean; counted: boolean }): LeaveDecision {
-  if (o.status === 'active' && o.systemDialog && ev !== 'pagehide') return 'defer';
+  if (o.status === 'active' && o.systemDialog) {
+    if (ev === 'blur' || ev === 'fullscreen') return 'defer';
+    if (ev === 'hidden') return 'system';
+  }
   if (o.strict && o.status === 'active' && o.fsGrace && (ev === 'blur' || ev === 'fullscreen')) return 'defer';
   if (o.strict && !o.counted && countsAsLock(o.status, ev)) return 'lock';
   return 'pause';

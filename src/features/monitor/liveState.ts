@@ -43,6 +43,8 @@ export interface LiveState {
   locks: number | null;
   /** 선생님에게 화면을 보여 주는 중인지 */
   sharing: boolean;
+  /** 기기 구분용 임의 번호(브라우저마다). 다른 기기의 '자리 비움'이 학습 중 보고를 덮지 않게(서버 규칙) */
+  dev: string;
 }
 
 export interface LiveLocation {
@@ -125,7 +127,11 @@ export function deriveFocus(i: FocusInput): LiveFocus {
   if (i.session) {
     if (i.session.status === 'active') return i.idle ? 'idle' : 'learning';
     const r = i.session.reason;
-    if (r === 'hidden' || r === 'blur' || r === 'pagehide' || r === 'fullscreen') return 'locked';
+    if (r === 'hidden' || r === 'blur' || r === 'pagehide' || r === 'fullscreen') {
+      // 단원 집중 학습만 '잠김'(횟수를 셈). 단원 밖 학습(최종 진단 등)의 가림은 잠김이 아니다
+      if (i.session.strict) return 'locked';
+      return i.hasFocus ? 'break' : 'hidden';
+    }
     return 'break'; // 쉬기·시작 전·새로고침 뒤·화면 공유 창
   }
   if (!i.hasFocus) return 'hidden'; // 다른 창을 보고 있음
@@ -133,7 +139,7 @@ export function deriveFocus(i: FocusInput): LiveFocus {
   return i.activity ? 'learning' : 'menu';
 }
 
-export function buildLiveState(i: { path: string; detail: string | null; fs: boolean; sharing: boolean } & Omit<FocusInput, 'activity'>): LiveState {
+export function buildLiveState(i: { path: string; detail: string | null; fs: boolean; sharing: boolean; dev: string } & Omit<FocusInput, 'activity'>): LiveState {
   const loc = deriveLocation(i.path);
   return {
     v: 1,
@@ -147,7 +153,24 @@ export function buildLiveState(i: { path: string; detail: string | null; fs: boo
     fs: i.fs,
     locks: i.session?.strict ? Math.max(0, Math.min(99, i.session.strict.locks)) : null,
     sharing: i.sharing,
+    dev: /^[a-z0-9]{1,16}$/.test(i.dev) ? i.dev : 'x',
   };
+}
+
+/** 같은 브라우저의 다른 탭이 앞에 있다고 보는 시간(앞에 있는 탭은 보낼 때마다·앞에 올 때 알림) */
+export const LEADER_MS = 35_000;
+
+/**
+ * 이 탭이 지금 보낼지(같은 브라우저 여러 탭·숨은 탭 때문에 상태가 깜박이지 않게).
+ * - 앞에 있는 탭(보이고 포커스 있음)은 언제나 보낸다(같은 브라우저의 다른 탭에 '내가 앞'이라고 알림).
+ * - 다른 탭이 최근(35초 안) 앞에 있었으면 보내지 않는다.
+ * - 숨은 탭은 숨겨질 때(상태 변화) 한 번만 보내고 하트비트는 멈춘다(다시 보이면 바로 보냄).
+ */
+export function shouldReport(o: { kind: 'change' | 'beat'; visible: boolean; hasFocus: boolean; otherFrontAgoMs: number }): boolean {
+  if (o.visible && o.hasFocus) return true;
+  if (o.otherFrontAgoMs < LEADER_MS) return false;
+  if (!o.visible && o.kind === 'beat') return false;
+  return true;
 }
 
 /* ---------------- 선생님 화면 ---------------- */
@@ -158,6 +181,8 @@ export const CHIP_LABEL: Record<LiveChip, string> = {
 };
 /** 이 시간 넘게 소식이 없으면 오프라인(학생 브라우저는 15초마다 보냄) */
 export const OFFLINE_AFTER_MS = 2 * 60 * 1000;
+/** 숨은 탭은 숨겨질 때 한 번만 보내므로, 그 뒤 이 시간까지는 오프라인 대신 '자리 비움' */
+export const HIDDEN_AWAY_MS = 10 * 60 * 1000;
 /** 상태순 정렬: 살펴볼 학생이 먼저 */
 export const CHIP_ORDER: LiveChip[] = ['locked', 'away', 'break', 'menu', 'learning', 'offline'];
 
@@ -178,12 +203,15 @@ export function normalizeLiveState(raw: unknown): LiveState {
     fs: r.fs === true,
     locks: typeof r.locks === 'number' ? r.locks : null,
     sharing: r.sharing === true,
+    dev: str(r.dev, 16) ?? '',
   };
 }
 
 export function chipOf(s: LiveState, updatedAt: string, now: number): LiveChip {
   const t = Date.parse(updatedAt);
-  if (!Number.isFinite(t) || now - t > OFFLINE_AFTER_MS) return 'offline';
+  if (!Number.isFinite(t)) return 'offline';
+  if (s.focus === 'hidden' && now - t <= HIDDEN_AWAY_MS) return 'away';
+  if (now - t > OFFLINE_AFTER_MS) return 'offline';
   if (s.focus === 'idle' || s.focus === 'hidden') return 'away';
   return s.focus;
 }

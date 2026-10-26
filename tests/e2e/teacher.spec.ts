@@ -132,7 +132,8 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     await expect.poll(() => calls.filter((c) => c.fn === 'report_live_status').length).toBeGreaterThan(0);
     const st = calls.find((c) => c.fn === 'report_live_status')!.body!.p_state as Record<string, unknown>;
     expect(st).toMatchObject({ v: 1, subject: 'cg', path: '/computer', label: '단원 목록', focus: 'menu', sharing: false });
-    expect(Object.keys(st).sort()).toEqual(['detail', 'focus', 'fs', 'label', 'locks', 'path', 'sharing', 'step', 'subject', 'unit', 'v']);
+    expect(Object.keys(st).sort()).toEqual(['detail', 'dev', 'focus', 'fs', 'label', 'locks', 'path', 'sharing', 'step', 'subject', 'unit', 'v']);
+    expect(st.dev).toMatch(/^[a-z0-9]{1,16}$/); // 기기 구분용 임의 번호
     // 선생님 요청 확인(5초마다)도 돈다
     await expect.poll(() => calls.some((c) => c.fn === 'my_screen_request')).toBe(true);
 
@@ -336,7 +337,9 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     const dlg = page.getByRole('dialog', { name: '화면 보기 요청' });
     await expect(dlg).toBeVisible();
     await expect(dlg).toContainText('선생님(김선생)이 화면 보기를 요청했어요. 공유하면 선택한 화면이 선생님에게 실시간으로 보여요(녹화·저장하지 않아요).');
-    await expect(dlg.getByRole('button', { name: '화면 공유하기' })).toBeVisible();
+    // 처음 포커스는 창 자체(허락 버튼이 아님), 뜬 직후 잠깐은 누를 수 없고 곧 누를 수 있다
+    await expect(dlg).toBeFocused();
+    await expect(dlg.getByRole('button', { name: '화면 공유하기' })).toBeEnabled();
     await dlg.getByRole('button', { name: '거절' }).click();
     await expect(dlg).toHaveCount(0);
     await expect.poll(() => calls.find((c) => c.fn === 'respond_screen')?.body).toEqual({ p_id: 'req-1', p_accept: false });
@@ -386,7 +389,8 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     await expect(overlay).toHaveCount(0);
     await expect(page.locator('.strict-bar')).toContainText('잠김 0/5');
     expect(calls.find((c) => c.fn === 'respond_screen')!.body).toEqual({ p_id: 'req-2', p_accept: true });
-    expect(String(calls.find((c) => c.fn === 'offer_screen')!.body!.p_sdp)).toMatch(/^v=0/);
+    // 화면을 고른 순간 '공유 중지'가 보이고(연결 정보 준비 중), 곧 연결 정보(SDP)를 보낸다
+    await expect.poll(() => String(calls.find((c) => c.fn === 'offer_screen')?.body?.p_sdp ?? ''), { timeout: 10000 }).toMatch(/^v=0/);
     await expect.poll(() => calls.some((c) => c.fn === 'report_live_status' && (c.body!.p_state as { sharing?: boolean }).sharing === true)).toBe(true);
     await expect(page.getByRole('button', { name: '학습 위치 공유 중' })).toHaveClass(/sharing/);
     // 선생님이 끝내면 공유도 끝
@@ -401,6 +405,55 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     });
     await expect(overlay).toBeVisible();
     await expect(overlay).toContainText('(1/5)');
+  });
+
+  test('선택 창 동안 탭이 숨겨지면 유예 없이 바로 멈춤(잠김으로 세지 않음), 잠김 화면 위의 공유 중지는 키보드로 누를 수 있다', async ({ page }) => {
+    let requested = false;
+    const calls = await fakeSupabase(page, STUDENT, false, {
+      my_screen_request: () => ({ json: requested ? [{ id: 'req-3', teacher_name: '김선생' }] : [] }),
+      respond_screen: () => {
+        requested = false;
+        return { json: 'accepted' };
+      },
+      offer_screen: () => ({ json: 'offered' }),
+      get_screen_answer: () => ({ json: [{ status: 'offered', answer: null }] }),
+      end_screen: () => ({ json: null }),
+    });
+    // 선택 창을 연 채로 다른 탭으로 감(hidden) → 돌아와서 화면을 고름
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getDisplayMedia = async () => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        await new Promise((r) => setTimeout(r, 500));
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+        document.dispatchEvent(new Event('visibilitychange'));
+        window.dispatchEvent(new Event('focus'));
+        const c = document.createElement('canvas');
+        c.getContext('2d')!.fillRect(0, 0, 10, 10);
+        return c.captureStream(5);
+      };
+    });
+    await open(page, '/computer/unit/U1');
+    const overlay = page.getByTestId('focus-overlay');
+    await overlay.getByRole('button', { name: /학습 시작$/ }).click();
+    await expect(overlay).toHaveCount(0);
+    await page.waitForTimeout(1700);
+    requested = true;
+    const dlg = page.getByRole('dialog', { name: '화면 보기 요청' });
+    await expect(dlg).toBeVisible({ timeout: 12000 });
+    await dlg.getByRole('button', { name: '화면 공유하기' }).click();
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByRole('heading', { name: '화면 공유 창 때문에 멈췄어요' })).toBeVisible();
+    await expect(overlay).toContainText('잠김 0/5');
+    const stop = page.locator('.share-banner').getByRole('button', { name: '공유 중지' });
+    await expect(stop).toBeVisible();
+    await stop.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.share-note')).toContainText('화면 공유를 멈췄어요.');
+    await expect.poll(() => calls.some((c) => c.fn === 'end_screen')).toBe(true);
+    await overlay.getByRole('button', { name: /다시 시작$/ }).click();
+    await expect(overlay).toHaveCount(0);
+    await expect(page.locator('.strict-bar')).toContainText('잠김 0/5');
   });
 
   test('스크린샷(선생님 화면, 가짜 자료): 1280px·390px', async ({ page }) => {

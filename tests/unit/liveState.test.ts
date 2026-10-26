@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  agoText, buildLiveState, chipOf, cleanPath, deriveFocus, deriveLocation, normalizeLiveState, OFFLINE_AFTER_MS, sortLive, SUBJECT_LIST, toLiveStudents, type LiveState,
+  agoText, buildLiveState, chipOf, cleanPath, deriveFocus, deriveLocation, HIDDEN_AWAY_MS, LEADER_MS, normalizeLiveState, OFFLINE_AFTER_MS, shouldReport, sortLive, SUBJECT_LIST,
+  toLiveStudents, type LiveState,
 } from '../../src/features/monitor/liveState';
 import { isMissingFunction, rpcErrorText } from '../../src/features/monitor/api';
 import type { FocusSnapshot } from '../../src/features/focus/focusSignal';
@@ -58,17 +59,41 @@ describe('집중 상태 판정', () => {
     expect(deriveFocus({ ...on, session: null, activity: true })).toBe('learning');
     expect(deriveFocus({ visible: true, hasFocus: false, idle: false, session: null, activity: true })).toBe('hidden');
   });
+  it('단원 밖 학습(최종 진단 등)의 가림은 잠김이 아니다(자리 비움·쉬는 중)', () => {
+    const loose = (status: FocusSnapshot['status'], reason: FocusSnapshot['reason']): FocusSnapshot => ({ status, reason, strict: null });
+    expect(deriveFocus({ visible: true, hasFocus: false, idle: false, session: loose('paused', 'blur'), activity: true })).toBe('hidden');
+    expect(deriveFocus({ ...on, session: loose('readyToResume', 'blur'), activity: true })).toBe('break');
+    expect(deriveFocus({ ...on, session: loose('active', null), activity: true })).toBe('learning');
+  });
   it('보내는 상태: 화면 내용 없이 위치·문항·잠김 횟수만', () => {
-    const s = buildLiveState({ path: '/computer/unit/U3/3', detail: '문항 7/20', fs: true, sharing: false, ...on, session: strict('active', null, 3) });
+    const s = buildLiveState({ path: '/computer/unit/U3/3', detail: '문항 7/20', fs: true, sharing: false, dev: 'abc123', ...on, session: strict('active', null, 3) });
     expect(s).toEqual({
       v: 1, subject: 'cg', path: '/computer/unit/U3/3', unit: 'U3', step: '3', label: '3단원 · 3단계 기초 객관식', detail: '문항 7/20',
-      focus: 'learning', fs: true, locks: 3, sharing: false,
+      focus: 'learning', fs: true, locks: 3, sharing: false, dev: 'abc123',
     });
-    expect(Object.keys(s).sort()).toEqual(['detail', 'focus', 'fs', 'label', 'locks', 'path', 'sharing', 'step', 'subject', 'unit', 'v']);
+    expect(Object.keys(s).sort()).toEqual(['detail', 'dev', 'focus', 'fs', 'label', 'locks', 'path', 'sharing', 'step', 'subject', 'unit', 'v']);
     expect(JSON.stringify(s).length).toBeLessThan(4096);
-    const m = buildLiveState({ path: '/', detail: null, fs: false, sharing: true, ...on, session: null });
+    const m = buildLiveState({ path: '/', detail: null, fs: false, sharing: true, dev: 'd', ...on, session: null });
     expect(m).toMatchObject({ subject: null, focus: 'menu', locks: null, sharing: true, label: '과목 선택' });
-    expect(buildLiveState({ path: '/x', detail: 'x'.repeat(200), fs: false, sharing: false, ...on, session: null }).detail).toHaveLength(80);
+    expect(buildLiveState({ path: '/x', detail: 'x'.repeat(200), fs: false, sharing: false, dev: 'd', ...on, session: null }).detail).toHaveLength(80);
+    expect(buildLiveState({ path: '/', detail: null, fs: false, sharing: false, dev: 'NOT OK!', ...on, session: null }).dev).toBe('x');
+  });
+});
+
+describe('여러 탭·숨은 탭: 보낼지(깜박임 방지)', () => {
+  const far = LEADER_MS + 1;
+  it('앞에 있는 탭(보이고 포커스)은 언제나 보낸다', () => {
+    expect(shouldReport({ kind: 'beat', visible: true, hasFocus: true, otherFrontAgoMs: 0 })).toBe(true);
+  });
+  it('같은 브라우저의 다른 탭이 최근 앞에 있었으면 보내지 않는다(숨은 탭·뒤 창 모두)', () => {
+    expect(shouldReport({ kind: 'change', visible: false, hasFocus: false, otherFrontAgoMs: 1000 })).toBe(false);
+    expect(shouldReport({ kind: 'beat', visible: true, hasFocus: false, otherFrontAgoMs: 1000 })).toBe(false);
+  });
+  it('숨은 탭은 숨겨질 때 한 번만(상태 변화) 보내고 하트비트는 멈춘다', () => {
+    expect(shouldReport({ kind: 'change', visible: false, hasFocus: false, otherFrontAgoMs: far })).toBe(true);
+    expect(shouldReport({ kind: 'beat', visible: false, hasFocus: false, otherFrontAgoMs: far })).toBe(false);
+    // 보이지만 다른 앱이 앞(같은 브라우저의 다른 탭은 없음): 계속 알린다
+    expect(shouldReport({ kind: 'beat', visible: true, hasFocus: false, otherFrontAgoMs: far })).toBe(true);
   });
 });
 
@@ -81,6 +106,10 @@ describe('선생님 화면 상태 표시', () => {
     expect(chipOf(st('learning'), ago(OFFLINE_AFTER_MS / 1000 + 1), now)).toBe('offline');
     expect(chipOf(st('idle'), ago(10), now)).toBe('away');
     expect(chipOf(st('hidden'), ago(10), now)).toBe('away');
+    // 숨은 탭은 한 번만 보내므로 10분까지는 오프라인 대신 자리 비움
+    expect(chipOf(st('hidden'), ago(300), now)).toBe('away');
+    expect(chipOf(st('hidden'), ago(HIDDEN_AWAY_MS / 1000 + 1), now)).toBe('offline');
+    expect(chipOf(st('idle'), ago(300), now)).toBe('offline');
     expect(chipOf(st('locked'), ago(10), now)).toBe('locked');
     expect(chipOf(st('learning'), 'garbage', now)).toBe('offline');
   });
@@ -110,5 +139,6 @@ describe('선생님 화면 상태 표시', () => {
     expect(rpcErrorText('course_class_overview', { code: '22023', message: '알 수 없는 과목입니다' })).toContain('20261026000000_courses.sql');
     expect(rpcErrorText('cg_class_overview', { code: '42501', message: 'x' })).toBe('선생님 계정만 볼 수 있어요.');
     expect(isMissingFunction({ code: '42501', message: '선생님 계정만 볼 수 있어요' })).toBe(false);
+    expect(rpcErrorText('request_screen', { code: '23505', message: 'duplicate key value violates unique constraint "screen_share_one_open"' })).toBe('다른 요청이 동시에 처리되고 있어요. 잠시 뒤 다시 시도해 주세요.');
   });
 });

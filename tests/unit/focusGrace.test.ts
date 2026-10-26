@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { afterSystemDialog, classifyLeave, focusReducer, initialFocus, type FocusState } from '../../src/features/focus/focusMachine';
-import { allowSystemDialog, onSystemDialogEnd, SYSTEM_DIALOG_TAIL_MS, systemDialogActive } from '../../src/features/focus/systemDialog';
+import { allowSystemDialog, onSystemDialogEnd, resetSystemDialog, SYSTEM_DIALOG_TAIL_MS, systemDialogActive } from '../../src/features/focus/systemDialog';
 
 /**
  * 화면 공유 유예(docs/09_FOCUS_MODE.md): 학생이 선생님 요청에 '화면 공유하기'를 눌러 브라우저 선택 창이 열린 동안의
- * 포커스 잃음·전체화면 나감·숨김은 잠김으로 세지 않는다. 끝난 뒤 이 창에 돌아와 있지 않으면 세지 않고 멈춘다.
+ * 포커스 잃음·전체화면 나감은 잠김으로 세지 않는다(최대 30초, 화면 고르기가 끝나면 바로 끝). 그동안 탭이 숨겨지면
+ * 유예하지 않고 바로 멈춘다(세지는 않음). 끝난 뒤 이 창에 돌아와 있지 않으면 세지 않고 멈춘다.
  * 공유가 시작된 뒤에는 보통 규칙(떠나면 잠김)이 다시 적용된다.
  */
 const on = { visible: true, hasFocus: true };
+afterEach(() => {
+  vi.useRealTimers();
+  resetSystemDialog();
+});
 const base = { strict: true, status: 'active' as const, systemDialog: false, fsGrace: false, counted: false };
 
 describe('이탈 처리 결정(classifyLeave)', () => {
@@ -17,14 +22,16 @@ describe('이탈 처리 결정(classifyLeave)', () => {
     expect(classifyLeave('blur', { ...base, status: 'paused' })).toBe('pause');
     expect(classifyLeave('blur', { ...base, strict: false })).toBe('pause');
   });
-  it('화면 공유 선택 창이 열린 동안: blur·hidden·전체화면 나감은 세지 않고 미룬다(창 닫기 pagehide는 그대로)', () => {
+  it('화면 공유 선택 창이 열린 동안: blur·전체화면 나감은 세지 않고 미룬다, 숨김은 바로 멈춤(세지 않음), 창 닫기는 그대로', () => {
     const g = { ...base, systemDialog: true };
     expect(classifyLeave('blur', g)).toBe('defer');
-    expect(classifyLeave('hidden', g)).toBe('defer');
     expect(classifyLeave('fullscreen', g)).toBe('defer');
+    expect(classifyLeave('hidden', g)).toBe('system'); // 다른 탭·앱으로 감: 유예 없이 멈춤(잠김 아님)
     expect(classifyLeave('pagehide', g)).toBe('lock');
     // 단원 밖 학습(가림만 하는 화면)도 선택 창 때문에 멈추지 않는다
     expect(classifyLeave('blur', { ...g, strict: false })).toBe('defer');
+    // 이미 멈춘 상태면 유예와 상관없이 상태기계에만
+    expect(classifyLeave('blur', { ...g, status: 'paused' })).toBe('pause');
   });
   it('전체화면 전환 유예는 blur·전체화면 흔들림만 미룬다(숨김은 바로 셈)', () => {
     const g = { ...base, fsGrace: true };
@@ -54,8 +61,18 @@ describe('세지 않는 멈춤(systemPause)', () => {
     // 이미 멈춘 상태에서는 아무 일도 없음
     expect(focusReducer({ status: 'paused', reason: 'blur', pauses: 1 }, { type: 'systemPause' })).toEqual({ status: 'paused', reason: 'blur', pauses: 1 });
   });
-  it('공유가 시작된 뒤에는 보통 규칙: 다른 창으로 가면 잠김 1회', () => {
-    expect(classifyLeave('blur', { ...base, systemDialog: false })).toBe('lock');
+  it('공유가 시작된 뒤에는 보통 규칙: 같은 blur가 선택 창 동안엔 미뤄지고, 고르기가 끝난 뒤엔 잠김 1회', () => {
+    vi.useFakeTimers();
+    try {
+      const end = allowSystemDialog(30_000);
+      expect(classifyLeave('blur', { ...base, systemDialog: systemDialogActive() })).toBe('defer');
+      end(); // 화면 고르기 끝(스트림 시작)
+      vi.advanceTimersByTime(SYSTEM_DIALOG_TAIL_MS + 20);
+      expect(classifyLeave('blur', { ...base, systemDialog: systemDialogActive() })).toBe('lock');
+      expect(classifyLeave('hidden', { ...base, systemDialog: systemDialogActive() })).toBe('lock');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -80,12 +97,12 @@ describe('유예 시간(allowSystemDialog)', () => {
     expect(seen).toHaveLength(1);
     off();
   });
-  it('끝내지 않아도 정한 시간(최대 2분)이 지나면 저절로 끝난다', () => {
+  it('끝내지 않아도 정한 시간(최대 30초)이 지나면 저절로 끝난다', () => {
     vi.useFakeTimers();
     let n = 0;
     const off = onSystemDialogEnd(() => n++);
-    allowSystemDialog(10 * 60_000); // 10분을 요청해도 2분까지만
-    vi.advanceTimersByTime(119_000);
+    allowSystemDialog(10 * 60_000); // 10분을 요청해도 30초까지만
+    vi.advanceTimersByTime(29_000);
     expect(systemDialogActive()).toBe(true);
     vi.advanceTimersByTime(1000 + SYSTEM_DIALOG_TAIL_MS + 20);
     expect(systemDialogActive()).toBe(false);

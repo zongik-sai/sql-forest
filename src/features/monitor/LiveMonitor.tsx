@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { onBeforeSignOut } from '../auth/signOutHooks';
 import { rpcErrorText, type MonitorApi } from './api';
 import { agoText, CHIP_LABEL, CHIP_ORDER, SUBJECT_LIST, sortLive, subjectName, toLiveStudents, type LiveChip, type LiveRow, type LiveSort, type LiveStudent } from './liveState';
 import { ViewerSession, type ViewerState } from './rtc';
@@ -65,6 +66,11 @@ export function LiveMonitor({ api }: { api: MonitorApi }) {
     const iv = window.setInterval(() => document.visibilityState === 'visible' && setNow(Date.now()), 1000);
     return () => window.clearInterval(iv);
   }, []);
+
+  // 로그아웃 전에 보던 화면 공유를 끝낸다(로그인한 채로 서버 정리)
+  useEffect(() => onBeforeSignOut(async () => {
+    await viewerRef.current?.closeAndWait();
+  }), []);
 
   // 이 화면을 떠나거나 창을 닫으면 보던 화면 공유를 끝낸다
   useEffect(() => {
@@ -164,7 +170,7 @@ export function LiveMonitor({ api }: { api: MonitorApi }) {
 const PHASE_TEXT: Partial<Record<ViewerState['phase'], string>> = {
   requesting: '요청을 보내는 중…',
   waiting: '학생의 허락을 기다리는 중이에요. 2분 안에 응답이 없으면 끝나요.',
-  choosing: '학생이 허락했어요. 보여 줄 화면을 고르는 중…',
+  choosing: '학생이 허락했어요. 보여 줄 화면을 고르는 중…(3분 안에 고르지 않으면 끝나요)',
   connecting: '연결하는 중…',
 };
 

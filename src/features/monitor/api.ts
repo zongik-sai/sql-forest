@@ -56,6 +56,7 @@ export function rpcErrorText(fn: string, e: unknown): string {
     return '서버의 과목 목록에 아직 이 과목이 없어요. 관리자가 최신 supabase/migrations/20261026000000_courses.sql을 다시 실행해야 해요.';
   }
   if (x?.code === '42501') return '선생님 계정만 볼 수 있어요.';
+  if (x?.code === '23505') return '다른 요청이 동시에 처리되고 있어요. 잠시 뒤 다시 시도해 주세요.';
   return x?.message || String(e);
 }
 
