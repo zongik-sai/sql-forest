@@ -102,6 +102,12 @@
   - 화면 보기 요청: `screen_share` + RPC(요청·수락/거절·offer·answer·종료), WebRTC(STUN만, 비 trickle ICE), 녹화·저장 없음, 연결 정보는 끝나면 지움. 공유 창(브라우저 선택 창)이 뜨는 동안의 이탈은 집중 학습 잠김으로 세지 않음(좁은 유예, docs/09_FOCUS_MODE.md).
   - 검증: tsc·eslint, Vitest 740(PGlite monitoring 23·course 포함), Playwright(teacher 7·supplement 8 포함) — 실제 운영 Supabase·실제 Google 선생님 로그인·두 기기 간 WebRTC·실제 브라우저 화면 선택 창은 미검증.
 
+- 2026-10-26(3) — Data 과목을 YBM DATA 2급 교재 단원 문제(선생님 제공: 워드 4개·PDF 67쪽, 6개 장)에 맞춰 8 → 11단원으로 보강.
+  - 자료 분석: 1 도입부(파이썬)·2 빅데이터·3 데이터 수집 및 전처리·4 데이터 탐색과 이해·5 데이터 분석·6 데이터 시각화의 객관식·작업형 범위와 함수·인자·답안 형식을 정리(교재 정답 오류 몇 개 확인: 2장 5번·3장 20번·6장 20번, 5장 작업형 풀이 조건 누락).
+  - 새 단원: 9 빅데이터와 분석 방법론, 10 통계 분석: 가설 검정과 회귀(scipy·statsmodels), 11 머신러닝 기초와 작업형 답안 쓰기(sklearn, solution() 형식). 영역 'ML' 추가.
+  - 보강: 1(반복 절차·비정형 예), 2(EDA·위치/변이/모양 통계량·quantile·kurt), 3(숫자·문자 표기·이스케이프·round 음수·튜플·np.arange/where·idxmax), 4(읽기 함수·dtype·nunique·iloc), 6(notna·결측 처리 방법·MCAR·-1 코드·글자 숫자 정리·weekday·MinMaxScaler), 7(merge vs join·concat axis·조건 개수/비율·최빈값), 8(pandas plot 접근자·value_counts/sort_index/isna 이어 그리기·범례·격자). 바뀐 문항·카드는 같은 ID에 새 내용(오답노트에 남은 그 ID는 새 문항으로 보임).
+  - 문항은 교재를 옮기지 않고 새로 만들었고, 모든 코드 출력·오류는 pandas 3.0.2·scipy 1.17.1·statsmodels 0.15.0·scikit-learn 1.8.0으로 실행해 맞춤. 단원별 별도 검토.
+
 ## 미검증·한계(정직한 보고)
 - Supabase·Google 설정은 실제로 완료했지만, 실제 Google 로그인 왕복(로그인·취소·만료·다기기)은 배포 주소에서 선생님 계정으로 확인해야 한다. mock 성공을 실제 검증으로 보고하지 않는다.
 - Google 대상은 '외부·프로덕션'(2026-10-12)이다. 개인 Gmail 실제 로그인과 만 18세 미만 학교 계정 차단 여부는 아직 확인하지 않았다.
