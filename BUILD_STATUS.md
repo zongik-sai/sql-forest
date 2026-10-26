@@ -85,6 +85,14 @@
   - 검증: Vitest 500(단계 콘텐츠 검사 48, 단계 규칙, 실습장 41, PGlite DB 41 포함), Playwright 51(U01 1~3단계 실제 내용으로 끝까지 통과, 자유 실습장 7 포함).
   - 미검증: 단계 콘텐츠의 교과 정확성은 선생님 검토 전(자동·별도 검토만 함), 실제 학생 계정의 단원 초기화 왕복.
 
+- 2026-10-26 — 과목 엔진 일반화 + 새 과목 3개(네트워크 `/network`·프로그래밍 `/programming`·Data `/data`, 정의는 `src/features/computer/courses/defs.ts`).
+  - 컴퓨터 일반 화면·저장·모의고사·오답노트·선생님 현황·단원 집중 학습을 과목 정의(CourseConfig: 이름·경로·단원·영역·문항 찾기·저장 키 구간·서버 위치·모의고사 시드)로 돌리게 바꿈(`course.ts`, `CourseApp.tsx`). 컴퓨터 일반은 저장 키 `cg:`·`cg_progress`·`save_cg_progress`·시드 `cg-mock-set1-v1`·선생님 탭(컴퓨터 일반/데이터베이스) 그대로.
+  - 새 과목: 이 기기 `<학습자>:net|prog|data:state` 등, 서버 `course_progress`(학생 × 과목) + `save_course_progress(p_course, …)`(CAS) + `course_class_overview(p_course)`(선생님 읽기 전용) — `20261026000000_courses.sql`. 과목마다 자기 단원 8개만 든 chunk로 따로 내려받음(빌드 결과로 확인).
+  - 새 원본 형식 어댑터(`content/adapt.ts`: 카드의 match·code, 문항 code, 모르는 영역 → 첫 영역, 빈 단원 방어), 코드 블록(카드·카드 다시 보기·문제·복습 카드·모의고사, 긴 줄은 블록 안 가로 스크롤). 식물 기준은 전체 단계 수에 비례(40단계는 1·8·16·28·40 그대로).
+  - 첫 화면 과목 5개(자격증 이름 없음, 내용 범위 출처는 과목 화면 아래 작은 글씨로만).
+  - 검증: tsc·eslint 통과, Vitest(새 단위 테스트 14 + PGlite course_progress 14 포함) — `courseBanks.test.ts`의 Data U4~U8은 다른 작업이 아직 쓰는 중이라 실패(내용 미작성), Playwright dev 11(새 과목 4 포함)·pages 7 통과.
+  - 미검증: 운영 Supabase에 새 migration 적용 및 실제 로그인 학생의 새 과목 저장·가져오기 왕복, 새 과목 내용의 교과 정확성(선생님 검토 전).
+
 ## 미검증·한계(정직한 보고)
 - Supabase·Google 설정은 실제로 완료했지만, 실제 Google 로그인 왕복(로그인·취소·만료·다기기)은 배포 주소에서 선생님 계정으로 확인해야 한다. mock 성공을 실제 검증으로 보고하지 않는다.
 - Google 대상은 '외부·프로덕션'(2026-10-12)이다. 개인 Gmail 실제 로그인과 만 18세 미만 학교 계정 차단 여부는 아직 확인하지 않았다.
