@@ -1,10 +1,11 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
   activeWrongIds, addLock, addMock, cardsDone, lockCount, LOCK_LIMIT, resetUnit, emptyCgState, isOpen, isPassed, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
   passNeed, passedCount, plantStage, recordScore, scoreMock, unitLevel, type CgState, type MockRecord,
 } from '../../src/features/computer/model';
 import { buildMock, optionOrder, orderByArea, seededRandom } from '../../src/features/computer/mock';
-import { CG_UNITS } from '../../src/features/computer/content';
+import { CG_COURSE, CG_UNITS } from '../../src/features/computer/content';
 import { BLANK_RE, CG_AREAS, CG_UNIT_IDS, type CgArea } from '../../src/features/computer/types';
 
 const T = (n: number) => `2026-10-07T00:00:${String(n).padStart(2, '0')}.000Z`;
@@ -378,5 +379,21 @@ describe('단원 집중 학습: 잠김 5번이면 그 단원 초기화', () => {
     const s = normalizeCgState({ locks: { U1: [T(1), 3, T(2)], U9: [T(1)], constructor: [T(1)] }, resets: { U2: { at: T(5) }, U3: { n: 2 } } });
     expect(s.locks).toEqual({ U1: [T(1), T(2)] });
     expect(s.resets).toEqual({ U2: { at: T(5), n: 1 } });
+  });
+});
+
+describe('컴퓨터 일반 고정 모의고사 회차는 과목 엔진 일반화 뒤에도 그대로', () => {
+  // 운영 화면(Mock.tsx)과 같은 경로로 만든다. 값이 바뀌면 학생이 보던 고정 회차가 달라진 것이다.
+  const fingerprint = (kind: 'set1' | 'set2' | 'set3') => {
+    const p = buildMock(CG_COURSE.units, kind, { seedPrefix: CG_COURSE.mockSeed, areas: CG_COURSE.areas.map((a) => a.id) });
+    return createHash('sha256').update(JSON.stringify([p.items.map((q) => q.id), p.orders])).digest('hex').slice(0, 16);
+  };
+  it('저장 구간·서버 위치·시드 접두어', () => {
+    expect(CG_COURSE.storage).toBe('cg');
+    expect(CG_COURSE.remote.kind).toBe('cg');
+    expect(CG_COURSE.mockSeed).toBe('cg');
+  });
+  it('1~3회 문항·보기 순서 지문', () => {
+    expect([fingerprint('set1'), fingerprint('set2'), fingerprint('set3')]).toEqual(['dc0a2e4fe07e5af5', 'b3dd8c7951a6d0e6', '69fad0a27321fc84']); // main(일반화 전)과 같은 값
   });
 });

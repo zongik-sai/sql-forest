@@ -4,9 +4,14 @@ import { optionOrder } from './mock';
 import type { CgMcq } from './types';
 
 /** 객관식 문항에 필요한 최소 정보(두 과목 공통) */
-export type McqItem = Pick<CgMcq, 'id' | 'question' | 'options' | 'answer' | 'explanation'> & { tag?: string };
+export type McqItem = Pick<CgMcq, 'id' | 'question' | 'options' | 'answer' | 'explanation'> & { tag?: string; code?: string };
 
 export const MARK = ['①', '②', '③', '④', '⑤'];
+
+/** 카드·문항에 딸린 코드. 줄바꿈·들여쓰기를 그대로 두고, 긴 줄은 블록 안에서 가로로 스크롤한다 */
+export function CodeBlock({ code, label = '코드' }: { code: string; label?: string }) {
+  return <pre className="codeblock cg-code" tabIndex={0} aria-label={label}><code>{code}</code></pre>;
+}
 
 /**
  * 객관식을 한 문제씩 풀고 즉시 채점·해설을 보여 준다(기초 객관식·실력점검·오답 다시 풀기).
@@ -81,6 +86,7 @@ export function McqRunner<T extends McqItem>({ items, storageKey, onAnswer, onFi
       <div className="panel stack">
         <div className="row small muted" style={{ gap: '0.4rem' }}>{q.tag && <span className="badge badge-plain">{q.tag}</span>}</div>
         <h2 ref={headRef} tabIndex={-1} className="cg-q">{run.idx + 1}. {q.question}</h2>
+        {q.code && <CodeBlock code={q.code} label="문제 코드" />}
         <fieldset disabled={answered !== undefined}>
           <legend className="sr-only">보기</legend>
           <div className="options">
@@ -125,6 +131,7 @@ export function ReviewCard({ q, n, picked, order, unansweredNote = true }: { q: 
   return (
     <details className="panel cg-review">
       <summary>{n !== undefined ? `${n}. ` : ''}{q.question}</summary>
+      {q.code && <CodeBlock code={q.code} label="문제 코드" />}
       <ol className="cg-opts" style={{ listStyle: 'none', paddingLeft: 0 }}>
         {ord.map((oi, p) => (
           <li key={oi} className={oi === q.answer ? 'ans' : oi === picked ? 'picked' : ''}>

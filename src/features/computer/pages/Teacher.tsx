@@ -2,33 +2,44 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PLANT_STAGES } from '../../../components/Plant';
 import { supabase } from '../../auth/supabase';
-import { CG_UNIT_BY_ID, mcqById } from '../content';
-import { TOTAL_STEPS } from '../model';
+import { useCourse } from '../course';
 import { useCg } from '../store';
 import { classSummary, downloadText, toCsv, toStudents, type CgClassRow, type CgStudent } from '../teacher';
-import { CG_PASS, CG_UNIT_IDS } from '../types';
+import { CG_PASS } from '../types';
 
-/** 선생님 반 학습 현황: 지정된 선생님 계정만(서버 RPC가 다시 확인). 읽기 전용. */
+/**
+ * 선생님 반 학습 현황: 지정된 선생님 계정만(서버 RPC가 다시 확인). 읽기 전용.
+ * 컴퓨터 일반은 예전처럼 컴퓨터 일반·데이터베이스 탭(cg_class_overview·db_class_overview),
+ * 새 과목은 그 과목 학생만(course_class_overview(p_course)).
+ */
 export function TeacherPage() {
   const cg = useCg();
+  const course = useCourse();
+  const base = course.basePath;
   const [tab, setTab] = useState<'cg' | 'db'>('cg');
   if (!cg.isTeacher) {
     return (
       <div className="stack">
         <p className="notice">선생님 계정만 볼 수 있는 화면이에요.</p>
-        <Link className="btn" to="/computer">컴퓨터 일반 홈</Link>
+        <Link className="btn" to={base}>{course.name} 홈</Link>
       </div>
     );
   }
   return (
     <div className="stack">
-      <p className="crumbs" style={{ margin: 0 }}><Link to="/computer">컴퓨터 일반</Link> / 반 학습 현황</p>
+      <p className="crumbs" style={{ margin: 0 }}><Link to={base}>{course.name}</Link> / 반 학습 현황</p>
       <h1 style={{ margin: 0 }}>반 학습 현황</h1>
-      <div className="seg" role="tablist" aria-label="과목">
-        <button role="tab" aria-selected={tab === 'cg'} className={tab === 'cg' ? 'on' : ''} onClick={() => setTab('cg')}>컴퓨터 일반</button>
-        <button role="tab" aria-selected={tab === 'db'} className={tab === 'db' ? 'on' : ''} onClick={() => setTab('db')}>데이터베이스</button>
-      </div>
-      {tab === 'cg' ? <CgClass /> : <DbClass />}
+      {course.remote.kind === 'cg' ? (
+        <>
+          <div className="seg" role="tablist" aria-label="과목">
+            <button role="tab" aria-selected={tab === 'cg'} className={tab === 'cg' ? 'on' : ''} onClick={() => setTab('cg')}>컴퓨터 일반</button>
+            <button role="tab" aria-selected={tab === 'db'} className={tab === 'db' ? 'on' : ''} onClick={() => setTab('db')}>데이터베이스</button>
+          </div>
+          {tab === 'cg' ? <CgClass fn="cg_class_overview" /> : <DbClass />}
+        </>
+      ) : (
+        <CgClass fn="course_class_overview" args={{ p_course: course.remote.course }} />
+      )}
       <p className="small muted">점수는 학생 브라우저가 저장한 자기 학습 기록이라 조작될 수 있어요. 평가 근거가 아니라 학습 지원용으로 활용해 주세요. 새로고침할 때마다 학생 수만큼 읽어요.</p>
     </div>
   );
@@ -37,16 +48,18 @@ export function TeacherPage() {
 type SortKey = 'name' | 'passed' | 'mockBest' | 'wrong' | 'lastAt';
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-');
 
-function useRpc<T>(fn: string) {
+function useRpc<T>(fn: string, args?: Record<string, string>) {
   const [rows, setRows] = useState<T[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const argKey = JSON.stringify(args ?? null);
   useEffect(() => {
     const sb = supabase();
     if (!sb) return setErr('로그인 설정이 없어요.');
     let alive = true;
     setRows(null);
-    sb.rpc(fn).then(({ data, error }) => {
+    const a = JSON.parse(argKey) as Record<string, string> | null;
+    (a ? sb.rpc(fn, a) : sb.rpc(fn)).then(({ data, error }) => {
       if (!alive) return;
       if (error) setErr(error.message);
       else setRows((data ?? []) as T[]);
@@ -54,16 +67,20 @@ function useRpc<T>(fn: string) {
     return () => {
       alive = false;
     };
-  }, [fn, tick]);
+  }, [fn, argKey, tick]);
   return { rows, err, reload: () => setTick((t) => t + 1) };
 }
 
-function CgClass() {
-  const { rows, err, reload } = useRpc<CgClassRow>('cg_class_overview');
+/** 과목 학생 목록(지금 과목의 단원 목록으로 집계) */
+function CgClass({ fn, args }: { fn: string; args?: Record<string, string> }) {
+  const course = useCourse();
+  const units = course.unitIds;
+  const total = course.totalSteps;
+  const { rows, err, reload } = useRpc<CgClassRow>(fn, args);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<{ k: SortKey; desc: boolean }>({ k: 'lastAt', desc: true });
-  const students = useMemo(() => (rows ? toStudents(rows) : []), [rows]);
-  const sum = useMemo(() => classSummary(students), [students]);
+  const students = useMemo(() => (rows ? toStudents(rows, course) : []), [rows, course]);
+  const sum = useMemo(() => classSummary(students, Date.now(), course), [students, course]);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     const f = t ? students.filter((s) => s.name.toLowerCase().includes(t) || s.email.toLowerCase().includes(t)) : students;
@@ -81,24 +98,24 @@ function CgClass() {
       <button className="btn-quiet thsort" onClick={() => setSort((s) => ({ k, desc: s.k === k ? !s.desc : k !== 'name' }))}>{label}{sort.k === k ? (sort.desc ? ' ▼' : ' ▲') : ''}</button>
     </th>
   );
-  const csv = () => downloadText(`컴퓨터일반_반현황_${new Date().toISOString().slice(0, 10)}.csv`, toCsv(
-    ['이름', '이메일', '식물', `통과(/${TOTAL_STEPS})`, ...CG_UNIT_IDS.map((u) => `${u} 레벨`), '모의 최고', '오답', '최근 활동'],
-    list.map((s) => [s.name, s.email, PLANT_STAGES[s.plant], s.passed, ...CG_UNIT_IDS.map((u) => s.levels[u]), s.mockBest, s.wrong, fmt(s.lastAt)]),
+  const csv = () => downloadText(`${course.name.replace(/\s/g, '')}_반현황_${new Date().toISOString().slice(0, 10)}.csv`, toCsv(
+    ['이름', '이메일', '식물', `통과(/${total})`, ...units.map((u) => `${u} 레벨`), '모의 최고', '오답', '최근 활동'],
+    list.map((s) => [s.name, s.email, PLANT_STAGES[s.plant], s.passed, ...units.map((u) => s.levels[u]), s.mockBest, s.wrong, fmt(s.lastAt)]),
   ));
   return (
     <div className="stack">
       <div className="kpis">
         <div className="kpi"><b>{sum.n}</b><span>학생</span></div>
         <div className="kpi"><b>{sum.active7}</b><span>최근 7일 학습</span></div>
-        <div className="kpi"><b>{sum.avgPassed.toFixed(1)}</b><span>평균 통과 단계(/{TOTAL_STEPS})</span></div>
+        <div className="kpi"><b>{sum.avgPassed.toFixed(1)}</b><span>평균 통과 단계(/{total})</span></div>
         <div className="kpi"><b>{sum.mockPassed}</b><span>모의고사 {CG_PASS.mock.need}점 이상 경험</span></div>
       </div>
       <div className="cg-result-cols">
         <div className="panel">
           <h2>단원별 평균 레벨</h2>
           <table className="data"><tbody>
-            {CG_UNIT_IDS.map((u) => (
-              <tr key={u}><th scope="row">{u.replace('U', '')}. {CG_UNIT_BY_ID[u]?.title}</th><td>{sum.unitAvg[u].toFixed(1)}/5</td>
+            {units.map((u) => (
+              <tr key={u}><th scope="row">{u.replace('U', '')}. {course.unitById(u)?.title}</th><td>{sum.unitAvg[u].toFixed(1)}/5</td>
                 <td><span className="cg-bar"><span style={{ width: `${(sum.unitAvg[u] / 5) * 100}%` }} /></span></td></tr>
             ))}
           </tbody></table>
@@ -108,7 +125,7 @@ function CgClass() {
           {sum.topWrong.length === 0 ? <p className="muted">없어요.</p> : (
             <ol className="cg-top-wrong">
               {sum.topWrong.map(([id, n]) => {
-                const mq = mcqById(id);
+                const mq = course.mcqById(id);
                 return (
                   <li key={id}>
                     <span className="small muted">{n}명 · {mq?.unitId.replace('U', '')}단원</span><br />
@@ -130,7 +147,7 @@ function CgClass() {
         <table className="data cg-class">
           <thead><tr>
             {th('name', '이름')}<th scope="col">식물</th>{th('passed', '통과')}
-            {CG_UNIT_IDS.map((u) => <th scope="col" key={u}>{u}</th>)}
+            {units.map((u) => <th scope="col" key={u}>{u}</th>)}
             {th('mockBest', '모의 최고')}{th('wrong', '오답')}{th('lastAt', '최근 활동')}
           </tr></thead>
           <tbody>
@@ -138,8 +155,8 @@ function CgClass() {
               <tr key={s.id}>
                 <th scope="row"><span title={s.email}>{s.name}</span><br /><span className="small muted">{s.email}</span></th>
                 <td>{PLANT_STAGES[s.plant]}</td>
-                <td>{s.passed}/{TOTAL_STEPS}</td>
-                {CG_UNIT_IDS.map((u) => <td key={u} className={`lv lv${s.levels[u]}`}>{s.levels[u]}</td>)}
+                <td>{s.passed}/{total}</td>
+                {units.map((u) => <td key={u} className={`lv lv${s.levels[u]}`}>{s.levels[u]}</td>)}
                 <td>{s.mockBest || '-'}</td>
                 <td>{s.wrong}</td>
                 <td>{fmt(s.lastAt)}</td>

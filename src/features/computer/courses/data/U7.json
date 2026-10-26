@@ -1,0 +1,1246 @@
+{
+  "unit": 7,
+  "title": "그룹 집계와 데이터 결합",
+  "intro": "같은 값끼리 묶어 계산하는 groupby·agg부터 pivot_table·crosstab 요약표, merge·concat으로 두 표를 합치는 방법, 비율·백분율 계산까지 데이터 분석의 핵심 집계 기술을 익힌다.",
+  "theory": [
+    {
+      "id": "t1",
+      "title": "groupby: 같은 값끼리 묶어 계산하기",
+      "points": [
+        "그룹 집계는 같은 값을 가진 행끼리 묶은 뒤 묶음마다 합계·평균 같은 대표값을 하나씩 구하는 것이다. 예: 반별 평균 점수, 지점별 매출 합계.",
+        "pandas에서는 df.groupby('기준 열')['계산할 열'].집계함수() 순서로 쓴다. df.groupby('반')['점수'].mean()은 반별 평균 점수를 구한다.",
+        "이 과정을 분할(split) → 적용(apply) → 결합(combine)이라 한다. 반마다 행을 나누고, 묶음마다 평균을 계산한 뒤, 결과를 표 하나로 모은다.",
+        "결과는 기준 값(A, B)이 인덱스가 되는 Series이며, 기준 값은 기본적으로 오름차순으로 정렬된다."
+      ],
+      "table": {
+        "head": [
+          "단계",
+          "하는 일",
+          "예(반별 평균 점수)"
+        ],
+        "rows": [
+          [
+            "분할",
+            "기준 값마다 행을 나눈다",
+            "A반 3행 / B반 2행"
+          ],
+          [
+            "적용",
+            "묶음마다 계산한다",
+            "A: 90.0 / B: 65.0"
+          ],
+          [
+            "결합",
+            "결과를 하나로 모은다",
+            "인덱스가 A, B인 Series"
+          ]
+        ]
+      },
+      "tip": "groupby(무엇으로 묶을까)[무엇을 계산할까].어떻게()",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'B', 'A', 'B', 'A'],\n                   '점수': [80, 70, 90, 60, 100]})\nr = df.groupby('반')['점수'].mean()\nprint(r['A'], r['B'])    # 90.0 65.0",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "groupby",
+            "desc": "기준 열을 정해 같은 값을 가진 행끼리 묶는 pandas 메서드"
+          },
+          {
+            "term": "분할(split)",
+            "desc": "기준 값에 따라 행을 여러 묶음으로 나누는 첫 단계"
+          },
+          {
+            "term": "결합(combine)",
+            "desc": "묶음마다 낸 결과를 표 하나로 모으는 마지막 단계"
+          }
+        ],
+        "distractor": "적용(apply)"
+      }
+    },
+    {
+      "id": "t2",
+      "title": "집계 함수: sum·mean·count·size",
+      "points": [
+        "groupby 뒤에 붙이는 sum(합계)·mean(평균)·max(최댓값)·min(최솟값)·median(중앙값)을 집계 함수라 한다. 여러 값을 대표값 하나로 줄인다.",
+        "count()는 묶음마다 결측치(NaN, 비어 있는 값)를 뺀 값의 개수를 센다. A반 점수가 [80, NaN]이면 count는 1이다.",
+        "size()는 결측치가 든 행까지 포함한 행 수를 센다. 같은 A반의 size는 2이다. df.groupby('반').size()처럼 열을 고르지 않아도 쓸 수 있다.",
+        "mean·sum 같은 계산도 결측치는 빼고 한다. A반 [80, NaN]의 평균은 40.0이 아니라 80.0이다."
+      ],
+      "table": {
+        "head": [
+          "함수",
+          "뜻",
+          "결측치(NaN)"
+        ],
+        "rows": [
+          [
+            "sum / mean",
+            "합계 / 평균",
+            "빼고 계산"
+          ],
+          [
+            "max / min",
+            "최댓값 / 최솟값",
+            "빼고 계산"
+          ],
+          [
+            "count",
+            "값의 개수",
+            "세지 않음"
+          ],
+          [
+            "size",
+            "행의 개수",
+            "포함해서 셈"
+          ]
+        ]
+      },
+      "tip": "count는 '값' 개수(NaN 제외), size는 '행' 개수(NaN 포함)",
+      "code": "import pandas as pd\nimport numpy as np\ndf = pd.DataFrame({'반': ['A', 'A', 'B', 'B', 'B'],\n                   '점수': [80, np.nan, 70, 90, np.nan]})\ng = df.groupby('반')['점수']\nprint(g.count().tolist())   # [1, 2]\nprint(g.size().tolist())    # [2, 3]\nprint(g.mean().tolist())    # [80.0, 80.0]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "count",
+            "desc": "묶음마다 비어 있지 않은 값만 세는 집계 함수"
+          },
+          {
+            "term": "size",
+            "desc": "비어 있는 값이 든 행까지 모두 세는 집계 함수"
+          },
+          {
+            "term": "결측치",
+            "desc": "자료가 없어 비어 있는 칸으로, pandas에서는 NaN으로 표시된다"
+          }
+        ],
+        "distractor": "median"
+      }
+    },
+    {
+      "id": "t3",
+      "title": "agg: 여러 집계를 한 번에",
+      "points": [
+        "agg(aggregate의 줄임)는 집계 함수를 이름 문자열로 받아 적용하는 메서드이다. 여러 개를 리스트로 넘기면 한 번에 계산한다.",
+        "df.groupby('반')['점수'].agg(['mean', 'max'])는 반별 평균과 최댓값을 구하며, 함수 이름 mean·max가 결과의 열 이름이 된다.",
+        "딕셔너리 {'열': '함수'}를 넘기면 열마다 다른 집계를 한다. agg({'점수': 'mean', '나이': 'max'})는 점수는 평균, 나이는 최댓값을 구한다.",
+        "df.groupby('반').agg(최고=('점수', 'max'))처럼 새 열 이름=(열, 함수)로 쓰면 결과 열 이름을 직접 정한다. 이를 이름 붙인 집계라 한다."
+      ],
+      "tip": "리스트는 한 열에 여러 함수, 딕셔너리는 열마다 다른 함수",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'B', 'A', 'B', 'A'],\n                   '점수': [80, 70, 90, 60, 100],\n                   '나이': [17, 18, 17, 17, 16]})\nr = df.groupby('반')['점수'].agg(['mean', 'max'])\nprint(r.columns.tolist())     # ['mean', 'max']\nr2 = df.groupby('반').agg({'점수': 'mean', '나이': 'max'})\nprint(r2.loc['A', '점수'], r2.loc['A', '나이'])   # 90.0 17",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "agg",
+            "desc": "집계 함수 여러 개를 이름으로 받아 한꺼번에 적용하는 메서드"
+          },
+          {
+            "term": "딕셔너리",
+            "desc": "열마다 서로 다른 집계를 정할 때 넘기는 {열: 함수} 형태"
+          },
+          {
+            "term": "이름 붙인 집계",
+            "desc": "새 열 이름=(열, 함수)로 써서 결과 열 이름을 직접 정하는 방법"
+          }
+        ],
+        "distractor": "value_counts"
+      }
+    },
+    {
+      "id": "t4",
+      "title": "여러 열로 묶기와 결과 정리",
+      "points": [
+        "groupby(['반', '성별'])처럼 기준 열을 리스트로 넘기면 두 열 값의 조합마다 묶는다. 'A반 남학생', 'A반 여학생'처럼 더 잘게 나뉜다.",
+        "결과 인덱스는 반과 성별 두 단계로 된 멀티인덱스(MultiIndex)가 된다. 리스트에 쓴 순서대로 바깥 단계, 안쪽 단계가 정해진다.",
+        "reset_index()를 붙이면 인덱스였던 기준 값이 일반 열로 돌아와 평범한 표가 된다. groupby('반', as_index=False)도 같은 효과를 낸다.",
+        "집계 결과도 Series·DataFrame이므로 sort_values(ascending=False)로 큰 값부터 정렬하거나 nlargest(2)로 상위 2개를 고를 수 있다."
+      ],
+      "table": {
+        "head": [
+          "반",
+          "성별",
+          "점수(평균)"
+        ],
+        "rows": [
+          [
+            "A",
+            "남",
+            "80.0"
+          ],
+          [
+            "A",
+            "여",
+            "95.0"
+          ],
+          [
+            "B",
+            "남",
+            "60.0"
+          ],
+          [
+            "B",
+            "여",
+            "70.0"
+          ]
+        ]
+      },
+      "tip": "인덱스로 들어간 기준 값을 열로 꺼내려면 reset_index()",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'B', 'A', 'B', 'A'],\n                   '성별': ['남', '여', '여', '남', '여'],\n                   '점수': [80, 70, 90, 60, 100]})\nr = df.groupby(['반', '성별'])['점수'].mean()\nprint(r[('A', '여')])            # 95.0\nt = r.reset_index()\nprint(t.columns.tolist())        # ['반', '성별', '점수']\nprint(t.shape)                   # (4, 3)",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "MultiIndex",
+            "desc": "두 단계 이상으로 이루어진 인덱스로, 여러 열로 묶을 때 생긴다"
+          },
+          {
+            "term": "reset_index",
+            "desc": "결과의 인덱스를 일반 열로 되돌려 평범한 표로 만드는 메서드"
+          },
+          {
+            "term": "as_index=False",
+            "desc": "묶을 때부터 기준 값을 인덱스가 아닌 열로 남기게 하는 옵션"
+          }
+        ],
+        "distractor": "sort_values"
+      }
+    },
+    {
+      "id": "t5",
+      "title": "pivot_table: 행×열 요약표 만들기",
+      "points": [
+        "pivot_table은 엑셀의 피벗 테이블처럼 행 기준과 열 기준을 정해 값을 가로·세로로 펼친 요약표를 만든다.",
+        "index는 행으로 둘 열, columns는 열 머리로 펼칠 열, values는 계산할 값 열, aggfunc는 계산 방법이다.",
+        "aggfunc를 생략하면 기본값인 평균(mean)으로 계산한다. 합계를 원하면 aggfunc='sum', 개수를 원하면 aggfunc='count'로 직접 지정한다.",
+        "그 조합의 자료가 없는 칸은 NaN이 되며 fill_value=0으로 채울 수 있다. margins=True는 같은 계산 방식의 전체 요약 행·열 All을 붙인다."
+      ],
+      "table": {
+        "head": [
+          "반 ↓ / 성별 →",
+          "남",
+          "여"
+        ],
+        "rows": [
+          [
+            "A",
+            "80.0",
+            "95.0"
+          ],
+          [
+            "B",
+            "60.0",
+            "70.0"
+          ]
+        ]
+      },
+      "tip": "pivot_table의 기본 계산은 평균! 합계는 aggfunc='sum'을 꼭 쓴다",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'B', 'A', 'B', 'A'],\n                   '성별': ['남', '여', '여', '남', '여'],\n                   '점수': [80, 70, 90, 60, 100]})\np = df.pivot_table(index='반', columns='성별',\n                   values='점수', aggfunc='mean')\nprint(p.loc['A', '여'], p.loc['B', '남'])   # 95.0 60.0",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "aggfunc",
+            "desc": "칸마다 쓸 계산 방법으로, 생략하면 평균이 쓰인다"
+          },
+          {
+            "term": "columns",
+            "desc": "요약표의 가로 머리(열 이름)로 펼칠 기준 열을 정하는 매개변수"
+          },
+          {
+            "term": "fill_value",
+            "desc": "자료가 없어 비어 있는 칸을 채울 값을 정하는 옵션"
+          }
+        ],
+        "distractor": "index"
+      }
+    },
+    {
+      "id": "t6",
+      "title": "crosstab: 두 범주의 빈도표",
+      "points": [
+        "교차표는 두 범주형 변수의 값 조합마다 행이 몇 개인지 센 빈도표이다. 예: 반별·성별 학생 수, 학년별·동아리별 인원.",
+        "pd.crosstab(df['반'], df['성별'])처럼 pd 함수로 부르고 행 기준, 열 기준이 될 열을 차례로 넘긴다. 기본은 개수를 세며 자료가 없는 조합은 0이다.",
+        "margins=True를 주면 행·열 합계 All이 붙는다. normalize=True는 전체 대비 비율, normalize='index'는 행마다 합이 1인 비율로 바꾼다.",
+        "pivot_table은 값 열을 계산(기본 평균)하고, crosstab은 기본으로 개수를 센다는 점이 다르다."
+      ],
+      "table": {
+        "head": [
+          "반 ↓ / 성별 →",
+          "남",
+          "여",
+          "All"
+        ],
+        "rows": [
+          [
+            "A",
+            "1",
+            "2",
+            "3"
+          ],
+          [
+            "B",
+            "1",
+            "1",
+            "2"
+          ],
+          [
+            "All",
+            "2",
+            "3",
+            "5"
+          ]
+        ]
+      },
+      "tip": "pivot_table은 '값을 계산', crosstab은 '개수를 센다'",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'B', 'A', 'B', 'A'],\n                   '성별': ['남', '여', '여', '남', '여']})\nct = pd.crosstab(df['반'], df['성별'], margins=True)\nprint(ct.loc['A', '여'], ct.loc['All', 'All'])   # 2 5\nr = pd.crosstab(df['반'], df['성별'], normalize='index')\nprint(r.loc['A', '여'].round(3))                  # 0.667",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "crosstab",
+            "desc": "두 범주형 열의 값 조합마다 해당 행 수를 세어 주는 pd 함수"
+          },
+          {
+            "term": "margins=True",
+            "desc": "행 합계와 열 합계(All)를 덧붙이게 하는 옵션"
+          },
+          {
+            "term": "normalize='index'",
+            "desc": "행마다 합이 1이 되도록 개수를 비율로 바꾸는 옵션"
+          }
+        ],
+        "distractor": "normalize=True"
+      }
+    },
+    {
+      "id": "t7",
+      "title": "merge: 공통 열로 두 표 붙이기",
+      "points": [
+        "데이터 결합은 따로 저장된 표를 하나로 합치는 것이다. 예: 학생 명단 표와 시험 점수 표를 번호로 이어 한 표로 만든다.",
+        "pd.merge(왼쪽, 오른쪽, on='번호')는 두 표에서 번호 값이 같은 행끼리 옆으로 이어 붙인다. 짝을 맞추는 기준 열을 키(key)라 한다.",
+        "how를 생략하면 기본값 inner(내부 결합)로, 두 표 모두에 있는 키만 남는다. 한쪽에만 있는 행은 결과에서 빠진다.",
+        "on을 생략하면 두 표에서 이름이 같은 열을 키로 쓴다. 키 열 이름이 서로 다르면 left_on='학번', right_on='번호'처럼 따로 지정한다."
+      ],
+      "tip": "merge는 키로 짝 맞춰 옆으로, 기본 inner는 '양쪽에 다 있는 것만'",
+      "code": "import pandas as pd\nstu = pd.DataFrame({'번호': [1, 2, 3, 4],\n                    '이름': ['민수', '지은', '하준', '서연']})\nsc = pd.DataFrame({'번호': [2, 3, 4, 5],\n                   '점수': [85, 90, 75, 60]})\nm = pd.merge(stu, sc, on='번호')\nprint(m['번호'].tolist())    # [2, 3, 4]\nprint(m.shape)               # (3, 3)",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "merge",
+            "desc": "기준 열 값이 같은 행끼리 두 표를 옆으로 이어 붙이는 함수"
+          },
+          {
+            "term": "키(key)",
+            "desc": "두 표의 행을 짝지을 때 기준이 되는 열"
+          },
+          {
+            "term": "inner",
+            "desc": "how를 생략하면 쓰이며, 양쪽 표에 모두 있는 값의 행만 남기는 방식"
+          }
+        ],
+        "distractor": "concat"
+      }
+    },
+    {
+      "id": "t8",
+      "title": "how: inner·left·right·outer 비교",
+      "points": [
+        "how='left'는 왼쪽 표의 행을 모두 남기고, 오른쪽에 짝이 없으면 그 칸을 NaN으로 채운다. 명단은 모두 두고 점수만 붙일 때 쓴다.",
+        "how='right'는 반대로 오른쪽 표의 행을 모두 남긴다. how='outer'는 양쪽 키를 모두 남기는 합집합 방식이다.",
+        "앞 카드의 예(왼쪽 번호 1~4, 오른쪽 번호 2~5)에서 결과 행 수는 inner 3, left 4, right 4, outer 5이다.",
+        "키가 한쪽에 여러 번 나오면(1:N) 짝이 되는 행마다 다른 쪽 값이 복사되어 붙는다. 예: 고객 1명의 주문 3건이면 결과도 3행이다.",
+        "키가 아닌 같은 이름의 열이 양쪽에 있으면 '점수_x'(왼쪽)·'점수_y'(오른쪽)가 되며, suffixes=('_중간', '_기말')로 바꿀 수 있다."
+      ],
+      "table": {
+        "head": [
+          "how",
+          "남는 키",
+          "예의 행 수"
+        ],
+        "rows": [
+          [
+            "inner(기본)",
+            "양쪽 모두에 있는 키(교집합)",
+            "3"
+          ],
+          [
+            "left",
+            "왼쪽 표의 키 전부",
+            "4"
+          ],
+          [
+            "right",
+            "오른쪽 표의 키 전부",
+            "4"
+          ],
+          [
+            "outer",
+            "양쪽 키 전부(합집합)",
+            "5"
+          ]
+        ]
+      },
+      "tip": "짝 없는 칸은 NaN — 그래서 정수 점수가 실수(85.0)로 바뀐다",
+      "code": "import pandas as pd\nstu = pd.DataFrame({'번호': [1, 2, 3, 4],\n                    '이름': ['민수', '지은', '하준', '서연']})\nsc = pd.DataFrame({'번호': [2, 3, 4, 5],\n                   '점수': [85, 90, 75, 60]})\nfor how in ['inner', 'left', 'right', 'outer']:\n    print(how, len(pd.merge(stu, sc, on='번호', how=how)))\nm = pd.merge(stu, sc, on='번호', how='left')\nprint(m['점수'].tolist())   # [nan, 85.0, 90.0, 75.0]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "how='left'",
+            "desc": "왼쪽 표의 행을 모두 지키고 짝이 없는 칸은 NaN으로 두는 방식"
+          },
+          {
+            "term": "how='outer'",
+            "desc": "양쪽 표의 기준 값을 모두 남기는 합집합 방식"
+          },
+          {
+            "term": "suffixes",
+            "desc": "양쪽에 겹친 열 이름 뒤에 붙일 꼬리말을 정하는 옵션"
+          }
+        ],
+        "distractor": "how='inner'"
+      }
+    },
+    {
+      "id": "t9",
+      "title": "concat: 표를 위아래·옆으로 잇기",
+      "points": [
+        "pd.concat([df1, df2])는 표 여러 개를 리스트로 받아 그대로 이어 붙인다. 키로 짝을 맞추는 merge와 달리 방향(축)만 정해 쌓는다.",
+        "기본값 axis=0은 행 방향, 즉 위아래로 쌓는다. 예: 1반 명단 아래 2반 명단 붙이기. 원래 인덱스가 남아 0, 1, 0처럼 겹칠 수 있다.",
+        "ignore_index=True를 주면 인덱스를 0부터 새로 매긴다. 열 이름이 다르면 한쪽에만 있는 열은 다른 표에서 온 행에서 NaN이 된다.",
+        "axis=1은 열 방향, 즉 옆으로 붙이며 같은 인덱스 값끼리 한 행이 된다. 예: 국어 점수 표 옆에 수학 점수 표 붙이기."
+      ],
+      "tip": "axis=0은 ↓ 위아래(행이 늘어남), axis=1은 → 옆으로(열이 늘어남)",
+      "code": "import pandas as pd\na = pd.DataFrame({'이름': ['민수', '지은'], '점수': [80, 90]})\nb = pd.DataFrame({'이름': ['하준'], '점수': [70]})\nprint(pd.concat([a, b]).index.tolist())   # [0, 1, 0]\nc = pd.concat([a, b], ignore_index=True)\nprint(c.index.tolist(), c.shape)          # [0, 1, 2] (3, 2)\nd = pd.DataFrame({'수학': [70, 80]})\nprint(pd.concat([a, d], axis=1).shape)    # (2, 3)",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "concat",
+            "desc": "여러 표를 리스트로 받아 위아래나 옆으로 그대로 이어 붙이는 함수"
+          },
+          {
+            "term": "ignore_index=True",
+            "desc": "원래 행 번호를 버리고 0부터 새로 매기게 하는 옵션"
+          },
+          {
+            "term": "axis=1",
+            "desc": "표를 열 방향, 즉 옆으로 나란히 붙이게 하는 설정"
+          }
+        ],
+        "distractor": "axis=0"
+      }
+    },
+    {
+      "id": "t10",
+      "title": "비율과 백분율 계산",
+      "points": [
+        "비율은 부분 ÷ 전체, 백분율(%)은 비율 × 100이다. 전체 매출 200 중 강남점이 80이면 비율 0.4, 백분율 40%이다.",
+        "지점별 매출 비중은 g = df.groupby('지점')['매출'].sum()으로 합계를 구한 뒤 g / g.sum() * 100으로 계산한다. Series를 숫자로 나누면 값마다 나뉜다.",
+        "value_counts(normalize=True)는 개수 대신 전체에서 차지하는 비율을 돌려준다. 이것은 '건수' 비중이므로 '매출' 비중과 다를 수 있다.",
+        "round(1)로 소수 첫째 자리까지 반올림한다. 반올림 전 비율의 합은 1(백분율은 100)이므로 합을 확인하면 계산 실수를 잡을 수 있다.",
+        "그룹 안에서의 비율은 transform('sum')으로 각 행에 그룹 합계를 붙인 뒤 나눈다. transform은 agg와 달리 원래 행 수를 그대로 유지한다."
+      ],
+      "tip": "비중은 분모부터 확인 — 건수 비중과 금액 비중은 다르다",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'지점': ['강남', '강북', '강남', '강서', '강북', '강남'],\n                   '매출': [30, 20, 10, 40, 60, 40]})\ng = df.groupby('지점')['매출'].sum()\nprint(g.tolist())                       # [80, 80, 40]\nprint((g / g.sum() * 100).tolist())     # [40.0, 40.0, 20.0]\nr = df['지점'].value_counts(normalize=True)\nprint((r * 100).round(1).tolist())      # [50.0, 33.3, 16.7]\nt = df.groupby('지점')['매출'].transform('sum')\nprint(len(t), t.tolist()[:3])           # 6 [80, 80, 80]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "백분율",
+            "desc": "부분을 전체로 나눈 값에 100을 곱해 %로 나타낸 것"
+          },
+          {
+            "term": "normalize=True",
+            "desc": "개수 대신 전체에서 차지하는 몫(0~1)을 돌려주게 하는 옵션"
+          },
+          {
+            "term": "transform",
+            "desc": "그룹별 계산값을 원래 행 수 그대로 각 행에 돌려주는 메서드"
+          }
+        ],
+        "distractor": "agg"
+      }
+    }
+  ],
+  "bank": [
+    "groupby",
+    "적용",
+    "sum",
+    "count",
+    "size",
+    "agg",
+    "MultiIndex",
+    "reset_index",
+    "columns",
+    "평균",
+    "crosstab",
+    "margins",
+    "on",
+    "inner",
+    "left",
+    "outer",
+    "concat",
+    "ignore_index",
+    "1",
+    "normalize",
+    "결합",
+    "max",
+    "transform",
+    "fill_value",
+    "values",
+    "right",
+    "index",
+    "merge",
+    "0",
+    "how"
+  ],
+  "fill": [
+    {
+      "id": "f1",
+      "text": "같은 값을 가진 행끼리 묶어 묶음마다 합계·평균 같은 대표값을 구하게 해 주는 pandas 메서드는 ____이다.",
+      "answer": "groupby",
+      "exp": "df.groupby('반')처럼 기준 열을 정해 같은 값끼리 묶는다."
+    },
+    {
+      "id": "f2",
+      "text": "그룹 집계는 행을 묶음으로 나누는 분할, 묶음마다 계산하는 ____, 결과를 하나로 모으는 결합의 3단계로 이루어진다.",
+      "answer": "적용",
+      "exp": "분할(split) → 적용(apply) → 결합(combine) 순서이다."
+    },
+    {
+      "id": "f3",
+      "text": "df.groupby('반')['점수'].____()는 반별 점수 합계를 구한다.",
+      "answer": "sum",
+      "exp": "합계는 sum, 평균은 mean, 최댓값은 max이다."
+    },
+    {
+      "id": "f4",
+      "text": "묶음마다 결측치(NaN)를 뺀 값의 개수만 세는 집계 함수는 ____이다.",
+      "answer": "count",
+      "exp": "count는 비어 있지 않은 값만 센다."
+    },
+    {
+      "id": "f5",
+      "text": "결측치가 든 행까지 포함해 묶음마다 행 수를 세는 집계 함수는 ____이다.",
+      "answer": "size",
+      "exp": "size는 값이 비어 있어도 행이면 모두 센다."
+    },
+    {
+      "id": "f6",
+      "text": "['mean', 'max']처럼 집계 함수 이름을 리스트로 받아 한 번에 적용하는 메서드는 ____이다.",
+      "answer": "agg",
+      "exp": "agg(['mean', 'max'])는 mean 열과 max 열을 가진 표를 돌려준다."
+    },
+    {
+      "id": "f7",
+      "text": "groupby(['반', '성별'])처럼 두 열로 묶으면 결과 인덱스가 두 단계로 된 ____가 된다.",
+      "answer": "MultiIndex",
+      "exp": "바깥 단계는 반, 안쪽 단계는 성별인 멀티인덱스가 된다."
+    },
+    {
+      "id": "f8",
+      "text": "집계 결과에서 인덱스가 된 기준 값을 일반 열로 되돌려 평범한 표로 만드는 메서드는 ____이다.",
+      "answer": "reset_index",
+      "exp": "reset_index()를 붙이면 기준 값이 열로 돌아오고 인덱스는 0부터 새로 매겨진다."
+    },
+    {
+      "id": "f9",
+      "text": "pivot_table에서 요약표의 가로(열 머리)로 펼칠 기준 열을 지정하는 매개변수는 ____이다.",
+      "answer": "columns",
+      "exp": "index는 세로(행) 기준, columns는 가로(열) 기준, values는 계산할 값이다."
+    },
+    {
+      "id": "f10",
+      "text": "pivot_table에서 aggfunc를 생략하면 칸마다 값들의 ____을 계산한다.",
+      "answer": "평균",
+      "exp": "aggfunc의 기본값은 mean(평균)이다. 합계는 aggfunc='sum'으로 지정한다."
+    },
+    {
+      "id": "f11",
+      "text": "두 범주형 열의 값 조합마다 행 수를 세어 빈도표를 만드는 pandas 함수는 pd.____이다.",
+      "answer": "crosstab",
+      "exp": "pd.crosstab(df['반'], df['성별'])은 반별·성별 인원표를 만든다."
+    },
+    {
+      "id": "f12",
+      "text": "crosstab이나 pivot_table에 ____=True를 주면 전체 요약 행·열 All이 붙는다.",
+      "answer": "margins",
+      "exp": "margins=True는 행·열 끝에 All(전체) 요약을 덧붙인다."
+    },
+    {
+      "id": "f13",
+      "text": "pd.merge에서 두 표의 행을 짝지을 기준 열 이름을 지정하는 매개변수는 ____이다.",
+      "answer": "on",
+      "exp": "pd.merge(L, R, on='번호')는 번호 열을 키로 쓴다."
+    },
+    {
+      "id": "f14",
+      "text": "pd.merge에서 how를 생략하면 두 표 모두에 있는 키만 남기는 ____ 방식으로 결합한다.",
+      "answer": "inner",
+      "exp": "기본값은 how='inner'로, 한쪽에만 있는 행은 빠진다."
+    },
+    {
+      "id": "f15",
+      "text": "왼쪽 표의 행을 모두 남기고 오른쪽에 짝이 없는 칸은 NaN으로 채우려면 how='____'를 쓴다.",
+      "answer": "left",
+      "exp": "how='left'는 왼쪽 표를 기준으로 모든 행을 지킨다."
+    },
+    {
+      "id": "f16",
+      "text": "어느 한쪽 표에라도 있는 키를 모두 남기는 합집합 방식의 결합은 how='____'이다.",
+      "answer": "outer",
+      "exp": "outer는 양쪽 키를 모두 남기고, 짝이 없는 칸은 NaN이 된다."
+    },
+    {
+      "id": "f17",
+      "text": "키로 짝을 맞추지 않고 여러 표를 리스트로 받아 위아래나 옆으로 그대로 이어 붙이는 함수는 pd.____이다.",
+      "answer": "concat",
+      "exp": "pd.concat([a, b])는 기본으로 위아래(행 방향)로 쌓는다."
+    },
+    {
+      "id": "f18",
+      "text": "pd.concat으로 쌓은 뒤 인덱스가 0, 1, 0처럼 겹치지 않게 0부터 새로 매기려면 ____=True를 준다.",
+      "answer": "ignore_index",
+      "exp": "ignore_index=True는 원래 인덱스를 버리고 새 번호를 붙인다."
+    },
+    {
+      "id": "f19",
+      "text": "pd.concat([a, b], axis=____)로 쓰면 두 표를 열 방향, 즉 옆으로 나란히 붙인다.",
+      "answer": "1",
+      "exp": "axis=0(기본)은 위아래, axis=1은 옆으로 붙인다."
+    },
+    {
+      "id": "f20",
+      "text": "value_counts(____=True)는 각 값의 개수 대신 전체에서 차지하는 비율을 돌려주며, 여기에 100을 곱하면 백분율이 된다.",
+      "answer": "normalize",
+      "exp": "normalize=True를 주면 결과의 합이 1이 되는 비율로 바뀐다."
+    }
+  ],
+  "basic": [
+    {
+      "id": "b1",
+      "q": "그룹 집계(groupby)에 대한 설명으로 옳은 것은?",
+      "o": [
+        "같은 값을 가진 행끼리 묶어 묶음마다 대표값을 계산한다",
+        "두 표를 공통 열 값으로 짝지어 옆으로 이어 붙인다",
+        "결측치를 찾아 열의 평균으로 채운다",
+        "행의 순서를 무작위로 섞어 표본을 뽑는다"
+      ],
+      "a": 0,
+      "exp": "groupby는 기준 열의 값이 같은 행끼리 묶어 합계·평균 같은 대표값을 구한다. 공통 열로 옆에 붙이는 것은 merge, 결측치 채우기는 fillna가 하는 일이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b2",
+      "q": "df.groupby('반')['점수'].mean()이 구하는 것은?",
+      "o": [
+        "전체 학생의 점수 평균 하나",
+        "반별 점수 평균",
+        "반별 학생 수",
+        "점수별 반의 개수"
+      ],
+      "a": 1,
+      "exp": "'반'으로 묶고 '점수' 열의 평균(mean)을 구하므로 반마다 평균이 하나씩 나온다. 반별 학생 수는 size나 count로 센다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b3",
+      "q": "그룹 집계가 이루어지는 3단계를 순서대로 바르게 나열한 것은?",
+      "o": [
+        "결합 → 분할 → 적용",
+        "적용 → 분할 → 결합",
+        "분할 → 결합 → 적용",
+        "분할 → 적용 → 결합"
+      ],
+      "a": 3,
+      "exp": "먼저 기준 값마다 행을 나누고(분할), 묶음마다 계산한 뒤(적용), 결과를 하나로 모은다(결합). split-apply-combine이라고 한다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b4",
+      "q": "A반 학생 3명의 점수가 80, NaN(결측치), 70이다. df.groupby('반')['점수']의 count()와 size()가 돌려주는 A반 값을 차례로 고른 것은?",
+      "o": [
+        "2, 3",
+        "3, 3",
+        "3, 2",
+        "2, 2"
+      ],
+      "a": 0,
+      "exp": "count는 NaN을 빼고 값만 세므로 2, size는 NaN이 든 행까지 세므로 3이다. 둘을 바꿔 기억하지 않도록 주의한다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b5",
+      "q": "groupby 결과에서 묶음마다 결측치가 든 행까지 포함한 행 수를 세는 함수는?",
+      "o": [
+        "count()",
+        "sum()",
+        "size()",
+        "nunique()"
+      ],
+      "a": 2,
+      "exp": "size()는 행 수를 세므로 NaN이 있어도 센다. count()는 NaN을 빼고 세고, nunique()는 서로 다른 값의 개수를 센다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b6",
+      "q": "df.groupby('반')['점수'].agg(['mean', 'max'])의 결과로 옳은 것은?",
+      "o": [
+        "반별 평균과 최댓값이 mean 열과 max 열로 담긴 DataFrame",
+        "반별 평균과 최댓값을 더한 값이 담긴 Series",
+        "반별 최댓값만 담긴 Series",
+        "agg에는 함수를 하나만 넣을 수 있어 오류가 난다"
+      ],
+      "a": 0,
+      "exp": "agg에 함수 이름 리스트를 넘기면 함수마다 열이 하나씩 생긴 DataFrame이 나온다. 여러 함수를 한꺼번에 적용하는 것이 agg의 장점이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b7",
+      "q": "df.groupby('반').agg({'점수': 'mean', '나이': 'max'})가 하는 일로 옳은 것은?",
+      "o": [
+        "반별로 점수와 나이 모두 평균과 최댓값을 구한다",
+        "반별로 점수는 평균, 나이는 최댓값을 구한다",
+        "점수가 가장 높은 학생의 나이를 구한다",
+        "점수 평균이 가장 높은 반 하나만 고른다"
+      ],
+      "a": 1,
+      "exp": "딕셔너리 {'열': '함수'}를 넘기면 열마다 다른 집계를 한다. 점수 열에는 mean, 나이 열에는 max만 적용된다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b8",
+      "q": "df.groupby(['반', '성별'])['점수'].mean()의 결과에 대한 설명으로 옳은 것은?",
+      "o": [
+        "반별 평균과 성별 평균이 각각 따로 계산된다",
+        "반과 성별의 조합마다 평균이 나오고 인덱스가 두 단계이다",
+        "성별 열은 무시되고 반별 평균만 나온다",
+        "두 열 이상으로는 묶을 수 없어 오류가 난다"
+      ],
+      "a": 1,
+      "exp": "기준 열을 리스트로 넘기면 (반, 성별) 조합마다 묶고, 결과 인덱스는 두 단계로 된 MultiIndex가 된다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b9",
+      "q": "groupby 집계 결과에서 인덱스가 된 기준 값을 일반 열로 되돌리는 메서드는?",
+      "o": [
+        "set_index()",
+        "sort_index()",
+        "reset_index()",
+        "drop()"
+      ],
+      "a": 2,
+      "exp": "reset_index()는 인덱스를 열로 꺼내고 0부터 새 인덱스를 매긴다. set_index()는 반대로 열을 인덱스로 만들고, sort_index()는 인덱스 순서로 정렬한다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b10",
+      "q": "df.pivot_table(index='반', columns='성별', values='점수', aggfunc='sum')에서 요약표의 가로(열 머리)에 펼쳐지는 것은?",
+      "o": [
+        "반의 값",
+        "성별의 값",
+        "점수의 값",
+        "sum이라는 이름"
+      ],
+      "a": 1,
+      "exp": "columns에 준 열(성별)의 값이 가로 머리가 된다. index(반)는 세로 행, values(점수)는 칸 안에서 계산되는 값이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b11",
+      "q": "pivot_table에서 aggfunc를 지정하지 않으면 칸마다 계산되는 값은?",
+      "o": [
+        "합계",
+        "개수",
+        "최댓값",
+        "평균"
+      ],
+      "a": 3,
+      "exp": "pivot_table의 aggfunc 기본값은 mean이다. 합계가 필요하면 aggfunc='sum'을 직접 써야 한다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b12",
+      "q": "두 범주형 변수(예: 반, 성별)의 값 조합마다 행 수를 세는 빈도표를 가장 간단히 만드는 것은?",
+      "o": [
+        "pd.crosstab",
+        "pd.concat",
+        "pd.merge",
+        "df.describe"
+      ],
+      "a": 0,
+      "exp": "pd.crosstab(df['반'], df['성별'])은 조합마다 개수를 센 교차표를 만든다. concat·merge는 표를 합치는 함수이고, describe는 열마다 요약 통계를 보여 준다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b13",
+      "q": "pd.crosstab(df['반'], df['성별'], margins=True)에서 margins=True의 역할은?",
+      "o": [
+        "개수를 비율로 바꾼다",
+        "비어 있는 칸을 NaN으로 바꾼다",
+        "행·열 합계 All을 덧붙인다",
+        "행과 열을 뒤바꾼다"
+      ],
+      "a": 2,
+      "exp": "margins=True는 표 끝에 행 합계와 열 합계 All을 붙인다. 비율로 바꾸는 것은 normalize 옵션이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b14",
+      "q": "pd.merge(a, b, on='번호')처럼 how를 생략했을 때 쓰이는 결합 방식은?",
+      "o": [
+        "inner",
+        "left",
+        "outer",
+        "right"
+      ],
+      "a": 0,
+      "exp": "how의 기본값은 inner로, 두 표 모두에 있는 번호의 행만 남는다. 한쪽에만 있는 행은 결과에서 빠진다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b15",
+      "q": "pd.merge(stu, sc, on='번호')에서 '번호' 열처럼 두 표의 행을 짝짓는 기준이 되는 열을 무엇이라 하는가?",
+      "o": [
+        "결측치",
+        "키(key)",
+        "축(axis)",
+        "집계 함수"
+      ],
+      "a": 1,
+      "exp": "merge에서 행을 짝짓는 기준 열을 키(key)라 한다. 축(axis)은 concat에서 붙이는 방향을 정할 때 쓰는 말이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b16",
+      "q": "학생 명단 표(왼쪽)는 한 명도 빠짐없이 남기고, 점수 표(오른쪽)에 없는 학생은 점수를 NaN으로 두려 한다. pd.merge의 how에 넣을 값은?",
+      "o": [
+        "'inner'",
+        "'right'",
+        "'cross'",
+        "'left'"
+      ],
+      "a": 3,
+      "exp": "how='left'는 왼쪽 표의 행을 모두 남기고 짝이 없으면 NaN으로 채운다. inner는 점수가 없는 학생이 빠지고, right는 점수 표를 기준으로 남긴다. cross는 모든 행을 서로 짝짓는 방식이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b17",
+      "q": "두 표 중 어느 한쪽에라도 있는 키를 모두 남기는(합집합) merge 방식은?",
+      "o": [
+        "how='inner'",
+        "how='left'",
+        "how='outer'",
+        "how='right'"
+      ],
+      "a": 2,
+      "exp": "outer는 양쪽 키를 모두 남기는 합집합 방식이다. inner는 교집합, left·right는 한쪽 표의 키만 모두 남긴다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b18",
+      "q": "pd.concat([df1, df2])처럼 axis를 생략하면 두 표는 어떻게 붙는가?",
+      "o": [
+        "같은 키 값끼리 짝지어 옆으로 붙는다",
+        "행 방향으로 위아래로 쌓인다",
+        "열 방향으로 옆으로 나란히 붙는다",
+        "두 표에 공통인 열만 남기고 합쳐진다"
+      ],
+      "a": 1,
+      "exp": "concat의 기본값은 axis=0으로 위아래(행 방향)로 쌓는다. 키로 짝짓는 것은 merge이고, 기본 concat은 한쪽에만 있는 열도 남기고 NaN으로 채운다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b19",
+      "q": "pd.concat으로 두 표를 위아래로 쌓았더니 인덱스가 0, 1, 0이 되었다. 인덱스를 0부터 새로 매기게 하는 옵션은?",
+      "o": [
+        "axis=1",
+        "ignore_index=True",
+        "sort=True",
+        "how='outer'"
+      ],
+      "a": 1,
+      "exp": "ignore_index=True는 원래 인덱스를 버리고 0, 1, 2…로 새로 매긴다. axis=1은 옆으로 붙이는 설정이고, how는 merge의 옵션이다.",
+      "area": "ANAL"
+    },
+    {
+      "id": "b20",
+      "q": "전체 매출 200만 원 가운데 강남점 매출이 50만 원일 때 강남점의 매출 비중(백분율)은?",
+      "o": [
+        "25%",
+        "40%",
+        "50%",
+        "4%"
+      ],
+      "a": 0,
+      "exp": "비율 = 부분 ÷ 전체 = 50 ÷ 200 = 0.25이고, 백분율은 0.25 × 100 = 25%이다. 4%는 200 ÷ 50을 계산한 실수이다.",
+      "area": "ANAL"
+    }
+  ],
+  "summary": {
+    "keys": [
+      {
+        "k": "groupby",
+        "v": "df.groupby('기준')['값'].집계(). 분할 → 적용 → 결합, 결과 인덱스는 기준 값(기본 오름차순)"
+      },
+      {
+        "k": "count와 size",
+        "v": "count는 NaN을 뺀 값 개수, size는 NaN이 든 행까지 센 행 수. mean·sum도 NaN은 빼고 계산"
+      },
+      {
+        "k": "agg",
+        "v": "리스트 ['mean', 'max']는 함수 이름이 열 이름, 딕셔너리 {'열': '함수'}는 열마다 다른 집계, 새이름=('열', '함수')"
+      },
+      {
+        "k": "여러 열로 묶기",
+        "v": "groupby(['반', '성별'])는 조합마다 묶고 MultiIndex가 된다. reset_index() 또는 as_index=False로 일반 표"
+      },
+      {
+        "k": "pivot_table",
+        "v": "index(행)·columns(열)·values(값)·aggfunc(기본 mean). fill_value로 빈칸 채우기, margins=True로 All"
+      },
+      {
+        "k": "crosstab",
+        "v": "pd.crosstab(행 기준, 열 기준)으로 조합별 개수표. 없는 조합은 0, margins=True 합계, normalize 비율"
+      },
+      {
+        "k": "merge",
+        "v": "pd.merge(L, R, on='키', how=…). 기본 inner, left·right·outer는 짝 없으면 NaN, 겹친 열은 _x·_y"
+      },
+      {
+        "k": "concat",
+        "v": "pd.concat([a, b]). 기본 axis=0은 위아래, axis=1은 옆으로. ignore_index=True로 인덱스 새로 매기기"
+      },
+      {
+        "k": "비율·백분율",
+        "v": "부분 ÷ 전체(× 100). g / g.sum() * 100, value_counts(normalize=True), round(1)로 정리"
+      }
+    ],
+    "compare": [
+      {
+        "title": "merge의 how (왼쪽 번호 1~4, 오른쪽 번호 2~5)",
+        "head": [
+          "how",
+          "남는 키",
+          "행 수",
+          "NaN이 생기는 곳"
+        ],
+        "rows": [
+          [
+            "inner(기본)",
+            "양쪽 모두에 있는 키",
+            "3",
+            "없음"
+          ],
+          [
+            "left",
+            "왼쪽 표의 키 전부",
+            "4",
+            "오른쪽 열(번호 1의 점수)"
+          ],
+          [
+            "right",
+            "오른쪽 표의 키 전부",
+            "4",
+            "왼쪽 열(번호 5의 이름)"
+          ],
+          [
+            "outer",
+            "양쪽 키 전부(합집합)",
+            "5",
+            "양쪽 모두"
+          ]
+        ]
+      },
+      {
+        "title": "merge와 concat",
+        "head": [
+          "비교",
+          "merge",
+          "concat"
+        ],
+        "rows": [
+          [
+            "붙이는 기준",
+            "키 열의 값",
+            "방향(축)과 인덱스"
+          ],
+          [
+            "기본 동작",
+            "inner 결합, 옆으로 붙임",
+            "axis=0, 위아래로 쌓음"
+          ],
+          [
+            "쓰는 법",
+            "pd.merge(L, R, on='키')",
+            "pd.concat([a, b])"
+          ],
+          [
+            "짝이 없을 때",
+            "how에 따라 빠지거나 NaN",
+            "한쪽에만 있는 열은 NaN"
+          ]
+        ]
+      },
+      {
+        "title": "groupby·pivot_table·crosstab",
+        "head": [
+          "도구",
+          "결과 모양",
+          "기본 계산"
+        ],
+        "rows": [
+          [
+            "groupby",
+            "기준 값이 인덱스인 Series/DataFrame",
+            "직접 정함(sum·mean 등)"
+          ],
+          [
+            "pivot_table",
+            "행 × 열로 펼친 요약표",
+            "평균(mean)"
+          ],
+          [
+            "crosstab",
+            "행 × 열 빈도표",
+            "개수(없는 조합은 0)"
+          ]
+        ]
+      }
+    ],
+    "traps": [
+      "count는 NaN을 세지 않고 size는 센다. 점수가 빈 학생까지 인원에 넣으려면 size를 쓴다.",
+      "pivot_table의 aggfunc 기본값은 sum이 아니라 mean이다. 합계가 필요하면 aggfunc='sum'을 꼭 쓴다.",
+      "merge의 how 기본값은 inner라 한쪽에만 있는 행이 사라진다. 명단을 모두 지키려면 how='left'를 쓴다.",
+      "concat의 기본 axis=0은 위아래로 쌓는다. 옆으로 붙이려면 axis=1이고, 인덱스가 겹치면 ignore_index=True를 준다.",
+      "groupby 결과는 기준 값이 인덱스로 들어간다. 일반 열로 쓰려면 reset_index()를 붙인다.",
+      "문자열 열이 섞인 표에 groupby('반').mean()을 하면 오류가 날 수 있다. ['점수']처럼 계산할 열을 골라 쓴다.",
+      "비중은 분모부터 확인한다. 지점별 매출 비중(매출 합계 ÷ 전체 매출)과 건수 비중(value_counts)은 다르다.",
+      "키가 여러 번 나오는 1:N 결합에서는 짝이 되는 행마다 값이 복사되어 결과 행 수가 늘어날 수 있다."
+    ]
+  },
+  "advanced": [
+    {
+      "id": "a1",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'지점': ['강남', '강북', '강남', '강북', '강남'],\n                   '매출': [30, 20, 10, 50, 40]})\nr = df.groupby('지점')['매출'].sum()\nprint(r['강남'], r['강북'])",
+      "o": [
+        "70 80",
+        "40 50",
+        "80 70",
+        "3 2"
+      ],
+      "a": 2,
+      "exp": "강남은 30+10+40 = 80, 강북은 20+50 = 70이다. 40 50은 지점별 최댓값(max), 3 2는 지점별 행 수(size)이다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a2",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'A', 'B', 'B', 'B'],\n                   '점수': [90, None, 70, None, None]})\ng = df.groupby('반')['점수']\nprint(g.count().tolist(), g.size().tolist())",
+      "o": [
+        "[2, 3] [1, 1]",
+        "[2, 3] [2, 3]",
+        "[1, 1] [1, 1]",
+        "[1, 1] [2, 3]"
+      ],
+      "a": 3,
+      "exp": "None은 숫자 열에서 결측치 NaN이 된다. count는 NaN을 빼고 세므로 A 1, B 1이고, size는 행 수이므로 A 2, B 3이다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a3",
+      "q": "A반 학생 3명의 점수가 80, NaN(미응시), 90이다. df.groupby('반')['점수'].mean()이 돌려주는 A반의 값은?",
+      "o": [
+        "85.0",
+        "약 56.7",
+        "NaN",
+        "170.0"
+      ],
+      "a": 0,
+      "exp": "mean은 결측치를 빼고 계산하므로 (80 + 90) ÷ 2 = 85.0이다. NaN을 0으로 보고 3으로 나누면 약 56.7이 되는데, 이는 pandas의 기본 동작이 아니다. 170.0은 합계이다.",
+      "area": "ANAL",
+      "type": "계산"
+    },
+    {
+      "id": "a4",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'B', 'A', 'B', 'A'],\n                   '점수': [80, 70, 90, 60, 100]})\nr = df.groupby('반').agg(최고=('점수', 'max'),\n                         인원=('점수', 'count'))\nprint(r.loc['A', '최고'], r.loc['B', '인원'])",
+      "o": [
+        "90 2",
+        "100 3",
+        "270 2",
+        "100 2"
+      ],
+      "a": 3,
+      "exp": "이름 붙인 집계로 '최고' 열은 반별 max, '인원' 열은 반별 count이다. A반 최고는 100, B반 인원은 70·60의 2명이다. 90은 A반 평균, 270은 A반 합계, 3은 A반 인원이다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a5",
+      "q": "df에 반·성별·점수 열이 있다. 반을 세로(행), 성별을 가로(열)로 놓고 칸마다 점수 평균을 보여 주는 표를 만드는 코드로 옳은 것은?",
+      "o": [
+        "df.pivot_table(index='성별', columns='반', values='점수')",
+        "df.pivot_table(index='반', columns='성별', values='점수')",
+        "pd.crosstab(df['반'], df['성별'])",
+        "df.pivot_table(index='반', columns='성별', values='점수', aggfunc='sum')"
+      ],
+      "a": 1,
+      "exp": "행은 index='반', 열은 columns='성별', 값은 values='점수'이고 aggfunc를 생략하면 평균이다. index='성별'·columns='반'은 행·열이 뒤바뀌었고, crosstab은 개수를, aggfunc='sum'은 합계를 구한다.",
+      "area": "ANAL",
+      "type": "응용"
+    },
+    {
+      "id": "a6",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': ['A', 'A', 'B', 'A', 'B'],\n                   '과목': ['국어', '수학', '국어', '국어', '국어'],\n                   '점수': [70, 80, 90, 60, 50]})\np = df.pivot_table(index='반', columns='과목', values='점수',\n                   aggfunc='sum', fill_value=0)\nprint(p.loc['A', '국어'], p.loc['B', '수학'])",
+      "o": [
+        "65 0",
+        "130 nan",
+        "130 0",
+        "65.0 nan"
+      ],
+      "a": 2,
+      "exp": "A반 국어는 70 + 60 = 130(합계)이다. B반 수학은 자료가 없어 NaN이 될 칸이지만 fill_value=0으로 0이 채워진다. 65는 aggfunc를 평균으로 착각한 값이다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a7",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'학년': [1, 1, 2, 2, 2, 1],\n                   '동아리': ['코딩', '미술', '코딩', '코딩', '코딩', '미술']})\nct = pd.crosstab(df['학년'], df['동아리'], margins=True)\nprint(ct.loc['All', '코딩'], ct.loc[2, '미술'])",
+      "o": [
+        "4 nan",
+        "3 0",
+        "6 0",
+        "4 0"
+      ],
+      "a": 3,
+      "exp": "코딩은 1학년 1명, 2학년 3명으로 합계(All) 4이다. 2학년 미술은 한 명도 없는데, crosstab은 개수를 세므로 NaN이 아니라 0이다. 6은 전체 인원이다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a8",
+      "q": "groupby·pivot_table·crosstab에 대한 설명으로 옳지 않은 것은?",
+      "o": [
+        "groupby 결과의 기준 값은 기본적으로 오름차순으로 정렬된다.",
+        "pivot_table은 aggfunc를 생략하면 합계(sum)로 계산한다.",
+        "crosstab은 기본적으로 값 조합마다 행 수를 센다.",
+        "groupby(['반', '성별'])의 결과 인덱스는 두 단계로 이루어진다."
+      ],
+      "a": 1,
+      "exp": "pivot_table의 aggfunc 기본값은 합계가 아니라 평균(mean)이다. 나머지는 모두 옳은 설명이다.",
+      "area": "ANAL",
+      "type": "부정형"
+    },
+    {
+      "id": "a9",
+      "q": "표 L의 번호 열은 1, 2, 3, 4, 5이고 표 R의 번호 열은 3, 4, 5, 6, 7이다(각 표 안에서 번호는 겹치지 않는다). pd.merge(L, R, on='번호', how=…)에서 how가 'inner', 'left', 'outer'일 때 결과 행 수를 차례로 나열한 것은?",
+      "o": [
+        "3, 3, 7",
+        "5, 5, 10",
+        "3, 5, 7",
+        "2, 5, 7"
+      ],
+      "a": 2,
+      "exp": "inner는 공통 번호 3·4·5의 3행, left는 L의 번호 전부인 5행, outer는 1~7의 합집합 7행이다. 5, 5, 10은 행을 단순히 이어 붙였다고 착각한 값이다.",
+      "area": "ANAL",
+      "type": "계산"
+    },
+    {
+      "id": "a10",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\nstu = pd.DataFrame({'번호': [1, 2, 3, 4, 5],\n                    '이름': ['민수', '지은', '하준', '서연', '도윤']})\nsc = pd.DataFrame({'번호': [2, 4, 6],\n                   '점수': [85, 70, 95]})\nm = pd.merge(stu, sc, on='번호', how='left')\nprint(len(m), m['점수'].isna().sum())",
+      "o": [
+        "6 3",
+        "3 0",
+        "5 2",
+        "5 3"
+      ],
+      "a": 3,
+      "exp": "how='left'라 왼쪽 학생 5명이 모두 남고, 점수 표에 없는 번호 1·3·5의 점수가 NaN이 되어 결측치는 3개이다. 번호 6은 왼쪽에 없으므로 결과에 들어가지 않는다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a11",
+      "q": "pd.merge에 대한 설명으로 옳지 않은 것은?",
+      "o": [
+        "how를 생략하면 두 표 모두에 있는 키만 남는다.",
+        "키가 아닌 '점수' 열이 양쪽에 있으면 결과에 '점수_x'와 '점수_y'가 생긴다.",
+        "how='left'는 오른쪽 표의 행을 모두 남기고, 짝이 없는 칸을 NaN으로 채운다.",
+        "키 열 이름이 서로 다르면 left_on과 right_on으로 각각 지정한다."
+      ],
+      "a": 2,
+      "exp": "how='left'는 왼쪽 표의 행을 모두 남긴다. 오른쪽 표의 행을 모두 남기는 것은 how='right'이다. 나머지는 옳은 설명이다.",
+      "area": "ANAL",
+      "type": "부정형"
+    },
+    {
+      "id": "a12",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\na = pd.DataFrame({'이름': ['민수', '지은'], '점수': [80, 90]})\nb = pd.DataFrame({'이름': ['하준'], '반': ['B']})\nc = pd.concat([a, b], ignore_index=True)\nprint(c.shape, c['점수'].isna().sum())",
+      "o": [
+        "(3, 3) 1",
+        "(3, 2) 0",
+        "(2, 4) 1",
+        "(3, 3) 2"
+      ],
+      "a": 0,
+      "exp": "위아래로 쌓아 3행이 되고, 열은 이름·점수·반의 3개이다. 하준의 행에는 점수가 없어 NaN이 1개 생긴다(반 열의 NaN은 2개). concat 기본은 한쪽에만 있는 열도 남긴다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a13",
+      "q": "df에 반·점수 열이 있다. 다음 중 반마다 구하는 통계량의 종류가 나머지 셋과 다른 것은?",
+      "o": [
+        "df.groupby('반')['점수'].mean()",
+        "df.groupby('반')['점수'].agg('mean')",
+        "df.pivot_table(index='반', values='점수')",
+        "df.groupby('반')['점수'].count()"
+      ],
+      "a": 3,
+      "exp": "앞의 셋은 모두 반별 평균을 구한다(pivot_table은 aggfunc 기본값이 mean). count()는 반별로 결측치가 아닌 값의 개수를 센다.",
+      "area": "ANAL",
+      "type": "비교"
+    },
+    {
+      "id": "a14",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'지점': ['강남', '강북', '강남', '강서', '강북', '강남'],\n                   '매출': [30, 20, 10, 40, 60, 40]})\ng = df.groupby('지점')['매출'].sum()\nr = (g / g.sum() * 100).round(1)\nprint(r['강서'])",
+      "o": [
+        "16.7",
+        "0.2",
+        "20.0",
+        "40.0"
+      ],
+      "a": 2,
+      "exp": "전체 매출은 200이고 강서 매출 합계는 40이므로 40 ÷ 200 × 100 = 20.0이다. 16.7은 건수 비중(6건 중 1건), 0.2는 100을 곱하기 전의 비율이다.",
+      "area": "ANAL",
+      "type": "계산"
+    },
+    {
+      "id": "a15",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\norder = pd.DataFrame({'고객': ['가', '가', '나', '다'],\n                      '금액': [100, 200, 300, 400]})\ncust = pd.DataFrame({'고객': ['가', '나'],\n                     '지역': ['서울', '부산']})\nm = pd.merge(order, cust, on='고객')\nr = m.groupby('지역')['금액'].sum()\nprint(len(m), r['서울'])",
+      "o": [
+        "4 300",
+        "2 100",
+        "4 700",
+        "3 300"
+      ],
+      "a": 3,
+      "exp": "기본 inner 결합이라 고객 정보가 없는 '다'의 주문은 빠져 3행이 된다. 고객 '가'의 주문 2건에 지역 서울이 각각 붙으므로(1:N) 서울 금액 합계는 100 + 200 = 300이다.",
+      "area": "ANAL",
+      "type": "확장"
+    }
+  ]
+}

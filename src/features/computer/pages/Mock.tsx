@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { learnerPrefix, readJson, removeRaw, writeJson } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
-import { CG_UNIT_BY_ID, CG_UNITS, mcqById } from '../content';
+import { useCourse } from '../course';
 import { buildMock } from '../mock';
 import { activeWrongIds, addMock, isRegularMock, MOCK_LABEL, noteAnswer, scoreMock, WRONG_MOCK_MIN, type MockKind, type MockRecord } from '../model';
-import { MARK, ReviewCard } from '../McqRunner';
+import { CodeBlock, MARK, ReviewCard } from '../McqRunner';
 import { useCg } from '../store';
-import { CG_AREA_LABEL, CG_AREAS, CG_PASS, CG_UNIT_IDS, type CgMcq } from '../types';
+import { CG_PASS, type CgMcq } from '../types';
 
 const KINDS: MockKind[] = ['set1', 'set2', 'set3', 'random', 'wrong'];
 const pct = (c: number, t: number) => (t ? Math.round((c / t) * 100) : 0);
@@ -18,21 +18,28 @@ function usePrefix() {
   return learnerPrefix(id ? id.learnerKey : 'guest');
 }
 
+/** 영역 출제 순서 안내(컴퓨터 일반은 예전 문구 그대로) */
+const areaOrderText = (c: ReturnType<typeof useCourse>) =>
+  c.id === 'cg' ? '운영체제 → 주변기기 → 유지보수 → 네트워크 → 컴퓨터 일반' : c.areas.map((a) => a.label).join(' → ');
+
 export function MockHubPage() {
   const cg = useCg();
+  const course = useCourse();
+  const base = course.basePath;
   const prefix = usePrefix();
   const [, setTick] = useState(0);
-  const current = readJson<ExamState | null>(`${prefix}cg:mock:current`, null);
+  const curKey = `${prefix}${course.storage}:mock:current`;
+  const current = readJson<ExamState | null>(curKey, null);
   const wrongN = activeWrongIds(cg.state).length;
   const hist = [...cg.state.mock].reverse();
   const best = (k: MockKind) => cg.state.mock.filter((m) => m.kind === k).reduce((b, m) => Math.max(b, m.score), -1);
   return (
     <div className="stack" style={{ maxWidth: 900, margin: '0 auto', width: '100%' }}>
-      <p className="crumbs" style={{ margin: 0 }}><Link to="/computer">컴퓨터 일반</Link> / 모의고사</p>
+      <p className="crumbs" style={{ margin: 0 }}><Link to={base}>{course.name}</Link> / 모의고사</p>
       <h1 style={{ margin: 0 }}>모의고사</h1>
       <p className="muted" style={{ margin: 0 }}>
         사지선다 {CG_PASS.mock.total}문항 · {CG_PASS.mock.minutes}분 · {CG_PASS.mock.need}문항 이상이면 합격 기준이에요.
-        단원별로 고르게 뽑아 영역 순서(운영체제 → 주변기기 → 유지보수 → 네트워크 → 컴퓨터 일반)로 나와요.
+        단원별로 고르게 뽑아 영역 순서({areaOrderText(course)})로 나와요.
       </p>
       {current && (
         <div className="notice row">
@@ -41,8 +48,8 @@ export function MockHubPage() {
           ) : (
             <span>{MOCK_LABEL[current.kind]}을(를) 풀던 중이에요.</span>
           )}
-          <Link className="btn btn-small btn-primary" to={`/computer/mock/${current.kind}`}>{Date.now() - current.startedAt > CG_PASS.mock.minutes * 60_000 ? '채점하기' : '이어서 풀기'}</Link>
-          <button className="btn btn-small btn-quiet" onClick={() => { removeRaw(`${prefix}cg:mock:current`); setTick((t) => t + 1); }}>버리기</button>
+          <Link className="btn btn-small btn-primary" to={`${base}/mock/${current.kind}`}>{Date.now() - current.startedAt > CG_PASS.mock.minutes * 60_000 ? '채점하기' : '이어서 풀기'}</Link>
+          <button className="btn btn-small btn-quiet" onClick={() => { removeRaw(curKey); setTick((t) => t + 1); }}>버리기</button>
         </div>
       )}
       <div className="cg-mock-grid">
@@ -57,7 +64,7 @@ export function MockHubPage() {
               </span>
               <span className="small">{b >= 0 ? `최고 ${b}점` : '아직 안 봤어요'}</span>
               {disabled ? <span className="small muted">오답이 {WRONG_MOCK_MIN}문항 이상 모이면 열려요.</span> : (
-                <Link className="btn btn-small btn-primary" to={`/computer/mock/${k}`} onClick={() => { if (current && current.kind !== k) removeRaw(`${prefix}cg:mock:current`); }}>
+                <Link className="btn btn-small btn-primary" to={`${base}/mock/${k}`} onClick={() => { if (current && current.kind !== k) removeRaw(curKey); }}>
                   {current?.kind === k ? '이어서 풀기' : '시작'}
                 </Link>
               )}
@@ -102,22 +109,26 @@ interface ExamState {
 
 export function MockExamPage() {
   const { kind } = useParams();
+  const base = useCourse().basePath;
   const k = kind as MockKind;
-  if (!KINDS.includes(k)) return <Navigate to="/computer/mock" replace />;
+  if (!KINDS.includes(k)) return <Navigate to={`${base}/mock`} replace />;
   return <Exam kind={k} key={k} />;
 }
 
 function Exam({ kind }: { kind: MockKind }) {
   const cg = useCg();
+  const course = useCourse();
+  const base = course.basePath;
+  const mcqById = course.mcqById;
   const prefix = usePrefix();
-  const key = `${prefix}cg:mock:current`;
+  const key = `${prefix}${course.storage}:mock:current`;
   const nav = useNavigate();
   const [exam, setExam] = useState<ExamState | null>(() => {
     const saved = readJson<ExamState | null>(key, null);
-    if (saved && saved.kind === kind && saved.orders && saved.ids.every((id) => mcqById(id))) return saved;
+    if (saved && saved.kind === kind && saved.orders && Array.isArray(saved.ids) && saved.ids.length && saved.ids.every((id) => mcqById(id))) return saved;
     const wrongIds = activeWrongIds(cg.state);
     if (kind === 'wrong' && wrongIds.length < WRONG_MOCK_MIN) return null;
-    const paper = buildMock(CG_UNITS, kind, { wrongIds });
+    const paper = buildMock(course.units, kind, { wrongIds, seedPrefix: course.mockSeed, areas: course.areas.map((a) => a.id) });
     if (!paper.items.length) return null;
     return { kind, ids: paper.items.map((q) => q.id), orders: Object.fromEntries(paper.items.map((q, i) => [q.id, paper.orders[i]])), answers: {}, startedAt: Date.now(), idx: 0 };
   });
@@ -125,7 +136,7 @@ function Exam({ kind }: { kind: MockKind }) {
   const [now, setNow] = useState(Date.now());
   const [confirm, setConfirm] = useState(false);
   const submitted = useRef(false);
-  const items = useMemo(() => (exam ? exam.ids.map((id) => mcqById(id)).filter((q): q is CgMcq => !!q) : []), [exam]);
+  const items = useMemo(() => (exam ? exam.ids.map((id) => mcqById(id)).filter((q): q is CgMcq => !!q) : []), [exam, mcqById]);
   const limit = CG_PASS.mock.minutes * 60;
   const elapsed = exam ? Math.floor((now - exam.startedAt) / 1000) : 0;
   const left = limit - elapsed;
@@ -171,8 +182,8 @@ function Exam({ kind }: { kind: MockKind }) {
 
   if (!exam) return (
     <div className="stack">
-      <p className="notice">오답노트에 문항이 {WRONG_MOCK_MIN}개 이상 모이면 오답 모의고사를 볼 수 있어요.</p>
-      <Link className="btn" to="/computer/mock">모의고사 목록</Link>
+      <p className="notice">{kind === 'wrong' ? `오답노트에 문항이 ${WRONG_MOCK_MIN}개 이상 모이면 오답 모의고사를 볼 수 있어요.` : '모의고사 문항을 준비하고 있어요. 잠시 후 다시 들어와 주세요.'}</p>
+      <Link className="btn" to={`${base}/mock`}>모의고사 목록</Link>
     </div>
   );
   if (result) return <MockResult {...result} />;
@@ -197,8 +208,9 @@ function Exam({ kind }: { kind: MockKind }) {
         </div>
       )}
       <div className="panel stack">
-        <p className="small muted" style={{ margin: 0 }}>{exam.idx + 1}번 · {CG_AREA_LABEL[q.area]}</p>
+        <p className="small muted" style={{ margin: 0 }}>{exam.idx + 1}번 · {course.areaLabel(q.area)}</p>
         <h2 className="cg-q" style={{ margin: 0 }}>{exam.idx + 1}. {q.question}</h2>
+        {q.code && <CodeBlock code={q.code} label="문제 코드" />}
         <fieldset>
           <legend className="sr-only">보기</legend>
           <div className="options">
@@ -220,12 +232,14 @@ function Exam({ kind }: { kind: MockKind }) {
           <button key={x.id} className={`${exam.answers[x.id] !== undefined ? 'done' : ''}${i === exam.idx ? ' cur' : ''}`} aria-current={i === exam.idx ? 'true' : undefined} aria-label={`${i + 1}번${exam.answers[x.id] !== undefined ? ' 답함' : ''}`} onClick={() => go(i)}>{i + 1}</button>
         ))}
       </nav>
-      <p className="small muted">풀던 답은 이 기기에 저장돼요. 시간은 시작한 때부터 계속 흘러요. <button className="btn btn-small btn-quiet" onClick={() => { removeRaw(key); nav('/computer/mock'); }}>그만두기(기록 없이 나가기)</button></p>
+      <p className="small muted">풀던 답은 이 기기에 저장돼요. 시간은 시작한 때부터 계속 흘러요. <button className="btn btn-small btn-quiet" onClick={() => { removeRaw(key); nav(`${base}/mock`); }}>그만두기(기록 없이 나가기)</button></p>
     </div>
   );
 }
 
 function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: CgMcq[]; answers: Record<string, number>; orders: Record<string, number[]> }) {
+  const course = useCourse();
+  const base = course.basePath;
   const pass = rec.total === CG_PASS.mock.total && rec.score >= CG_PASS.mock.need;
   const wrong = items.filter((q) => answers[q.id] !== q.answer);
   return (
@@ -242,18 +256,18 @@ function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: C
         <div className="panel">
           <h2>단원별 정답률</h2>
           <table className="data"><tbody>
-            {CG_UNIT_IDS.filter((u) => rec.perUnit[u]).map((u) => {
+            {course.unitIds.filter((u) => rec.perUnit[u]).map((u) => {
               const [c, t] = rec.perUnit[u]!;
-              return <tr key={u}><th scope="row">{u.replace('U', '')}단원 {CG_UNIT_BY_ID[u]?.title}</th><td>{c}/{t}</td><td><Bar v={pct(c, t)} /></td></tr>;
+              return <tr key={u}><th scope="row">{u.replace('U', '')}단원 {course.unitById(u)?.title}</th><td>{c}/{t}</td><td><Bar v={pct(c, t)} /></td></tr>;
             })}
           </tbody></table>
         </div>
         <div className="panel">
           <h2>영역별 정답률</h2>
           <table className="data"><tbody>
-            {CG_AREAS.filter((a) => rec.perArea[a]).map((a) => {
+            {course.areas.map((a) => a.id).filter((a) => rec.perArea[a]).map((a) => {
               const [c, t] = rec.perArea[a]!;
-              return <tr key={a}><th scope="row">{CG_AREA_LABEL[a]}</th><td>{c}/{t}</td><td><Bar v={pct(c, t)} /></td></tr>;
+              return <tr key={a}><th scope="row">{course.areaLabel(a)}</th><td>{c}/{t}</td><td><Bar v={pct(c, t)} /></td></tr>;
             })}
           </tbody></table>
         </div>
@@ -263,8 +277,8 @@ function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: C
         {wrong.map((q) => <ReviewCard key={q.id} q={q} n={items.indexOf(q) + 1} picked={answers[q.id]} order={orders[q.id]} />)}
       </section>
       <div className="row">
-        <Link className="btn btn-primary" to="/computer/mock">모의고사 목록</Link>
-        <Link className="btn" to="/computer/wrong">오답노트</Link>
+        <Link className="btn btn-primary" to={`${base}/mock`}>모의고사 목록</Link>
+        <Link className="btn" to={`${base}/wrong`}>오답노트</Link>
       </div>
     </div>
   );

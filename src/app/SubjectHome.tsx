@@ -4,14 +4,16 @@ import { Garden } from '../components/Garden';
 import { InAppNotice } from '../components/InAppNotice';
 import { Plant } from '../components/Plant';
 import { useAuth } from '../features/auth/AuthContext';
+import { NEW_COURSES, type NewCourseId } from '../features/computer/courses/defs';
 import { readRaw } from '../lib/storage';
 
 export const LAST_SUBJECT_KEY = 'sqlforest:last-subject';
-export type SubjectId = 'db' | 'cg';
+export type SubjectId = 'db' | 'cg' | NewCourseId;
 
 /** 경로로 과목을 판정(최근 과목 표시용) */
 export function subjectOfPath(path: string): SubjectId | null {
-  if (path.startsWith('/computer')) return 'cg';
+  if (/^\/computer(\/|$)/.test(path)) return 'cg';
+  for (const c of NEW_COURSES) if (path === c.path || path.startsWith(`${c.path}/`)) return c.id;
   if (/^\/(db|garden|learn|challenge|final|pre|review|report|practice)(\/|$)/.test(path)) return 'db';
   return null;
 }
@@ -42,6 +44,15 @@ const SUBJECTS: SubjectCard[] = [
     to: () => '/computer',
     art: <Plant stage={5} size={150} title="컴퓨터 일반: 꽃 핀 식물" />,
   },
+  // 같은 단원 × 5단계 구조의 새 과목들. 첫 화면에는 과목 이름·소개만(자격증 이름은 각 과목 화면에서 작게만)
+  ...NEW_COURSES.map((c, i): SubjectCard => ({
+    id: c.id,
+    name: c.name,
+    summary: c.summary,
+    facts: [`${c.units.length}단원 × 5단계`, '모의고사 50문항 · 50분', '오답노트 자동 정리'],
+    to: () => c.path,
+    art: <Plant stage={[3, 4, 6][i] ?? 4} size={150} title={`${c.name}: 자라는 식물`} />,
+  })),
 ];
 
 export function SubjectHome() {

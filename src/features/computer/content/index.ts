@@ -1,6 +1,8 @@
 import matchRaw from './card_match.json' with { type: 'json' };
 import raw from './pc_bank.json' with { type: 'json' };
-import { CG_AREAS, type CgArea, type CgCardMatch, type CgMcq, type CgTable, type CgUnit, type CgUnitId } from '../types';
+import { makeCourse, type CourseConfig } from '../course';
+import { CG_AREA_LABEL, CG_AREAS, type CgCardMatch, type CgMcq, type CgUnit, type CgUnitId } from '../types';
+import { adaptUnits, type RawUnit } from './adapt';
 
 /**
  * 컴퓨터 일반 8단원 문제은행.
@@ -8,57 +10,20 @@ import { CG_AREAS, type CgArea, type CgCardMatch, type CgMcq, type CgTable, type
  * 앱 표준 형태로 바꾼다. 문항 ID는 단원 안에서만 고유하므로 'U1-b1'처럼 단원을 붙인다.
  * 카드별 개념 맞추기(card_match.json)는 원본과 따로 보관한다(카드 ID 'U1-t1' 기준, 선생님 검토용).
  */
-interface RawTable { head: string[]; rows: string[][] }
-interface RawQ { id: string; q: string; o: string[]; a: number; exp: string; area: string; type?: string }
-interface RawUnit {
-  unit: number;
-  title: string;
-  intro: string;
-  theory: { id: string; title: string; points: string[]; table?: RawTable; tip?: string; ext: boolean }[];
-  bank: string[];
-  fill: { id: string; text: string; answer: string; exp: string }[];
-  basic: RawQ[];
-  summary: { keys: { k: string; v: string }[]; compare: (RawTable & { title: string })[]; traps: string[] };
-  advanced: RawQ[];
-}
-
-const table = (t: RawTable | undefined, caption?: string): CgTable | undefined =>
-  t ? { ...(caption ? { caption } : {}), header: t.head, rows: t.rows } : undefined;
-
-const area = (a: string): CgArea => (CG_AREAS.includes(a as CgArea) ? (a as CgArea) : 'GEN');
-
-function mcq(unitId: CgUnitId, set: 'basic' | 'check', q: RawQ): CgMcq {
-  return {
-    id: `${unitId}-${q.id}`, unitId, set, question: q.q, options: q.o, answer: q.a,
-    explanation: q.exp, area: area(q.area), ...(q.type ? { tag: q.type } : {}),
-  };
-}
-
 export function adaptBank(units: RawUnit[], matches: Record<string, CgCardMatch> = {}): CgUnit[] {
-  return units.map((u) => {
-    const id = `U${u.unit}` as CgUnitId;
-    return {
-      id, num: u.unit, title: u.title, intro: u.intro,
-      cards: u.theory.map((t) => {
-        const cid = `${id}-${t.id}`;
-        const m = Object.hasOwn(matches, cid) ? matches[cid] : undefined;
-        return {
-          id: cid, title: t.title.replace(/^\[확장\]\s*/, ''), points: t.points,
-          ...(t.table ? { table: table(t.table) } : {}), ...(t.tip ? { tip: t.tip } : {}), ext: !!t.ext,
-          ...(m ? { match: m } : {}),
-        };
-      }),
-      wordBox: u.bank,
-      blanks: u.fill.map((f) => ({ id: `${id}-${f.id}`, text: f.text, answer: f.answer, explanation: f.exp })),
-      basic: u.basic.map((q) => mcq(id, 'basic', q)),
-      summary: { keys: u.summary.keys, tables: u.summary.compare.map((c) => table(c, c.title)!), traps: u.summary.traps },
-      check: u.advanced.map((q) => mcq(id, 'check', q)),
-    };
-  });
+  // 모르는 영역은 예전처럼 '컴퓨터 일반(GEN)'으로
+  return adaptUnits(units, { areas: CG_AREAS, fallbackArea: 'GEN', matches });
 }
 
-export const CG_UNITS: CgUnit[] = adaptBank(raw as RawUnit[], matchRaw as Record<string, CgCardMatch>);
+export const CG_UNITS: CgUnit[] = adaptBank(raw as unknown as RawUnit[], matchRaw as Record<string, CgCardMatch>);
+
+/** 컴퓨터 일반 과목 정의: 저장 키 'cg:'·cg_progress·모의고사 시드 'cg-mock-…'는 예전 그대로 */
+export const CG_COURSE: CourseConfig = makeCourse({
+  id: 'cg', name: '컴퓨터 일반', basePath: '/computer', units: CG_UNITS,
+  areas: CG_AREAS.map((id) => ({ id, label: CG_AREA_LABEL[id] })),
+  remote: { kind: 'cg' }, storage: 'cg', mockSeed: 'cg',
+});
+
 export const CG_UNIT_BY_ID: Partial<Record<CgUnitId, CgUnit>> = Object.fromEntries(CG_UNITS.map((u) => [u.id, u]));
-const MCQ_MAP = new Map(CG_UNITS.flatMap((u) => [...u.basic, ...u.check]).map((q) => [q.id, q]));
 /** 문항 찾기(없는 ID·'constructor' 같은 키는 undefined) */
-export const mcqById = (id: string): CgMcq | undefined => MCQ_MAP.get(id);
+export const mcqById = (id: string): CgMcq | undefined => CG_COURSE.mcqById(id);

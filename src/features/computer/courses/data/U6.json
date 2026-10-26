@@ -1,0 +1,1093 @@
+{
+  "unit": 6,
+  "title": "데이터 전처리",
+  "intro": "분석 전에 데이터를 깨끗하게 다듬는 전처리를 익힌다. 결측치 확인·삭제·채우기, 중복 제거, 자료형·날짜 변환, 열 이름 바꾸기·삭제, 파생 변수 만들기, 문자열 열 처리, 이상치 처리까지 pandas 코드로 연습한다.",
+  "theory": [
+    {
+      "id": "t1",
+      "title": "전처리와 결측치 확인: isna·isnull",
+      "points": [
+        "데이터 전처리는 분석 전에 빠진 값·중복·잘못된 형식·튀는 값을 찾아 고치는 작업이다. 전처리가 엉성하면 평균 같은 분석 결과도 틀어진다.",
+        "값이 비어 있는 칸을 결측치라 한다. 예: 설문에서 키를 적지 않은 학생의 키 칸이다. pandas는 숫자 열의 결측치를 NaN(Not a Number)으로 표시한다.",
+        "isna()는 칸마다 결측치이면 True, 값이 있으면 False를 돌려준다. isnull()은 isna()와 똑같이 동작하는 다른 이름이다.",
+        "isna().sum()은 True를 1로 세어 열마다 결측치 개수를 알려 준다. isna().sum().sum()은 표 전체의 결측치 개수이다.",
+        "notna()는 반대로 값이 있으면 True이다. info()의 Non-Null Count로도 열마다 비어 있지 않은 값의 수를 볼 수 있다."
+      ],
+      "tip": "isna와 isnull은 같은 기능 — 개수를 세려면 뒤에 .sum()",
+      "code": "import pandas as pd\nimport numpy as np\ndf = pd.DataFrame({'이름': ['가', '나', '다', '라'],\n                   '키': [160, np.nan, 172, np.nan],\n                   '몸무게': [50, 61, np.nan, 58]})\nprint(df.isna().sum().tolist())   # [0, 2, 1]\nprint(df.isna().sum().sum())      # 3\nprint(df['키'].notna().sum())     # 2",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "결측치",
+            "desc": "값이 비어 있는 칸으로, pandas에서는 NaN으로 표시된다"
+          },
+          {
+            "term": "isna().sum()",
+            "desc": "열마다 빈 칸이 몇 개인지 세어 주는 표현"
+          },
+          {
+            "term": "notna",
+            "desc": "칸에 값이 들어 있으면 True를 돌려주는 메서드"
+          }
+        ],
+        "distractor": "dropna"
+      }
+    },
+    {
+      "id": "t2",
+      "title": "결측치 지우기: dropna",
+      "points": [
+        "dropna()는 결측치가 하나라도 있는 행을 지운 새 DataFrame을 돌려준다. 원본은 그대로이므로 df = df.dropna()처럼 다시 대입해야 바뀐다.",
+        "how='all'을 주면 모든 값이 비어 있는 행만 지운다. 기본값 how='any'는 하나라도 비면 지운다.",
+        "subset=['키']를 주면 키 열에 결측치가 있는 행만 지운다. 키는 있고 몸무게만 빈 행은 남는다.",
+        "axis=1을 주면 행 대신 결측치가 있는 열을 지운다. 기본값 axis=0은 행을 지운다.",
+        "지우기는 간단하지만 데이터가 줄어든다. 결측치가 여러 열에 흩어져 있으면 무작정 지울 때 남는 행이 얼마 없을 수 있다."
+      ],
+      "tip": "dropna 기본은 하나라도 빈 '행' 삭제 — 열을 지우려면 axis=1",
+      "code": "import pandas as pd\nimport numpy as np\ndf = pd.DataFrame({'키': [160, np.nan, 172, np.nan],\n                   '몸무게': [50, 61, np.nan, np.nan]})\nprint(len(df.dropna()))               # 1\nprint(len(df.dropna(how='all')))      # 3\nprint(len(df.dropna(subset=['키'])))  # 2\nprint(len(df))                        # 4 (원본은 그대로)",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "how='all'",
+            "desc": "모든 칸이 비어 있는 행만 골라 지우게 하는 옵션"
+          },
+          {
+            "term": "subset",
+            "desc": "지정한 열에 빈 칸이 있는 행만 지우게 하는 옵션"
+          },
+          {
+            "term": "axis=1",
+            "desc": "행 대신 빈 칸이 있는 열을 지우게 하는 옵션"
+          }
+        ],
+        "distractor": "how='any'"
+      }
+    },
+    {
+      "id": "t3",
+      "title": "결측치 채우기: fillna",
+      "points": [
+        "fillna(값)은 결측치를 지정한 값으로 채운 새 결과를 돌려준다. 예: df['몸무게'].fillna(0)은 빈 몸무게를 0으로 채운다.",
+        "mean()은 결측치를 빼고 평균을 낸다. [160, NaN, 170, NaN, 180]의 평균은 (160+170+180)÷3 = 170.0이다.",
+        "수치형 열은 흔히 평균으로 채운다. s.fillna(s.mean())은 빈 칸을 나머지 값의 평균으로 채우므로 평균이 그대로 유지된다.",
+        "0으로 채우면 '값이 0'이라는 자료가 생겨 (값이 양수라면) 평균이 낮아진다. 위 예에서 fillna(0) 뒤 평균은 510÷5 = 102.0이 된다.",
+        "이상치가 있어 평균이 한쪽으로 끌려가면 median()(중앙값)으로 채운다. 범주형 열은 최빈값(mode)이나 '없음' 같은 글자로 채운다."
+      ],
+      "tip": "0으로 채우기 = '값이 0'으로 바꾸기 — 평균이 낮아질 수 있다",
+      "code": "import pandas as pd\nimport numpy as np\ns = pd.Series([160, np.nan, 170, np.nan, 180])\nprint(s.mean())                     # 170.0\nprint(s.fillna(0).tolist())\n# [160.0, 0.0, 170.0, 0.0, 180.0]\nprint(s.fillna(0).mean())           # 102.0\nprint(s.fillna(s.mean()).tolist())\n# [160.0, 170.0, 170.0, 170.0, 180.0]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "fillna",
+            "desc": "빈 칸을 지정한 값으로 채운 결과를 돌려주는 메서드"
+          },
+          {
+            "term": "mean()",
+            "desc": "빈 칸은 빼고 나머지 값으로 평균을 내는 메서드"
+          },
+          {
+            "term": "median()",
+            "desc": "튀는 값에 덜 흔들리는, 크기순 가운데 값을 구하는 메서드"
+          }
+        ],
+        "distractor": "mode()"
+      }
+    },
+    {
+      "id": "t4",
+      "title": "중복 데이터: duplicated·drop_duplicates",
+      "points": [
+        "같은 내용의 행이 두 번 이상 들어간 것을 중복 데이터라 한다. 예: 설문을 두 번 제출해 같은 응답이 두 줄로 남은 경우이다.",
+        "duplicated()는 앞에서 이미 나온 행과 모든 열 값이 같으면 True를 돌려준다. 처음 나온 행은 False이다(기본값 keep='first').",
+        "duplicated().sum()은 중복 행 개수이고, drop_duplicates()는 중복 행을 지워 처음 나온 행만 남긴 결과이다.",
+        "subset=['이름']을 주면 이름 열 값만 비교한다. drop_duplicates에서 keep='last'는 마지막에 나온 행을 남기고, keep=False는 겹친 행을 모두 지운다."
+      ],
+      "tip": "같은 행이 3번이면 duplicated().sum()은 2 — 처음 행은 중복이 아니다",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'이름': ['민수', '지아', '민수', '현우', '지아'],\n                   '점수': [80, 90, 80, 70, 95]})\nprint(df.duplicated().tolist())\n# [False, False, True, False, False]\nprint(len(df.drop_duplicates()))                 # 4\nprint(len(df.drop_duplicates(subset=['이름'])))  # 3\nlast = df.drop_duplicates(subset=['이름'], keep='last')\nprint(last['점수'].tolist())                     # [80, 70, 95]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "duplicated()",
+            "desc": "앞에서 이미 나온 행과 같으면 True로 표시하는 메서드"
+          },
+          {
+            "term": "drop_duplicates()",
+            "desc": "겹치는 행을 지우고 처음 나온 행만 남긴 결과를 돌려주는 메서드"
+          },
+          {
+            "term": "keep='last'",
+            "desc": "겹친 행 가운데 마지막에 나온 행을 남기게 하는 옵션"
+          }
+        ],
+        "distractor": "unique()"
+      }
+    },
+    {
+      "id": "t5",
+      "title": "자료형 확인과 변환: dtypes·astype",
+      "points": [
+        "자료형은 값의 종류이다. dtypes로 열마다 자료형을 확인하며, int64는 정수, float64는 실수, 글자 열은 object(새 버전은 str)로 표시된다.",
+        "'85'처럼 글자로 저장된 숫자는 계산에 바로 쓸 수 없다. 글자끼리 +는 이어 붙이기라서 '85' + '70'은 '8570'이 된다.",
+        "astype(자료형)은 열의 자료형을 바꾼 결과를 돌려준다. astype(int)는 정수, astype(float)는 실수, astype(str)은 글자로 바꾼다.",
+        "'1,200'처럼 쉼표가 섞인 글자나 결측치(NaN)가 있는 열은 astype(int)에서 오류가 난다. 쉼표는 먼저 지우고, 결측치는 먼저 채운다."
+      ],
+      "tip": "계산 전에 dtypes부터 — 숫자가 글자로 읽혔다면 astype",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'국어': ['85', '90'], '수학': ['70', '95']})\nprint((df['국어'] + df['수학']).tolist())  # ['8570', '9095']\ndf['국어'] = df['국어'].astype(int)\ndf['수학'] = df['수학'].astype(int)\nprint((df['국어'] + df['수학']).tolist())  # [155, 185]\nprint(df['국어'].astype(float).tolist())   # [85.0, 90.0]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "dtypes",
+            "desc": "열마다 값의 종류를 한꺼번에 보여 주는 속성"
+          },
+          {
+            "term": "astype",
+            "desc": "열의 값 종류를 원하는 것으로 바꾼 결과를 돌려주는 메서드"
+          },
+          {
+            "term": "float64",
+            "desc": "소수점이 있는 실수 열에 붙는 자료형 이름"
+          }
+        ],
+        "distractor": "int64"
+      }
+    },
+    {
+      "id": "t6",
+      "title": "날짜 변환: to_datetime과 dt",
+      "points": [
+        "'2024-03-15'처럼 글자로 저장된 날짜에서는 연·월을 꺼내거나 날짜 계산을 할 수 없다. pd.to_datetime()으로 날짜 자료형으로 바꾼다.",
+        "날짜형 열은 .dt 접근자로 부분을 꺼낸다. dt.year는 연도, dt.month는 월, dt.day는 일이다.",
+        "dt.dayofweek는 요일을 숫자로 돌려준다. 월요일이 0, 화요일이 1, …, 일요일이 6이다.",
+        "날짜끼리 빼면 기간이 나오고 .days로 일수를 얻는다. 예: 2024-03-15에서 2024-03-01을 빼면 14일이다.",
+        "df['월'] = df['날짜'].dt.month처럼 꺼낸 값을 새 열로 만들면 월별 집계에 쓸 수 있다."
+      ],
+      "tip": "dt.day는 며칠(1~31), 요일은 dt.dayofweek(월요일 = 0)",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'날짜': ['2024-03-01', '2024-03-15', '2024-11-02']})\ndf['날짜'] = pd.to_datetime(df['날짜'])\nprint(df['날짜'].dt.year.tolist())       # [2024, 2024, 2024]\nprint(df['날짜'].dt.month.tolist())      # [3, 3, 11]\nprint(df['날짜'].dt.dayofweek.tolist())  # [4, 4, 5] 금·금·토\nprint((df['날짜'][1] - df['날짜'][0]).days)  # 14",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "pd.to_datetime()",
+            "desc": "글자로 된 날짜를 날짜 자료형으로 바꾸는 함수"
+          },
+          {
+            "term": "dt.month",
+            "desc": "날짜형 열에서 1~12의 달을 꺼내는 표현"
+          },
+          {
+            "term": "dt.dayofweek",
+            "desc": "요일을 숫자로 꺼내며 월요일이 0인 표현"
+          }
+        ],
+        "distractor": "dt.day"
+      }
+    },
+    {
+      "id": "t7",
+      "title": "열 이름 바꾸기·열 삭제: rename·drop",
+      "points": [
+        "rename(columns={'옛 이름': '새 이름'})은 열 이름을 바꾼다. 딕셔너리에 적은 열만 바뀌고 나머지 열 이름은 그대로이다.",
+        "drop(columns=['비고'])는 비고 열을 지운다. drop('비고', axis=1)도 같은 뜻이다.",
+        "drop의 기본 방향은 행(axis=0)이다. drop('비고')처럼 열 이름만 주면 행 인덱스에서 '비고'를 찾다가 없어서 KeyError가 난다.",
+        "drop(index=[0, 2])는 인덱스가 0, 2인 행을 지운다. 행 삭제가 기본 방향이라 drop([0, 2])도 같다.",
+        "rename·drop도 새 결과를 돌려줄 뿐 원본은 그대로이다. df = df.drop(columns=['비고'])처럼 다시 대입한다."
+      ],
+      "tip": "열을 지울 땐 columns= 또는 axis=1 — 빠뜨리면 KeyError",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'nm': ['가', '나', '다'], 'kor': [80, 90, 75],\n                   '비고': ['', '전학', '']})\ndf = df.rename(columns={'nm': '이름', 'kor': '국어'})\nprint(df.columns.tolist())   # ['이름', '국어', '비고']\ndf = df.drop(columns=['비고'])\nprint(df.columns.tolist())   # ['이름', '국어']\nprint(df.drop(index=[0, 2]).shape)  # (1, 2)",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "rename",
+            "desc": "옛 이름과 새 이름을 딕셔너리로 짝지어 열 이름을 바꾸는 메서드"
+          },
+          {
+            "term": "axis=1",
+            "desc": "drop에서 지울 대상이 행이 아니라 열임을 알려 주는 옵션"
+          },
+          {
+            "term": "KeyError",
+            "desc": "지울 이름을 행 인덱스에서 찾지 못했을 때 나는 오류"
+          }
+        ],
+        "distractor": "IndexError"
+      }
+    },
+    {
+      "id": "t8",
+      "title": "파생 변수: 열 계산·np.where·apply",
+      "points": [
+        "파생 변수는 기존 열을 계산·가공해 새로 만든 열이다. df['합계'] = df['국어'] + df['수학']처럼 없는 열 이름에 대입하면 새 열이 생긴다.",
+        "열끼리의 계산은 같은 행끼리 한꺼번에 이루어진다. df['평균'] = df['합계'] / 2처럼 숫자와도 계산할 수 있다.",
+        "np.where(조건, 참일 때 값, 거짓일 때 값)은 행마다 조건을 따져 두 값 중 하나를 고른다. 예: 평균 80 이상이면 '우수', 아니면 '보통'이다.",
+        "apply(함수)는 열의 값 하나하나에 함수를 적용한다. 등급을 세 단계 이상으로 나누듯 조건이 복잡하면 def로 함수를 만들어 넘긴다.",
+        "함수를 넘길 때는 괄호 없이 이름만 쓴다. apply(grade)가 맞고, apply(grade())는 grade를 먼저 호출해 버려 오류이다."
+      ],
+      "tip": "두 갈래는 np.where, 세 갈래 이상은 함수 + apply",
+      "code": "import pandas as pd\nimport numpy as np\ndf = pd.DataFrame({'국어': [90, 70, 85], '수학': [80, 60, 95]})\ndf['합계'] = df['국어'] + df['수학']\ndf['평균'] = df['합계'] / 2\ndf['결과'] = np.where(df['평균'] >= 80, '우수', '보통')\ndef grade(x):\n    if x >= 90:\n        return 'A'\n    elif x >= 70:\n        return 'B'\n    return 'C'\ndf['등급'] = df['평균'].apply(grade)\nprint(df['합계'].tolist())  # [170, 130, 180]\nprint(df['결과'].tolist())  # ['우수', '보통', '우수']\nprint(df['등급'].tolist())  # ['B', 'C', 'A']",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "파생 변수",
+            "desc": "기존 열을 계산하거나 가공해 새로 만든 열"
+          },
+          {
+            "term": "np.where",
+            "desc": "조건의 참·거짓에 따라 두 값 중 하나를 행마다 고르는 함수"
+          },
+          {
+            "term": "apply",
+            "desc": "열의 값 하나하나에 지정한 함수를 적용하는 메서드"
+          }
+        ],
+        "distractor": "groupby"
+      }
+    },
+    {
+      "id": "t9",
+      "title": "문자열 열 처리: str 접근자",
+      "points": [
+        "글자 열에 문자열 기능을 쓰려면 .str을 붙인다. df['코드'].str.upper()가 맞고, df['코드'].upper()는 AttributeError가 난다.",
+        "str.contains('서울')은 값에 '서울'이 들어 있으면 True를 돌려준다. df[df['주소'].str.contains('서울')]로 해당 행만 고를 수 있다.",
+        "str.replace(',', '')는 값 속의 쉼표를 지운다. '1,200'을 '1200'으로 만든 뒤 astype(int)로 바꾸면 계산할 수 있다.",
+        "str.upper()는 대문자, str.lower()는 소문자, str.strip()은 앞뒤 공백 제거이다. ' kim'과 'Kim'은 정리하기 전에는 서로 다른 값이다."
+      ],
+      "tip": "Series.replace는 칸 전체가 같을 때만 바꾼다 — 글자 일부는 str.replace",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'주소': ['서울 강남', '부산 해운대', '서울 마포'],\n                   '가격': ['1,200', '850', '2,000'],\n                   '코드': ['ab1', 'Cd2', 'ef3']})\nprint(df['주소'].str.contains('서울').sum())  # 2\ndf['가격'] = df['가격'].str.replace(',', '').astype(int)\nprint(df['가격'].sum())                       # 4050\nprint(df['코드'].str.upper().tolist())        # ['AB1', 'CD2', 'EF3']\nseoul = df[df['주소'].str.contains('서울')]\nprint(seoul['가격'].tolist())                 # [1200, 2000]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "str.contains",
+            "desc": "특정 글자가 들어 있으면 True를 돌려주는 메서드"
+          },
+          {
+            "term": "str.replace",
+            "desc": "값 속 글자 일부를 다른 글자로 바꾸는 메서드"
+          },
+          {
+            "term": "str.upper()",
+            "desc": "영문자를 모두 대문자로 바꾸는 메서드"
+          }
+        ],
+        "distractor": "str.strip()"
+      }
+    },
+    {
+      "id": "t10",
+      "title": "이상치 처리: IQR 경계·제거·clip",
+      "points": [
+        "이상치는 다른 값들과 동떨어진 값이다. 예: 고등학생 키 자료에 1700이 있으면 170을 잘못 입력했을 가능성이 크다.",
+        "IQR = Q3 − Q1이며, Q1 − 1.5×IQR보다 작거나 Q3 + 1.5×IQR보다 큰 값을 이상치로 본다. Q1·Q3는 quantile(0.25)·quantile(0.75)로 구한다.",
+        "처리 방법에는 ① 불리언 인덱싱으로 그 행 제거 ② 경계값으로 바꾸기 ③ 중앙값 등 다른 값으로 대체하기가 있다.",
+        "clip(lower=하한, upper=상한)은 하한보다 작은 값은 하한으로, 상한보다 큰 값은 상한으로 바꾼다. 행 수는 그대로이다.",
+        "먼저 입력 실수인지 실제로 드문 값인지 확인한다. 실제 값이면 지우지 않고 그대로 분석에 쓸 수도 있다."
+      ],
+      "tip": "경계는 Q1−1.5×IQR, Q3+1.5×IQR — 경계와 같은 값은 이상치가 아니다",
+      "code": "import pandas as pd\ns = pd.Series([5, 11, 12, 13, 14, 15, 16, 17, 40])\nq1 = s.quantile(0.25)\nq3 = s.quantile(0.75)\niqr = q3 - q1\nlow = q1 - 1.5 * iqr\nhigh = q3 + 1.5 * iqr\nprint(q1, q3, iqr)   # 12.0 16.0 4.0\nprint(low, high)     # 6.0 22.0\nprint(s[(s >= low) & (s <= high)].tolist())\n# [11, 12, 13, 14, 15, 16, 17]\nprint(s.clip(lower=6, upper=22).tolist())\n# [6, 11, 12, 13, 14, 15, 16, 17, 22]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "이상치",
+            "desc": "다른 값들과 동떨어져 홀로 튀는 값"
+          },
+          {
+            "term": "IQR",
+            "desc": "3사분위수에서 1사분위수를 뺀 값"
+          },
+          {
+            "term": "clip",
+            "desc": "하한·상한 밖의 값을 경계값으로 바꾸는 메서드"
+          }
+        ],
+        "distractor": "quantile"
+      }
+    }
+  ],
+  "bank": [
+    "전처리",
+    "NaN",
+    "sum()",
+    "dropna()",
+    "how='all'",
+    "fillna()",
+    "중앙값",
+    "duplicated()",
+    "drop_duplicates()",
+    "IQR",
+    "astype",
+    "to_datetime",
+    "dt.month",
+    "rename",
+    "axis=1",
+    "파생 변수",
+    "np.where",
+    "apply",
+    "str.contains",
+    "str.replace",
+    "isnull()",
+    "how='any'",
+    "평균",
+    "unique()",
+    "dt.year",
+    "axis=0",
+    "str.upper()",
+    "dtypes",
+    "clip",
+    "notna()"
+  ],
+  "fill": [
+    {
+      "id": "f1",
+      "text": "분석하기 전에 결측치·중복·잘못된 형식·이상치를 찾아 고치는 작업을 데이터 ____라 한다.",
+      "answer": "전처리",
+      "exp": "전처리가 잘돼야 평균 같은 분석 결과가 정확해진다."
+    },
+    {
+      "id": "f2",
+      "text": "pandas는 숫자 열에서 비어 있는 칸을 ____(Not a Number)으로 표시한다.",
+      "answer": "NaN",
+      "exp": "결측치는 NaN으로 표시되며 isna()로 찾는다."
+    },
+    {
+      "id": "f3",
+      "text": "df.isna() 뒤에 ____를 붙이면 True를 1로 세어 열마다 결측치 개수를 알려 준다.",
+      "answer": "sum()",
+      "exp": "isna().sum()은 열별 결측치 개수, 한 번 더 .sum()하면 전체 개수이다."
+    },
+    {
+      "id": "f4",
+      "text": "결측치가 하나라도 있는 행을 지운 결과를 돌려주는 메서드는 ____이다.",
+      "answer": "dropna()",
+      "exp": "dropna()의 기본값은 how='any', axis=0이다."
+    },
+    {
+      "id": "f5",
+      "text": "dropna(____)를 쓰면 모든 값이 비어 있는 행만 지운다.",
+      "answer": "how='all'",
+      "exp": "기본값 how='any'는 하나라도 비면 지우고, how='all'은 전부 비었을 때만 지운다."
+    },
+    {
+      "id": "f6",
+      "text": "결측치를 0이나 평균 같은 값으로 채운 결과를 돌려주는 메서드는 ____이다.",
+      "answer": "fillna()",
+      "exp": "fillna(0), fillna(df['열'].mean())처럼 채울 값을 괄호에 넣는다."
+    },
+    {
+      "id": "f7",
+      "text": "이상치 때문에 평균이 한쪽으로 끌려간 열은 결측치를 크기순 가운데 값인 ____으로 채우는 편이 낫다.",
+      "answer": "중앙값",
+      "exp": "중앙값(median)은 순서상 가운데 값이라 이상치에 덜 흔들린다."
+    },
+    {
+      "id": "f8",
+      "text": "앞에서 이미 나온 행과 모든 열 값이 같은 행에 True를 표시하는 메서드는 ____이다.",
+      "answer": "duplicated()",
+      "exp": "기본값 keep='first'라 처음 나온 행은 False이다."
+    },
+    {
+      "id": "f9",
+      "text": "중복 행을 지우고 처음 나온 행만 남긴 결과를 얻으려면 ____를 쓴다.",
+      "answer": "drop_duplicates()",
+      "exp": "subset으로 비교할 열을, keep으로 남길 행을 정할 수 있다."
+    },
+    {
+      "id": "f10",
+      "text": "Q3에서 Q1을 뺀 값인 ____에 1.5를 곱해 이상치의 아래·위 경계를 정한다.",
+      "answer": "IQR",
+      "exp": "Q1 − 1.5×IQR 미만, Q3 + 1.5×IQR 초과를 이상치로 본다."
+    },
+    {
+      "id": "f11",
+      "text": "글자로 저장된 '85'를 정수로 바꾸려면 df['점수'].____(int)라고 쓴다.",
+      "answer": "astype",
+      "exp": "astype(int)·astype(float)·astype(str)로 자료형을 바꾼다."
+    },
+    {
+      "id": "f12",
+      "text": "'2024-03-15' 같은 글자를 날짜 자료형으로 바꾸는 pandas 함수는 pd.____()이다.",
+      "answer": "to_datetime",
+      "exp": "날짜형으로 바꿔야 .dt로 연·월·일을 꺼낼 수 있다."
+    },
+    {
+      "id": "f13",
+      "text": "날짜형 열에서 월(1~12)을 꺼내려면 df['날짜'].____라고 쓴다.",
+      "answer": "dt.month",
+      "exp": "연도는 dt.year, 일은 dt.day, 요일은 dt.dayofweek이다."
+    },
+    {
+      "id": "f14",
+      "text": "df.____(columns={'kor': '국어'})는 열 이름 kor를 국어로 바꾼 결과를 돌려준다.",
+      "answer": "rename",
+      "exp": "딕셔너리는 {옛 이름: 새 이름} 순서로 쓴다."
+    },
+    {
+      "id": "f15",
+      "text": "drop으로 열을 지울 때 columns=를 쓰지 않는다면 ____을 함께 줘야 KeyError가 나지 않는다.",
+      "answer": "axis=1",
+      "exp": "drop의 기본 방향은 행(axis=0)이라 열 이름을 행에서 찾다가 KeyError가 난다."
+    },
+    {
+      "id": "f16",
+      "text": "df['합계'] = df['국어'] + df['수학']처럼 기존 열을 계산해 새로 만든 열을 ____라 한다.",
+      "answer": "파생 변수",
+      "exp": "없는 열 이름에 대입하면 새 열이 생긴다."
+    },
+    {
+      "id": "f17",
+      "text": "행마다 조건을 따져 참이면 한 값, 거짓이면 다른 값을 넣는 NumPy 함수는 ____이다.",
+      "answer": "np.where",
+      "exp": "np.where(조건, 참일 때 값, 거짓일 때 값) 형태로 쓴다."
+    },
+    {
+      "id": "f18",
+      "text": "df['평균'].____(grade)처럼 열의 값 하나하나에 def로 만든 함수를 적용한다.",
+      "answer": "apply",
+      "exp": "함수 이름만 괄호 없이 넘긴다. apply(grade())는 오류이다."
+    },
+    {
+      "id": "f19",
+      "text": "주소 열 값에 '서울'이 들어 있는지 True·False로 알려면 df['주소'].____('서울')을 쓴다.",
+      "answer": "str.contains",
+      "exp": "결과를 불리언 인덱싱에 넣으면 서울이 들어간 행만 고를 수 있다."
+    },
+    {
+      "id": "f20",
+      "text": "'1,200'의 쉼표를 지우려면 값 속 글자 일부를 바꾸는 ____(',', '')를 쓴다.",
+      "answer": "str.replace",
+      "exp": "쉼표를 지운 뒤 astype(int)로 바꿔야 계산할 수 있다."
+    }
+  ],
+  "basic": [
+    {
+      "id": "b1",
+      "q": "데이터 전처리에 대한 설명으로 가장 알맞은 것은?",
+      "o": [
+        "분석 전에 결측치·중복·잘못된 형식·이상치를 찾아 고치는 작업이다",
+        "분석 결과를 그래프로 그려 보여 주는 작업이다",
+        "어떤 데이터를 모을지 정하는 문제 정의 단계이다",
+        "분석 결과를 보고서로 정리하는 작업이다"
+      ],
+      "a": 0,
+      "exp": "전처리는 분석 직전에 데이터를 깨끗하게 다듬는 단계이다. 그래프 그리기는 시각화, 모을 데이터 정하기는 문제 정의, 보고서 정리는 해석·보고 단계이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b2",
+      "q": "pandas DataFrame의 숫자 열에서 값이 비어 있는 칸은 어떻게 표시되는가?",
+      "o": [
+        "0",
+        "NaN",
+        "False",
+        "-1"
+      ],
+      "a": 1,
+      "exp": "결측치는 NaN(Not a Number)으로 표시된다. 0이나 -1은 실제 값이고, False는 isna() 같은 판정 결과에 나오는 값이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b3",
+      "q": "df.isna().sum()을 실행하면 얻는 결과로 알맞은 것은?",
+      "o": [
+        "전체 행의 개수",
+        "열마다 값이 들어 있는 칸의 개수",
+        "열마다 결측치의 개수",
+        "결측치가 있는 행만 모은 표"
+      ],
+      "a": 2,
+      "exp": "isna()가 결측치를 True로 표시하고 sum()이 True를 1로 세므로 열마다 결측치 개수가 나온다. 값이 들어 있는 칸 수는 notna().sum()이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b4",
+      "q": "isna()와 똑같은 결과를 내는 메서드는?",
+      "o": [
+        "notna()",
+        "dropna()",
+        "fillna()",
+        "isnull()"
+      ],
+      "a": 3,
+      "exp": "isnull()은 isna()의 다른 이름이다. notna()는 반대로 값이 있으면 True이고, dropna()·fillna()는 결측치를 지우거나 채운다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b5",
+      "q": "df.dropna()를 옵션 없이 실행했을 때의 동작으로 옳은 것은?",
+      "o": [
+        "결측치를 0으로 바꾼다",
+        "모든 값이 비어 있는 행만 지운다",
+        "결측치가 있는 열을 지운다",
+        "결측치가 하나라도 있는 행을 지운다"
+      ],
+      "a": 3,
+      "exp": "기본값은 how='any', axis=0이라 결측치가 하나라도 있는 행을 지운다. 전부 빈 행만 지우려면 how='all', 열을 지우려면 axis=1, 0으로 바꾸려면 fillna(0)이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b6",
+      "q": "키 열의 결측치를 키 열의 평균으로 채운 결과를 얻는 코드로 옳은 것은?",
+      "o": [
+        "df['키'].dropna(df['키'].mean())",
+        "df['키'].fillna(df['키'].mean())",
+        "df['키'].mean().fillna()",
+        "df['키'].fillna('mean')"
+      ],
+      "a": 1,
+      "exp": "fillna 괄호 안에 채울 값을 넣는다. 채울 값은 df['키'].mean()으로 계산한 평균이다. fillna('mean')은 평균이 아니라 'mean'이라는 글자를 넣으라는 뜻이고, dropna는 지우는 메서드이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b7",
+      "q": "결측치를 평균 대신 중앙값으로 채우는 편이 더 알맞은 경우는?",
+      "o": [
+        "결측치가 하나도 없을 때",
+        "모든 값이 똑같을 때",
+        "아주 큰 이상치가 있어 평균이 한쪽으로 끌려갔을 때",
+        "열이 '남·여' 같은 범주형일 때"
+      ],
+      "a": 2,
+      "exp": "중앙값은 크기순 가운데 값이라 이상치에 덜 흔들린다. 범주형 열은 평균·중앙값을 구할 수 없어 최빈값이나 '없음' 같은 글자로 채운다.",
+      "area": "STAT"
+    },
+    {
+      "id": "b8",
+      "q": "df.duplicated()에 대한 설명으로 옳은 것은?",
+      "o": [
+        "앞에서 이미 나온 행과 모든 열 값이 같은 행을 True로 표시한다",
+        "중복된 행을 바로 지운 결과를 돌려준다",
+        "처음 나온 행과 그 뒤의 같은 행을 모두 True로 표시한다",
+        "결측치가 있는 행을 True로 표시한다"
+      ],
+      "a": 0,
+      "exp": "기본값 keep='first'라 처음 나온 행은 False, 뒤에 다시 나온 같은 행만 True이다. 지우는 것은 drop_duplicates(), 결측치 판정은 isna()이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b9",
+      "q": "df.drop_duplicates(subset=['이름'])의 결과로 알맞은 것은?",
+      "o": [
+        "이름 열을 지운 표",
+        "이름 값이 같은 행들 가운데 처음 나온 행만 남긴 표",
+        "이름이 비어 있는 행을 지운 표",
+        "이름 값이 겹친 행을 하나도 남기지 않고 모두 지운 표"
+      ],
+      "a": 1,
+      "exp": "subset은 비교할 열을 정하고, 기본값 keep='first'라 처음 나온 행이 남는다. 겹친 행을 모두 지우려면 keep=False를 써야 한다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b10",
+      "q": "점수 열에 '85', '90'처럼 숫자가 글자로 저장돼 있다. 평균을 구하기 전에 정수로 바꾸는 코드로 옳은 것은?",
+      "o": [
+        "df['점수'].astype(int)",
+        "df['점수'].dtypes(int)",
+        "df['점수'].int()",
+        "df['점수'].to_datetime()"
+      ],
+      "a": 0,
+      "exp": "자료형 변환은 astype(자료형)이다. dtypes는 자료형을 확인하는 속성이고, to_datetime은 날짜로 바꾸는 pandas 함수(pd.to_datetime)이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b11",
+      "q": "df.dtypes로 확인할 수 있는 것은?",
+      "o": [
+        "열마다 결측치 개수",
+        "열마다 자료형",
+        "행과 열의 개수",
+        "열마다 평균"
+      ],
+      "a": 1,
+      "exp": "dtypes는 int64·float64처럼 열별 자료형을 보여 준다. 행·열 개수는 shape, 결측치 개수는 isna().sum(), 평균은 mean()이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b12",
+      "q": "'2024-05-20' 같은 글자 날짜에서 연·월을 꺼내려 할 때 먼저 해야 할 일은?",
+      "o": [
+        "astype(int)로 정수로 바꾼다",
+        "str.upper()로 대문자로 바꾼다",
+        "pd.to_datetime()으로 날짜 자료형으로 바꾼다",
+        "dropna()로 결측치를 지운다"
+      ],
+      "a": 2,
+      "exp": "글자 상태에서는 .dt를 쓸 수 없다. pd.to_datetime()으로 날짜형으로 바꾼 뒤 dt.year·dt.month로 꺼낸다. '2024-05-20'은 하이픈 때문에 astype(int)도 오류이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b13",
+      "q": "날짜형으로 바뀐 df['날짜'] 열에서 연도만 꺼내는 표현은?",
+      "o": [
+        "df['날짜'].year",
+        "df['날짜'].str.year",
+        "df.year('날짜')",
+        "df['날짜'].dt.year"
+      ],
+      "a": 3,
+      "exp": "날짜형 열의 부분은 .dt 접근자로 꺼낸다. .str은 글자 열용이고, Series에 바로 .year를 붙이면 오류이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b14",
+      "q": "날짜형 열의 dt.dayofweek에 대한 설명으로 옳은 것은?",
+      "o": [
+        "월요일을 0으로 시작해 요일을 숫자로 돌려준다",
+        "일요일을 0으로 시작해 요일을 숫자로 돌려준다",
+        "한 달 중 며칠인지(1~31)를 돌려준다",
+        "1년 중 몇 번째 주인지를 돌려준다"
+      ],
+      "a": 0,
+      "exp": "dayofweek는 월요일 0, 화요일 1, …, 일요일 6이다. 한 달 중 며칠인지는 dt.day이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b15",
+      "q": "열 이름 'kor'를 '국어'로 바꾼 결과를 얻는 코드로 옳은 것은?",
+      "o": [
+        "df.rename(columns={'국어': 'kor'})",
+        "df.rename(columns={'kor': '국어'})",
+        "df.rename(index={'kor': '국어'})",
+        "df.columns('kor', '국어')"
+      ],
+      "a": 1,
+      "exp": "rename의 딕셔너리는 {옛 이름: 새 이름} 순서이다. {'국어': 'kor'}는 순서가 반대이고, index=는 열이 아니라 행 이름을 바꾼다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b16",
+      "q": "df에서 '비고' 열을 지운 결과를 얻는 코드로 옳은 것은?",
+      "o": [
+        "df.drop('비고')",
+        "df.dropna('비고')",
+        "df.drop(columns=['비고'])",
+        "df.drop(index=['비고'])"
+      ],
+      "a": 2,
+      "exp": "drop의 기본 방향은 행이라 df.drop('비고')와 index=['비고']는 행 인덱스에서 '비고'를 찾다가 KeyError가 난다. dropna는 결측치를 지우는 메서드이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b17",
+      "q": "df['합계'] = df['국어'] + df['수학']을 실행하면 일어나는 일은?",
+      "o": [
+        "행마다 국어와 수학 점수를 더한 '합계' 열이 새로 생긴다",
+        "국어 열의 값이 합계로 바뀐다",
+        "표 맨 아래에 합계 행이 추가된다",
+        "'합계' 열이 아직 없으므로 KeyError가 난다"
+      ],
+      "a": 0,
+      "exp": "없는 열 이름에 대입하면 새 열(파생 변수)이 생기고, 같은 행끼리 더해진다. 열을 꺼낼 때와 달리 대입할 때는 없는 이름이어도 오류가 나지 않는다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b18",
+      "q": "np.where(df['점수'] >= 60, '합격', '불합격')의 결과로 알맞은 것은?",
+      "o": [
+        "점수가 60 이상인 행만 남긴 표",
+        "점수가 60 이상인 행의 개수",
+        "행마다 60 이상이면 '합격', 아니면 '불합격'인 값들",
+        "60 미만 점수를 60으로 바꾼 값들"
+      ],
+      "a": 2,
+      "exp": "np.where(조건, 참일 때 값, 거짓일 때 값)은 행 수를 그대로 두고 행마다 두 값 중 하나를 고른다. 행을 고르는 것은 불리언 인덱싱, 개수는 (조건).sum()이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b19",
+      "q": "주소 열에 '서울'이 들어 있는 행만 고르는 코드로 옳은 것은?",
+      "o": [
+        "df[df['주소'].contains('서울')]",
+        "df[df['주소'] == '서울']",
+        "df['주소'].str.replace('서울')",
+        "df[df['주소'].str.contains('서울')]"
+      ],
+      "a": 3,
+      "exp": "글자 일부가 들어 있는지는 .str.contains로 확인한다. == '서울'은 값 전체가 정확히 '서울'인 행만 골라 '서울 강남'은 빠진다. .str 없이 contains를 쓰면 오류이다.",
+      "area": "PREP"
+    },
+    {
+      "id": "b20",
+      "q": "IQR 방법에서 위쪽 이상치 경계로 알맞은 것은? (Q1: 1사분위수, Q3: 3사분위수, IQR = Q3 − Q1)",
+      "o": [
+        "Q3 + IQR",
+        "Q3 + 1.5 × IQR",
+        "Q1 + 1.5 × IQR",
+        "평균 + 1.5 × IQR"
+      ],
+      "a": 1,
+      "exp": "위쪽 경계는 Q3 + 1.5×IQR, 아래쪽 경계는 Q1 − 1.5×IQR이다. 이 경계를 벗어난 값을 이상치로 본다.",
+      "area": "STAT"
+    }
+  ],
+  "summary": {
+    "keys": [
+      {
+        "k": "결측치 확인",
+        "v": "isna()·isnull()은 빈 칸이면 True. isna().sum()은 열별 결측치 개수, isna().sum().sum()은 전체 개수"
+      },
+      {
+        "k": "dropna",
+        "v": "기본은 결측치가 하나라도 있는 행 삭제. how='all'은 모두 빈 행만, subset=[열]은 그 열 기준, axis=1은 열 삭제"
+      },
+      {
+        "k": "fillna",
+        "v": "fillna(0)·fillna(평균). mean()은 NaN을 빼고 계산. 이상치가 있으면 중앙값, 범주형은 최빈값으로 채운다"
+      },
+      {
+        "k": "중복 처리",
+        "v": "duplicated()는 앞에 나온 행과 같으면 True(처음 행은 False). drop_duplicates()는 처음 행만 남김, subset·keep 옵션"
+      },
+      {
+        "k": "자료형 변환",
+        "v": "dtypes로 확인, astype(int·float·str)로 변환. 쉼표가 섞였거나 NaN이 있으면 int 변환 오류 → 먼저 정리"
+      },
+      {
+        "k": "날짜 변환",
+        "v": "pd.to_datetime() 뒤 .dt.year·.dt.month·.dt.day·.dt.dayofweek(월요일 0). 날짜끼리 빼면 기간(.days)"
+      },
+      {
+        "k": "열 이름·열 삭제",
+        "v": "rename(columns={옛: 새}), drop(columns=[열]) 또는 drop(열, axis=1). 결과는 다시 대입해야 저장"
+      },
+      {
+        "k": "파생 변수",
+        "v": "df['새 열'] = 계산식, np.where(조건, 참값, 거짓값), 열.apply(함수)"
+      },
+      {
+        "k": "문자열 열",
+        "v": ".str을 붙여 쓴다: str.contains·str.replace·str.upper·str.lower·str.strip"
+      },
+      {
+        "k": "이상치",
+        "v": "IQR = Q3 − Q1. Q1 − 1.5×IQR 미만, Q3 + 1.5×IQR 초과가 이상치. 제거·clip(경계로 바꾸기)·대체"
+      }
+    ],
+    "compare": [
+      {
+        "title": "결측치 처리 방법",
+        "head": [
+          "방법",
+          "코드 예",
+          "특징"
+        ],
+        "rows": [
+          [
+            "행 지우기",
+            "df.dropna()",
+            "간단하지만 행이 줄어든다"
+          ],
+          [
+            "0으로 채우기",
+            "df['열'].fillna(0)",
+            "행은 유지되지만 평균이 낮아질 수 있다"
+          ],
+          [
+            "평균으로 채우기",
+            "df['열'].fillna(df['열'].mean())",
+            "평균은 유지되지만 이상치에 흔들린다"
+          ],
+          [
+            "중앙값으로 채우기",
+            "df['열'].fillna(df['열'].median())",
+            "이상치가 있을 때 알맞다"
+          ]
+        ]
+      },
+      {
+        "title": "drop_duplicates의 keep 옵션 (이름 A가 1·3·5번째에 나올 때)",
+        "head": [
+          "keep",
+          "남는 A 행",
+          "뜻"
+        ],
+        "rows": [
+          [
+            "'first'(기본)",
+            "1번째",
+            "처음 나온 행을 남긴다"
+          ],
+          [
+            "'last'",
+            "5번째",
+            "마지막에 나온 행을 남긴다"
+          ],
+          [
+            "False",
+            "없음",
+            "겹친 행을 모두 지운다"
+          ]
+        ]
+      },
+      {
+        "title": "헷갈리는 짝",
+        "head": [
+          "구분",
+          "앞의 것",
+          "뒤의 것"
+        ],
+        "rows": [
+          [
+            "isna() / notna()",
+            "빈 칸이면 True",
+            "값이 있으면 True"
+          ],
+          [
+            "drop('열') / drop(columns=['열'])",
+            "행에서 찾아 KeyError",
+            "열을 지운다"
+          ],
+          [
+            "replace / str.replace",
+            "칸 값 전체가 같을 때만 바꿈",
+            "값 속 글자 일부를 바꿈"
+          ],
+          [
+            "dt.day / dt.dayofweek",
+            "그 달의 며칠(1~31)",
+            "요일 번호(월요일 0)"
+          ]
+        ]
+      }
+    ],
+    "traps": [
+      "dropna·fillna·rename·drop은 새 결과를 돌려준다. df = df.dropna()처럼 다시 대입하지 않으면 원본은 그대로이다.",
+      "drop('비고')처럼 axis 없이 열 이름을 주면 행에서 찾다가 KeyError가 난다. columns=['비고'] 또는 axis=1을 쓴다.",
+      "duplicated()는 처음 나온 행을 False로 둔다. 같은 행이 3번 나오면 duplicated().sum()은 3이 아니라 2이다.",
+      "결측치나 '1,200' 같은 쉼표가 있으면 astype(int)는 오류가 난다. 결측치 처리·쉼표 제거를 먼저 한다.",
+      "문자열 기능은 .str을 붙여야 한다. df['이름'].upper()는 AttributeError이다.",
+      "Series.replace(',', '')는 값 전체가 ','인 칸만 바꾼다. 글자 일부를 바꾸려면 str.replace를 쓴다.",
+      "dt.dayofweek는 월요일이 0, 일요일이 6이다. dt.day는 요일이 아니라 그 달의 며칠이다.",
+      "값이 모두 양수일 때 결측치를 0으로 채우면 평균이 낮아진다. mean()은 NaN을 빼고 계산하므로 채우기 전과 후의 평균이 다를 수 있다."
+    ]
+  },
+  "advanced": [
+    {
+      "id": "a1",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\nimport numpy as np\ndf = pd.DataFrame({'키': [160, np.nan, 172, np.nan, 158],\n                   '몸무게': [50, 61, np.nan, np.nan, 47]})\na = len(df.dropna())\nb = len(df.dropna(how='all'))\nc = len(df.dropna(subset=['몸무게']))\nprint(a, b, c)",
+      "o": [
+        "2 4 3",
+        "2 3 3",
+        "3 4 2",
+        "2 4 2"
+      ],
+      "a": 0,
+      "exp": "기본 dropna는 하나라도 빈 인덱스 1·2·3 행을 지워 2행, how='all'은 둘 다 빈 인덱스 3 행만 지워 4행, subset=['몸무게']는 몸무게가 빈 인덱스 2·3 행을 지워 3행이 남는다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a2",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\nimport numpy as np\ns = pd.Series([4, np.nan, 8, np.nan, 6])\nprint(s.mean(), s.fillna(0).mean())",
+      "o": [
+        "3.6 6.0",
+        "6.0 6.0",
+        "6.0 3.6",
+        "3.6 3.6"
+      ],
+      "a": 2,
+      "exp": "mean()은 NaN을 빼고 (4+8+6)÷3 = 6.0을 낸다. fillna(0) 뒤에는 0 두 개가 실제 값이 되어 (4+0+8+0+6)÷5 = 3.6이 된다.",
+      "area": "PREP",
+      "type": "계산"
+    },
+    {
+      "id": "a3",
+      "q": "결측치 처리에 대한 설명으로 옳지 않은 것은?",
+      "o": [
+        "dropna()는 기본적으로 결측치가 하나라도 있는 행을 지운다",
+        "mean()은 결측치를 빼고 평균을 계산한다",
+        "df.fillna(0)만 실행해도 다시 대입하지 않고 df의 결측치가 0으로 바뀐다",
+        "dropna(axis=1)은 결측치가 있는 열을 지운다"
+      ],
+      "a": 2,
+      "exp": "fillna는 채운 새 결과를 돌려줄 뿐 원본 df를 바꾸지 않는다. df = df.fillna(0)처럼 다시 대입해야 저장된다. 나머지는 모두 옳다.",
+      "area": "PREP",
+      "type": "부정형"
+    },
+    {
+      "id": "a4",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'반': [1, 2, 1, 1, 2],\n                   '이름': ['가', '나', '가', '다', '나'],\n                   '점수': [80, 75, 80, 90, 70]})\nx = df.duplicated().sum()\ny = df.duplicated(subset=['반', '이름']).sum()\nprint(x, y)",
+      "o": [
+        "2 2",
+        "1 1",
+        "2 4",
+        "1 2"
+      ],
+      "a": 3,
+      "exp": "모든 열이 앞의 행과 같은 것은 인덱스 2 행(1반 가 80) 하나라 1이다. 반·이름만 비교하면 인덱스 2 행(1반 가)과 인덱스 4 행(2반 나)이 앞의 행과 겹쳐 2이다. 처음 나온 행은 세지 않으므로 4가 아니다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a5",
+      "q": "가격 열에 '1,200', '850', '2,000'처럼 쉼표가 섞인 글자가 들어 있다. 합계를 구할 수 있도록 정수로 바꾸는 코드로 옳은 것은?",
+      "o": [
+        "df['가격'].astype(int)",
+        "df['가격'].replace(',', '').astype(int)",
+        "df['가격'].str.replace(',', '').astype(str)",
+        "df['가격'].str.replace(',', '').astype(int)"
+      ],
+      "a": 3,
+      "exp": "str.replace로 쉼표를 지운 뒤 astype(int)로 바꾼다. 바로 astype(int)는 '1,200' 때문에 ValueError, .str 없는 replace는 값 전체가 ','인 칸만 바꿔 쉼표가 남으므로 오류, astype(str)은 여전히 글자이다.",
+      "area": "PREP",
+      "type": "응용"
+    },
+    {
+      "id": "a6",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'날짜': ['2024-01-31', '2024-02-29', '2024-12-25']})\ndf['날짜'] = pd.to_datetime(df['날짜'])\nprint(df['날짜'].dt.month.tolist(), df['날짜'].dt.day.tolist())",
+      "o": [
+        "[31, 29, 25] [1, 2, 12]",
+        "[1, 2, 12] [31, 29, 25]",
+        "[2024, 2024, 2024] [1, 2, 12]",
+        "[1, 2, 12] [2, 3, 2]"
+      ],
+      "a": 1,
+      "exp": "dt.month는 월(1, 2, 12), dt.day는 그 달의 며칠(31, 29, 25)이다. [2, 3, 2]는 요일 번호인 dt.dayofweek의 결과(수·목·수)이다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a7",
+      "q": "값 5, 11, 12, 13, 14, 15, 16, 17, 40의 1사분위수(Q1)는 12, 3사분위수(Q3)는 16이다. 1.5×IQR 기준으로 이상치로 판단되는 값을 모두 고른 것은?",
+      "o": [
+        "40",
+        "5, 40",
+        "5, 17, 40",
+        "이상치 없음"
+      ],
+      "a": 1,
+      "exp": "IQR = 16 − 12 = 4, 1.5×IQR = 6이다. 아래 경계 12 − 6 = 6보다 작은 5와 위 경계 16 + 6 = 22보다 큰 40이 이상치이다. 17은 경계 안이다.",
+      "area": "STAT",
+      "type": "계산"
+    },
+    {
+      "id": "a8",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\nimport numpy as np\ndf = pd.DataFrame({'점수': [95, 72, 60, 88]})\ndf['결과'] = np.where(df['점수'] >= 70, 'P', 'F')\ndef lv(x):\n    if x >= 90:\n        return 3\n    elif x >= 70:\n        return 2\n    return 1\ndf['단계'] = df['점수'].apply(lv)\nprint(''.join(df['결과']), df['단계'].sum())",
+      "o": [
+        "PPFP 8",
+        "PPFP 9",
+        "PFFP 8",
+        "PPFP 7"
+      ],
+      "a": 0,
+      "exp": "70 이상이면 P라서 95·72·88은 P, 60은 F → PPFP이다. lv는 95→3, 72→2, 60→1, 88→2를 돌려주므로 합은 8이다. 88은 90 미만이라 3이 아니다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a9",
+      "q": "다음 코드의 두 출력을 순서대로 바르게 짝지은 것은?",
+      "code": "import pandas as pd\ns = pd.Series(['a-1', '-', 'b-2'])\nprint(s.replace('-', '').tolist())\nprint(s.str.replace('-', '').tolist())",
+      "o": [
+        "['a1', '', 'b2'] / ['a1', '', 'b2']",
+        "['a1', '', 'b2'] / ['a-1', '', 'b-2']",
+        "['a-1', '-', 'b-2'] / ['a1', '', 'b2']",
+        "['a-1', '', 'b-2'] / ['a1', '', 'b2']"
+      ],
+      "a": 3,
+      "exp": "Series.replace는 칸 값 전체가 '-'인 것만 바꾸므로 '-' 칸만 ''가 되고 'a-1'·'b-2'는 그대로이다. str.replace는 값 속 글자 일부를 바꿔 모든 '-'를 지운다.",
+      "area": "PREP",
+      "type": "비교"
+    },
+    {
+      "id": "a10",
+      "q": "문자열 열 처리에 대한 설명으로 옳지 않은 것은?",
+      "o": [
+        "df['코드'].str.upper()는 코드 열의 영문자를 대문자로 바꾼 결과를 돌려준다",
+        "df['이름'].upper()로 이름 열 전체를 대문자로 바꿀 수 있다",
+        "str.strip()은 값의 앞뒤 공백을 지운다",
+        "str.contains('서울')의 결과는 True·False라서 불리언 인덱싱에 쓸 수 있다"
+      ],
+      "a": 1,
+      "exp": "Series에는 upper 메서드가 없어 AttributeError가 난다. 글자 열에 문자열 기능을 쓰려면 df['이름'].str.upper()처럼 .str을 붙여야 한다.",
+      "area": "PREP",
+      "type": "부정형"
+    },
+    {
+      "id": "a11",
+      "q": "나이 열 [17.0, NaN, 18.0]에 astype(int)를 쓰자 오류가 났다. 가장 알맞은 해결 방법은?",
+      "o": [
+        "결측치를 fillna로 채우거나 dropna로 지운 뒤 astype(int)를 쓴다",
+        "astype(str)로 먼저 바꾼 뒤 astype(int)를 쓴다",
+        "rename으로 열 이름을 바꾼 뒤 다시 실행한다",
+        "astype(int)를 한 번 더 실행한다"
+      ],
+      "a": 0,
+      "exp": "NaN은 정수로 나타낼 수 없어 astype(int)에서 오류가 난다. 결측치를 먼저 처리해야 한다. 글자로 바꾸면 '17.0'처럼 소수점이 붙은 글자가 되어 정수 변환이 또 실패하고, 이름 변경이나 재실행은 원인과 관계없다.",
+      "area": "PREP",
+      "type": "응용"
+    },
+    {
+      "id": "a12",
+      "q": "다음 코드를 실행한 결과로 옳은 것은?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'이름': ['가', '나'], '비고': ['', '전학']})\ndf2 = df.drop('비고')\nprint(df2.shape)",
+      "o": [
+        "(2, 1)이 출력된다",
+        "(1, 2)가 출력된다",
+        "KeyError가 난다",
+        "(2, 2)가 출력된다"
+      ],
+      "a": 2,
+      "exp": "drop의 기본 방향은 행(axis=0)이라 행 인덱스(0, 1)에서 '비고'를 찾다가 KeyError가 난다. 열을 지우려면 drop(columns=['비고']) 또는 drop('비고', axis=1)을 쓴다.",
+      "area": "PREP",
+      "type": "코드"
+    },
+    {
+      "id": "a13",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ns = pd.Series([3, 8, 15, 22, 40])\nprint(s.clip(lower=5, upper=20).sum())",
+      "o": [
+        "66",
+        "88",
+        "23",
+        "68"
+      ],
+      "a": 3,
+      "exp": "clip은 값을 지우지 않고 경계로 바꾼다. 3은 하한 5로, 22와 40은 상한 20으로 바뀌어 5+8+15+20+20 = 68이다. 88은 원래 합, 23은 범위 밖 값을 지운 합이다.",
+      "area": "PREP",
+      "type": "계산"
+    },
+    {
+      "id": "a14",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'이름': ['A', 'B', 'A', 'C', 'A'],\n                   '점수': [1, 2, 3, 4, 5]})\na = df.drop_duplicates(subset=['이름'])\nb = df.drop_duplicates(subset=['이름'], keep='last')\nc = df.drop_duplicates(subset=['이름'], keep=False)\nprint(a['점수'].sum(), b['점수'].sum(), c['점수'].sum())",
+      "o": [
+        "7 11 6",
+        "7 11 15",
+        "11 7 6",
+        "7 6 11"
+      ],
+      "a": 0,
+      "exp": "keep 기본값('first')은 A(1)·B(2)·C(4)를 남겨 7, keep='last'는 B(2)·C(4)·A(5)를 남겨 11, keep=False는 겹친 A를 모두 지우고 B·C만 남겨 6이다.",
+      "area": "PREP",
+      "type": "비교"
+    },
+    {
+      "id": "a15",
+      "q": "표기가 제각각인 이름 열을 정리한 뒤 중복을 세는 코드이다. 실행 결과는?",
+      "code": "import pandas as pd\ns = pd.Series([' kim', 'KIM', 'lee ', 'Kim', 'lee'])\nclean = s.str.strip().str.upper()\nprint(s.duplicated().sum(), clean.duplicated().sum(), clean.nunique())",
+      "o": [
+        "0 2 2",
+        "1 3 2",
+        "0 3 2",
+        "0 3 3"
+      ],
+      "a": 2,
+      "exp": "정리 전에는 ' kim'·'KIM'·'Kim'처럼 글자가 달라 중복이 0개이다. strip·upper 뒤에는 KIM·KIM·LEE·KIM·LEE가 되어 뒤에 다시 나온 3개가 중복이고, 서로 다른 값은 KIM·LEE 2개이다.",
+      "area": "PREP",
+      "type": "확장"
+    }
+  ]
+}

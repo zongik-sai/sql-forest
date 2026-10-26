@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import { HashRouter, Link, MemoryRouter, NavLink, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Garden } from '../components/Garden';
 import { useAuth } from '../features/auth/AuthContext';
+import { LogoutButton } from '../features/auth/LogoutButton';
 import { FocusGate, FocusProvider, markInAppNavigation, useFocusGate, type StrictScope } from '../features/focus/FocusContext';
 import { addActiveSeconds, unitLockCount, UNIT_LOCK_LIMIT } from '../features/progress/model';
 import type { UnitId } from '../content/types';
@@ -16,6 +17,11 @@ import { LAST_SUBJECT_KEY, SubjectHome, subjectOfPath } from './SubjectHome';
 import { writeRaw } from '../lib/storage';
 // 컴퓨터 일반은 문제은행이 커서 들어갈 때만 내려받는다
 const ComputerRoutes = lazy(() => import('../features/computer/ComputerApp'));
+// 같은 단원 × 5단계 엔진을 쓰는 과목들: 과목마다 자기 단원 8개만 담긴 chunk
+const NetworkRoutes = lazy(() => import('../features/computer/courses/net'));
+const ProgrammingRoutes = lazy(() => import('../features/computer/courses/prog'));
+const DataRoutes = lazy(() => import('../features/computer/courses/data'));
+const loadingCourse = <div className="page" role="status">불러오는 중…</div>;
 // 데이터베이스 단원 단계 콘텐츠(이론 카드·개념 점검·실습 예제)도 단계 화면을 열 때만 내려받는다
 const StagePage = lazy(() => import('../features/learning/stages').then((m) => ({ default: m.StagePage })));
 
@@ -51,7 +57,7 @@ function TopBar({ learning }: { learning?: boolean }) {
       {L.identity.kind === 'demo' ? (
         <button className="btn btn-small btn-quiet" onClick={auth.exitDemo}>데모 나가기</button>
       ) : (
-        <button className="btn btn-small btn-quiet" onClick={() => void auth.signOut()}>로그아웃</button>
+        <LogoutButton />
       )}
     </header>
   );
@@ -247,7 +253,7 @@ function PublicShell() {
         {auth.identity?.kind === 'user' && (
           <>
             <span className="small muted">{auth.identity.name ?? auth.identity.email}</span>
-            <button className="btn btn-small btn-quiet" onClick={() => void auth.signOut()}>로그아웃</button>
+            <LogoutButton />
           </>
         )}
       </header>
@@ -294,7 +300,11 @@ export function App() {
             <Route path="/final" element={<FinalPage />} />
           </Route>
         </Route>
-        <Route path="/computer/*" element={<Suspense fallback={<div className="page" role="status">불러오는 중…</div>}><ComputerRoutes /></Suspense>} />
+        <Route path="/computer/*" element={<Suspense fallback={loadingCourse}><ComputerRoutes /></Suspense>} />
+        <Route path="/network/*" element={<Suspense fallback={loadingCourse}><NetworkRoutes /></Suspense>} />
+        <Route path="/programming/*" element={<Suspense fallback={loadingCourse}><ProgrammingRoutes /></Suspense>} />
+        {/* 'Data' 과목(/data). 데이터베이스 과목 경로(/db·/garden·/learn …)와 겹치지 않는다 */}
+        <Route path="/data/*" element={<Suspense fallback={loadingCourse}><DataRoutes /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
