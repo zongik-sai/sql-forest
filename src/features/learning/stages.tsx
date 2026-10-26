@@ -4,6 +4,7 @@ import { UNIT_BY_ID } from '../../content';
 import { UNIT_STAGES, quizNeed, type PracticeItem, type StageCard } from '../../content/stages';
 import type { UnitId } from '../../content/types';
 import { useLearner } from '../../app/LearnerContext';
+import { useLiveDetail } from '../monitor/liveStore';
 import { CardMatch } from '../../components/CardMatch';
 import { DataPanel } from '../../components/DataPanel';
 import { InfoTable } from '../../components/InfoTable';
@@ -135,6 +136,7 @@ function useStepper(ids: string[]) {
 }
 
 function StepNav({ ids, idx, isDone, go, doneN, word }: { ids: string[]; idx: number; isDone: (id: string) => boolean; go: (i: number) => void; doneN: number; word: string }) {
+  useLiveDetail(ids.length ? `${word} ${idx + 1}/${ids.length}` : null); // 선생님 화면 실시간 학습 위치
   return (
     <div className="cg-card-nav" role="group" aria-label={`${word} 고르기`}>
       {ids.map((id, i) => (

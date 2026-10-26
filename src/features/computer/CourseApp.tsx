@@ -15,6 +15,7 @@ import { LevelPage, UnitPage } from './pages/Unit';
 import { MockExamPage, MockHubPage } from './pages/Mock';
 import { WrongNotePage } from './pages/Wrong';
 import { TeacherPage } from './pages/Teacher';
+import { LiveIndicator } from '../monitor/LiveIndicator';
 
 /**
  * 단원 × 5단계 과목 화면(컴퓨터 일반·네트워크·프로그래밍·Data 공통 엔진).
@@ -46,9 +47,11 @@ function CourseTopBar() {
         <NavLink to={base} end>단원</NavLink>
         <NavLink to={`${base}/mock`}>모의고사</NavLink>
         <NavLink to={`${base}/wrong`}>오답노트{wrong ? ` ${wrong}` : ''}</NavLink>
-        {cg.isTeacher && <NavLink to={`${base}/teacher`}>반 학습 현황</NavLink>}
+        {/* 선생님 계정만(서버가 다시 확인): 선생님 화면의 이 과목 탭 */}
+        {cg.isTeacher && <NavLink to={`/teacher?s=${course.id}`} className="teacher-link">선생님 화면</NavLink>}
       </nav>
       <span className="spacer" />
+      <LiveIndicator />
       <span className="save-status" aria-live="polite">{cg.mode === 'guest' ? '로그인 없이 · 이 기기에만 저장' : SAVE_TEXT[cg.saveStatus]}</span>
       {cg.mode === 'user' ? (
         <button className="btn btn-small btn-quiet" onClick={() => void logout()}>로그아웃</button>
@@ -180,6 +183,7 @@ export function CourseRoutes({ course }: { course: CourseConfig }) {
             <Route path="mock" element={<MockHubPage />} />
             <Route path="mock/:kind" element={<MockExamPage />} />
             <Route path="wrong" element={<WrongNotePage />} />
+            {/* 예전 '반 학습 현황' 주소: 선생님 화면(/teacher?s=과목)으로 보낸다 */}
             <Route path="teacher" element={<TeacherPage />} />
             <Route path="*" element={<Navigate to={course.basePath} replace />} />
           </Route>

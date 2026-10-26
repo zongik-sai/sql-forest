@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { isDemoEnabled, isSupabaseConfigured } from '../../lib/config';
 import { hasUnsynced, learnerPrefix, readRaw, removeRaw, removeWithPrefix, writeRaw } from '../../lib/storage';
 import { signInWithGoogle, supabase, takeAuthError } from './supabase';
+import { runBeforeSignOut } from './signOutHooks';
 
 export type Identity =
   | { kind: 'demo'; learnerKey: 'demo' }
@@ -90,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sb = supabase();
     const prev = identity;
     if (!force && prev?.kind === 'user' && hasUnsynced(learnerPrefix(prev.learnerKey))) return false;
+    // 진행 중인 화면 공유 등은 로그인한 채로 먼저 끝낸다(서버 정리 RPC가 익명으로 가지 않게)
+    await runBeforeSignOut();
     explicitSignOut = true;
     if (sb) await sb.auth.signOut();
     // 로그아웃: 이 사용자의 로컬 캐시를 지워 다음 사용자에게 보이지 않게 한다.

@@ -1,12 +1,13 @@
 import { createContext, createElement, useContext, type ReactNode } from 'react';
-import type { CourseShape } from './model';
+import type { CoursePass, CourseShape } from './model';
+import type { CourseSize, NewCourseId } from './courses/defs';
 import { CG_PASS, type CgMcq, type CgUnit, type CgUnitId } from './types';
 
 /**
  * 단원 × 5단계 과목 정의(컴퓨터 일반·네트워크·프로그래밍·Data가 같은 학습 구조를 쓴다).
  * 화면·저장소·모의고사·선생님 현황은 모두 지금 과목(useCourse)을 따른다.
  */
-export type CourseId = 'cg' | 'net' | 'prog' | 'data';
+export type CourseId = 'cg' | NewCourseId;
 export type NewCourseKey = Exclude<CourseId, 'cg'>;
 
 export interface CourseArea { id: string; label: string }
@@ -37,8 +38,13 @@ export interface CourseConfig extends CourseShape {
   remote: CourseRemote;
   /** 고정 모의고사 시드 앞부분: `${mockSeed}-mock-set1-v1` */
   mockSeed: string;
-  /** 통과 기준(문항 수가 다르면 passNeed가 같은 비율로 올림) */
-  pass: typeof CG_PASS;
+  /** 과목 크기: full(컴퓨터 일반과 같은 분량) · short(보충 학습 3단원) */
+  size: CourseSize;
+  /**
+   * 통과 기준. 모의고사 문항 수·합격 기준·시간은 화면·식물(열매)·기록이 모두 이 값을 따른다.
+   * 단계(끼워맞추기·기초·실력점검)는 실제 문항 수로 passNeed가 같은 비율로 계산한다(여기 값은 과목 기본 문항 수 기준 안내용).
+   */
+  pass: CoursePass;
 }
 
 export interface CourseInput {
@@ -52,6 +58,10 @@ export interface CourseInput {
   /** 기본: 과목 ID */
   storage?: string;
   mockSeed?: string;
+  /** 기본 full */
+  size?: CourseSize;
+  /** 기본: 컴퓨터 일반 기준(CG_PASS) */
+  pass?: CoursePass;
 }
 
 /** 단원 목록에서 과목 정의를 만든다(ID 찾기 표는 Map이라 'constructor' 같은 키는 undefined) */
@@ -65,7 +75,7 @@ export function makeCourse(c: CourseInput): CourseConfig {
     units: c.units, unitIds, totalSteps: unitIds.length * 5,
     unitById: (id) => unitMap.get(id), mcqById: (id) => mcqMap.get(id),
     areas: c.areas, areaLabel: (id) => labels.get(id) ?? id,
-    storage: c.storage ?? c.id, remote: c.remote, mockSeed: c.mockSeed ?? c.id, pass: CG_PASS,
+    storage: c.storage ?? c.id, remote: c.remote, mockSeed: c.mockSeed ?? c.id, size: c.size ?? 'full', pass: c.pass ?? CG_PASS,
   };
 }
 

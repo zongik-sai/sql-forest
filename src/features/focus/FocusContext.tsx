@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ActiveTimer, countsAsLock, focusReducer, initialFocus, lockNotice, type FocusState, type LockEvent } from './focusMachine';
+import { ActiveTimer, afterSystemDialog, classifyLeave, focusReducer, initialFocus, lockNotice, type FocusState, type LockEvent } from './focusMachine';
+import { publishFocus } from './focusSignal';
+import { onSystemDialogEnd, systemDialogActive } from './systemDialog';
 import { Link } from 'react-router-dom';
 import { exitFullscreen, fullscreenElement, fullscreenSupported, lockEscapeKey, requestFullscreen, requestWakeLock, SUSPEND_EVENT, unlockEscapeKey } from './fullscreen';
 import { sqlClient } from '../../sql/worker/sqlClient';
@@ -118,8 +120,18 @@ export function FocusProvider({ children, onActiveSeconds, onPause, strict = nul
    */
   const leave = useCallback((ev: LockEvent) => {
     const sc = strictRef.current;
-    // 유예는 전체화면 전환 때 생길 수 있는 blur·전체화면 흔들림에만(창을 닫거나 새로고침하는 hidden·pagehide는 바로 셈)
-    if (sc && statusRef.current === 'active' && (ev === 'blur' || ev === 'fullscreen') && performance.now() < graceUntil.current) {
+    const decision = classifyLeave(ev, {
+      strict: !!sc,
+      status: statusRef.current,
+      // 화면 공유 선택 창(브라우저 자체 창)이 열려 있는 동안: 세지 않고, 끝난 뒤 onSystemDialogEnd에서 다시 확인
+      systemDialog: systemDialogActive(),
+      // 유예는 전체화면 전환 때 생길 수 있는 blur·전체화면 흔들림에만(창을 닫거나 새로고침하는 hidden·pagehide는 바로 셈)
+      fsGrace: performance.now() < graceUntil.current,
+      counted: countedRef.current,
+    });
+    if (decision === 'system') return systemPauseRef.current();
+    if (decision === 'defer') {
+      if (systemDialogActive()) return;
       // 전체화면 전환 직후의 흔들림일 수 있다: 유예가 끝나면 실제로 떠나 있는지 다시 확인
       if (graceTimer.current === null) {
         graceTimer.current = window.setTimeout(() => {
@@ -133,7 +145,7 @@ export function FocusProvider({ children, onActiveSeconds, onPause, strict = nul
       }
       return;
     }
-    if (sc && !countedRef.current && countsAsLock(statusRef.current, ev)) {
+    if (decision === 'lock' && sc) {
       countedRef.current = true;
       const r = sc.onLock();
       setLastLock(r);
@@ -142,6 +154,18 @@ export function FocusProvider({ children, onActiveSeconds, onPause, strict = nul
   }, []);
   const leaveRef = useRef(leave);
   leaveRef.current = leave;
+  /** 세지 않고 멈춤(화면 공유 선택 창 때문): 전체화면도 끝내고, 다시 시작 클릭으로 돌아온다 */
+  const systemPause = () => {
+    countedRef.current = true; // 곧 이어질 같은 이탈의 이벤트를 세지 않음(다시 시작하면 지움)
+    if (fsWanted.current) {
+      fsWanted.current = false;
+      unlockEscapeKey();
+      exitFullscreen();
+    }
+    dispatch({ type: 'systemPause' });
+  };
+  const systemPauseRef = useRef(systemPause);
+  systemPauseRef.current = systemPause;
 
   // 시작
   useEffect(() => {
@@ -245,6 +269,28 @@ export function FocusProvider({ children, onActiveSeconds, onPause, strict = nul
     return () => window.removeEventListener(SUSPEND_EVENT, on);
   }, []);
 
+  // 화면 공유 선택 창이 닫힌 뒤: 이 창으로 돌아와 있으면 그대로 계속, 아니면 세지 않고 멈춘다(다시 시작 클릭으로 전체화면)
+  useEffect(() => onSystemDialogEnd(() => {
+    if (statusRef.current !== 'active') return;
+    const e = env();
+    const fullscreenOk = !(strictRef.current && fsWanted.current && !fullscreenElement());
+    if (afterSystemDialog({ ...e, fullscreenOk }) === 'continue') return;
+    systemPauseRef.current();
+  }), []);
+
+  // 실시간 학습 위치(선생님 화면)용: 지금 집중 학습 상태를 알린다(화면 내용은 아님)
+  const strictLabel = strict?.label ?? null;
+  const strictLocks = strict?.locks ?? 0;
+  const strictLimit = strict?.limit ?? 0;
+  useEffect(() => {
+    publishFocus({
+      status: state.status,
+      reason: state.reason,
+      strict: strictKey ? { key: strictKey, label: strictLabel ?? '', locks: strictLocks, limit: strictLimit } : null,
+    });
+  }, [state.status, state.reason, strictKey, strictLabel, strictLocks, strictLimit]);
+  useEffect(() => () => publishFocus(null), []);
+
   // 단원 집중 학습 중에는 화면 꺼짐 방지(휴대폰 자동 잠금이 이탈로 세지지 않게). 멈추면 해제
   const strictActive = !!strictKey && state.status === 'active';
   useEffect(() => {
@@ -341,7 +387,8 @@ export function FocusGate({ children, exit }: { children: ReactNode; exit?: { to
   useEffect(() => {
     if (!paused) return;
     const block = (e: KeyboardEvent) => {
-      if (e.target instanceof Node && (e.target as HTMLElement).closest?.('.focus-overlay')) return;
+      // 가림 화면 자체, 화면 공유 허락 창(.monitor-modal)·공유 중 표시(.share-banner, '공유 중지')의 키 입력은 그대로
+      if (e.target instanceof Node && (e.target as HTMLElement).closest?.('.focus-overlay, .monitor-modal, .share-banner')) return;
       e.preventDefault();
       e.stopPropagation();
     };
@@ -349,7 +396,7 @@ export function FocusGate({ children, exit }: { children: ReactNode; exit?: { to
     return () => window.removeEventListener('keydown', block, true);
   }, [paused]);
 
-  const ready = f.state.status === 'readyToResume' || (f.state.status === 'paused' && f.state.reason === 'manual');
+  const ready = f.state.status === 'readyToResume' || (f.state.status === 'paused' && (f.state.reason === 'manual' || f.state.reason === 'system'));
   const sc = f.strict;
   return (
     <>
@@ -371,6 +418,8 @@ export function FocusGate({ children, exit }: { children: ReactNode; exit?: { to
                 <p id="focus-desc">
                   {f.state.reason === 'manual'
                     ? '쉬는 중이에요. 준비되면 계속할 수 있습니다.'
+                    : f.state.reason === 'system'
+                      ? SYSTEM_PAUSE_TEXT
                     : f.state.reason === 'reload' || f.state.reason === 'start'
                       ? '저장된 단계와 초안을 불러왔어요. 준비되면 학습을 시작하세요.'
                       : '돌아오면 계속할 수 있습니다. 입력한 초안과 힌트 단계는 그대로 보존돼요.'}
@@ -392,6 +441,8 @@ export function FocusGate({ children, exit }: { children: ReactNode; exit?: { to
   );
 }
 
+const SYSTEM_PAUSE_TEXT = '공유할 화면을 고르는 동안은 잠김으로 세지 않았어요. 이 창으로 돌아왔으면 다시 시작하세요.';
+
 /** 단원 집중 학습의 시작·잠김·쉬기 화면 */
 function StrictCard({ btn, exit }: { btn: RefObject<HTMLButtonElement>; exit?: { to: string; label: string } }) {
   const f = useFocusGate();
@@ -409,7 +460,12 @@ function StrictCard({ btn, exit }: { btn: RefObject<HTMLButtonElement>; exit?: {
   );
   return (
     <>
-      {reason === 'manual' ? (
+      {reason === 'system' ? (
+        <>
+          <h2 id="focus-title">화면 공유 창 때문에 멈췄어요</h2>
+          <p id="focus-desc">{SYSTEM_PAUSE_TEXT} (이 단원 잠김 {Math.min(sc.locks, sc.limit - 1)}/{sc.limit})</p>
+        </>
+      ) : reason === 'manual' ? (
         <>
           <h2 id="focus-title">쉬는 중이에요</h2>
           <p id="focus-desc">쉬는 동안은 잠김으로 세지 않아요. 준비되면 다시 시작하세요. (이 단원 잠김 {Math.min(sc.locks, sc.limit - 1)}/{sc.limit})</p>
@@ -431,7 +487,7 @@ function StrictCard({ btn, exit }: { btn: RefObject<HTMLButtonElement>; exit?: {
       <button ref={btn} className="btn btn-primary" onClick={f.resume}>
         {reason === 'gate' || reason === 'start' || reason === 'reload' ? `${fsWord}학습 시작` : `${fsWord}다시 시작`}
       </button>
-      {f.state.status !== 'readyToResume' && reason !== 'manual' && <p className="small muted" style={{ marginTop: '0.75rem' }}>이 창으로 돌아오면 버튼을 눌러 계속할 수 있어요.</p>}
+      {f.state.status !== 'readyToResume' && reason !== 'manual' && reason !== 'system' && <p className="small muted" style={{ marginTop: '0.75rem' }}>이 창으로 돌아오면 버튼을 눌러 계속할 수 있어요.</p>}
       {exit && <p style={{ margin: '1rem 0 0' }}><Link className="btn btn-small btn-quiet" to={exit.to}>{exit.label}</Link></p>}
     </>
   );

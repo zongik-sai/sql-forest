@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { readJson, removeRaw, writeJson } from '../../lib/storage';
 import { optionOrder } from './mock';
+import { useLiveDetail } from '../monitor/liveStore';
 import type { CgMcq } from './types';
 
 /** 객관식 문항에 필요한 최소 정보(두 과목 공통) */
@@ -54,6 +55,8 @@ export function McqRunner<T extends McqItem>({ items, storageKey, onAnswer, onFi
   const answered = q ? run.answers[q.id] : undefined;
   const score = items.filter((x) => run.answers[x.id] === x.answer).length;
   const done = items.every((x) => run.answers[x.id] !== undefined);
+  // 선생님 화면 실시간 학습 위치: 지금 몇 번째 문항인지(문항 내용은 보내지 않음)
+  useLiveDetail(items.length ? `문항 ${Math.min(run.idx + 1, items.length)}/${items.length}` : null);
 
   useEffect(() => {
     writeJson(storageKey, run);

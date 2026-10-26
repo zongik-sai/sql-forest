@@ -3,13 +3,24 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { learnerPrefix, readJson, removeRaw, writeJson } from '../../../lib/storage';
 import { useAuth } from '../../auth/AuthContext';
 import { useCourse } from '../course';
-import { buildMock } from '../mock';
+import { buildMock, FIXED_SETS, fixedSetCount, mockOptionsOf, type FixedSet } from '../mock';
 import { activeWrongIds, addMock, isRegularMock, MOCK_LABEL, noteAnswer, scoreMock, WRONG_MOCK_MIN, type MockKind, type MockRecord } from '../model';
 import { CodeBlock, MARK, ReviewCard } from '../McqRunner';
 import { useCg } from '../store';
-import { CG_PASS, type CgMcq } from '../types';
+import type { CgMcq } from '../types';
+import { useLiveDetail } from '../../monitor/liveStore';
 
 const KINDS: MockKind[] = ['set1', 'set2', 'set3', 'random', 'wrong'];
+const isFixed = (k: MockKind): k is FixedSet => (FIXED_SETS as readonly string[]).includes(k);
+
+/** 이 과목에서 보일 모의고사 종류: 고정 회차는 겹치지 않게 만들 수 있는 만큼(짧은 과목은 1·2회) + 랜덤 + 오답 */
+function useKinds() {
+  const course = useCourse();
+  return useMemo(() => {
+    const n = fixedSetCount(course.units, mockOptionsOf(course));
+    return KINDS.filter((k) => !isFixed(k) || FIXED_SETS.indexOf(k) < n);
+  }, [course]);
+}
 const pct = (c: number, t: number) => (t ? Math.round((c / t) * 100) : 0);
 const mmss = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.max(0, sec % 60)).padStart(2, '0')}`;
 
@@ -26,6 +37,8 @@ export function MockHubPage() {
   const cg = useCg();
   const course = useCourse();
   const base = course.basePath;
+  const m = course.pass.mock;
+  const kinds = useKinds();
   const prefix = usePrefix();
   const [, setTick] = useState(0);
   const curKey = `${prefix}${course.storage}:mock:current`;
@@ -38,29 +51,29 @@ export function MockHubPage() {
       <p className="crumbs" style={{ margin: 0 }}><Link to={base}>{course.name}</Link> / 모의고사</p>
       <h1 style={{ margin: 0 }}>모의고사</h1>
       <p className="muted" style={{ margin: 0 }}>
-        사지선다 {CG_PASS.mock.total}문항 · {CG_PASS.mock.minutes}분 · {CG_PASS.mock.need}문항 이상이면 합격 기준이에요.
+        사지선다 {m.total}문항 · {m.minutes}분 · {m.need}문항 이상이면 합격 기준이에요.
         단원별로 고르게 뽑아 영역 순서({areaOrderText(course)})로 나와요.
       </p>
       {current && (
         <div className="notice row">
-          {Date.now() - current.startedAt > CG_PASS.mock.minutes * 60_000 ? (
+          {Date.now() - current.startedAt > m.minutes * 60_000 ? (
             <span>{MOCK_LABEL[current.kind]}의 시간이 이미 끝났어요({Object.keys(current.answers).length}문항 답함). 채점해서 기록하거나 버릴 수 있어요.</span>
           ) : (
             <span>{MOCK_LABEL[current.kind]}을(를) 풀던 중이에요.</span>
           )}
-          <Link className="btn btn-small btn-primary" to={`${base}/mock/${current.kind}`}>{Date.now() - current.startedAt > CG_PASS.mock.minutes * 60_000 ? '채점하기' : '이어서 풀기'}</Link>
+          <Link className="btn btn-small btn-primary" to={`${base}/mock/${current.kind}`}>{Date.now() - current.startedAt > m.minutes * 60_000 ? '채점하기' : '이어서 풀기'}</Link>
           <button className="btn btn-small btn-quiet" onClick={() => { removeRaw(curKey); setTick((t) => t + 1); }}>버리기</button>
         </div>
       )}
       <div className="cg-mock-grid">
-        {KINDS.map((k) => {
+        {kinds.map((k) => {
           const b = best(k);
           const disabled = k === 'wrong' && wrongN < WRONG_MOCK_MIN;
           return (
             <div key={k} className="panel stack" style={{ gap: '0.4rem' }}>
               <b>{MOCK_LABEL[k]}</b>
               <span className="small muted">
-                {k === 'random' ? '볼 때마다 새로 뽑아요' : k === 'wrong' ? `오답노트 ${wrongN}문항에서 출제(최대 ${CG_PASS.mock.total})` : '고정 문항(다시 풀어도 같은 문제)'}
+                {k === 'random' ? '볼 때마다 새로 뽑아요' : k === 'wrong' ? `오답노트 ${wrongN}문항에서 출제(최대 ${m.total})` : '고정 문항(다시 풀어도 같은 문제)'}
               </span>
               <span className="small">{b >= 0 ? `최고 ${b}점` : '아직 안 봤어요'}</span>
               {disabled ? <span className="small muted">오답이 {WRONG_MOCK_MIN}문항 이상 모이면 열려요.</span> : (
@@ -79,13 +92,13 @@ export function MockHubPage() {
             <table className="data">
               <thead><tr><th scope="col">날짜</th><th scope="col">종류</th><th scope="col">점수</th><th scope="col">결과</th><th scope="col">걸린 시간</th></tr></thead>
               <tbody>
-                {hist.slice(0, 20).map((m) => (
-                  <tr key={m.id}>
-                    <td>{new Date(m.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                    <td>{MOCK_LABEL[m.kind]}</td>
-                    <td>{m.score}/{m.total}</td>
-                    <td>{m.total === CG_PASS.mock.total ? (m.score >= CG_PASS.mock.need ? '합격 기준 이상' : '기준 미만') : '-'}</td>
-                    <td>{mmss(m.seconds)}{m.timeUp ? ' (시간 종료)' : ''}</td>
+                {hist.slice(0, 20).map((r) => (
+                  <tr key={r.id}>
+                    <td>{new Date(r.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>{MOCK_LABEL[r.kind]}</td>
+                    <td>{r.score}/{r.total}</td>
+                    <td>{r.total === m.total ? (r.score >= m.need ? '합격 기준 이상' : '기준 미만') : '-'}</td>
+                    <td>{mmss(r.seconds)}{r.timeUp ? ' (시간 종료)' : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -110,8 +123,9 @@ interface ExamState {
 export function MockExamPage() {
   const { kind } = useParams();
   const base = useCourse().basePath;
+  const kinds = useKinds();
   const k = kind as MockKind;
-  if (!KINDS.includes(k)) return <Navigate to={`${base}/mock`} replace />;
+  if (!kinds.includes(k)) return <Navigate to={`${base}/mock`} replace />;
   return <Exam kind={k} key={k} />;
 }
 
@@ -128,7 +142,7 @@ function Exam({ kind }: { kind: MockKind }) {
     if (saved && saved.kind === kind && saved.orders && Array.isArray(saved.ids) && saved.ids.length && saved.ids.every((id) => mcqById(id))) return saved;
     const wrongIds = activeWrongIds(cg.state);
     if (kind === 'wrong' && wrongIds.length < WRONG_MOCK_MIN) return null;
-    const paper = buildMock(course.units, kind, { wrongIds, seedPrefix: course.mockSeed, areas: course.areas.map((a) => a.id) });
+    const paper = buildMock(course.units, kind, { ...mockOptionsOf(course), wrongIds });
     if (!paper.items.length) return null;
     return { kind, ids: paper.items.map((q) => q.id), orders: Object.fromEntries(paper.items.map((q, i) => [q.id, paper.orders[i]])), answers: {}, startedAt: Date.now(), idx: 0 };
   });
@@ -137,7 +151,8 @@ function Exam({ kind }: { kind: MockKind }) {
   const [confirm, setConfirm] = useState(false);
   const submitted = useRef(false);
   const items = useMemo(() => (exam ? exam.ids.map((id) => mcqById(id)).filter((q): q is CgMcq => !!q) : []), [exam, mcqById]);
-  const limit = CG_PASS.mock.minutes * 60;
+  useLiveDetail(exam && !result ? `모의고사 문항 ${exam.idx + 1}/${items.length}` : null);
+  const limit = course.pass.mock.minutes * 60;
   const elapsed = exam ? Math.floor((now - exam.startedAt) / 1000) : 0;
   const left = limit - elapsed;
 
@@ -240,7 +255,8 @@ function Exam({ kind }: { kind: MockKind }) {
 function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: CgMcq[]; answers: Record<string, number>; orders: Record<string, number[]> }) {
   const course = useCourse();
   const base = course.basePath;
-  const pass = rec.total === CG_PASS.mock.total && rec.score >= CG_PASS.mock.need;
+  const m = course.pass.mock;
+  const pass = rec.total === m.total && rec.score >= m.need;
   const wrong = items.filter((q) => answers[q.id] !== q.answer);
   return (
     <div className="stack" style={{ maxWidth: 900, margin: '0 auto', width: '100%' }}>
@@ -248,7 +264,7 @@ function MockResult({ rec, items, answers, orders }: { rec: MockRecord; items: C
       {!rec.id && <p className="notice">답한 문항이 없어 기록에 남기지 않았어요.</p>}
       <div className={`notice ${pass ? 'notice-good' : 'notice-warn'}`}>
         <b style={{ fontSize: '1.3rem' }}>{rec.score} / {rec.total}</b>{' '}
-        {rec.total === CG_PASS.mock.total ? (pass ? `합격 기준(${CG_PASS.mock.need}문항) 이상이에요!` : `합격 기준까지 ${CG_PASS.mock.need - rec.score}문항 남았어요.`) : ''}
+        {rec.total === m.total ? (pass ? `합격 기준(${m.need}문항) 이상이에요!` : `합격 기준까지 ${m.need - rec.score}문항 남았어요.`) : ''}
         {' '}· 걸린 시간 {mmss(rec.seconds)}{rec.timeUp ? ' (시간 종료로 자동 제출)' : ''}
         {isRegularMock(rec.kind) && pass && <span> · 정규 모의고사 기준을 넘어 열매 조건을 채웠어요.</span>}
       </div>
