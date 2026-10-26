@@ -62,7 +62,7 @@ for (const def of MAIN_COURSES) {
     for (const t of ['과목', '단원', '모의고사', '오답노트']) await expect(nav.getByRole('link', { name: t, exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: '반 학습 현황' })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: '씨앗' })).toBeVisible();
-    await expect(page.getByText(/통과한 단계 0 \/ 40/)).toBeVisible();
+    await expect(page.getByText(new RegExp(`통과한 단계 0 / ${def.units.length * 5}`))).toBeVisible();
     await expect(page.locator('.cg-unit')).toHaveCount(def.units.length);
     await expect(page.locator('.cg-unit').first()).toContainText(def.units[0].title);
     // 내용 범위(출처)는 과목 화면에만 작게
