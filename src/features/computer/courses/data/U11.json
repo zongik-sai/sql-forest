@@ -1,15 +1,1180 @@
 {
   "unit": 11,
-  "title": "(작성 중)",
-  "intro": "",
-  "theory": [],
-  "bank": [],
-  "fill": [],
-  "basic": [],
+  "title": "머신러닝 기초와 작업형 답안 쓰기",
+  "intro": "지도·비지도·강화 학습과 과적합, train_test_split·LinearRegression·LogisticRegression, 회귀·분류 평가 지표, KMeans·계층적 군집·지니 지수를 익히고 ※ 조건대로 solution()으로 답하는 작업형 답안 쓰기를 연습한다.",
+  "theory": [
+    {
+      "id": "t1",
+      "title": "머신러닝과 세 가지 학습 방법",
+      "points": [
+        "머신러닝은 사람이 규칙을 하나하나 짜 주지 않아도 컴퓨터가 데이터에서 규칙(모델)을 스스로 찾아 예측하게 하는 방법이다. 예: 지난 메일들로 스팸을 거르는 규칙 찾기.",
+        "지도 학습은 문제(입력)와 정답(라벨)을 함께 주고 둘 사이의 규칙을 찾게 한다. 선생님이 답을 알려 주며 가르치는 것 같아 교사 학습이라고도 한다.",
+        "비지도 학습은 정답 없이 데이터만 주고 비슷한 것끼리 묶거나 숨은 구조를 찾게 한다. 비교사 학습이라고도 하며 대표 예가 군집 분석이다.",
+        "강화 학습은 정답 대신 행동의 결과로 보상(점수)을 주어, 보상이 커지는 행동을 시행착오로 익히게 한다. 예: 게임 AI, 걷는 법을 배우는 로봇."
+      ],
+      "table": {
+        "head": [
+          "학습 방법",
+          "정답(라벨)",
+          "대표 작업",
+          "예"
+        ],
+        "rows": [
+          [
+            "지도 학습(교사 학습)",
+            "있음",
+            "회귀·분류",
+            "공부 시간으로 점수 예측"
+          ],
+          [
+            "비지도 학습(비교사 학습)",
+            "없음",
+            "군집",
+            "구매 패턴이 비슷한 고객 묶기"
+          ],
+          [
+            "강화 학습",
+            "보상으로 대신",
+            "행동 전략 익히기",
+            "바둑·게임 AI"
+          ]
+        ]
+      },
+      "tip": "정답을 주면 지도, 안 주면 비지도, 점수(보상)를 주면 강화",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "지도 학습",
+            "desc": "입력과 정답을 함께 주어 둘 사이의 규칙을 찾게 하는 학습"
+          },
+          {
+            "term": "비지도 학습",
+            "desc": "라벨 없이 데이터만으로 비슷한 것끼리 묶거나 구조를 찾는 학습"
+          },
+          {
+            "term": "강화 학습",
+            "desc": "행동의 결과로 받는 보상이 커지도록 스스로 익히는 학습"
+          }
+        ],
+        "distractor": "능동 학습"
+      }
+    },
+    {
+      "id": "t2",
+      "title": "지도 학습: X와 y, 회귀와 분류",
+      "points": [
+        "지도 학습 데이터는 예측에 쓰는 입력 열과 맞힐 정답 열로 나뉜다. 입력을 특성(feature)·독립변수라 하며 X로, 정답을 타깃(target)·종속변수라 하며 y로 쓴다.",
+        "sklearn에서 X는 표 모양(2차원)이어야 하므로 열이 하나여도 df[['공부시간']]처럼 대괄호를 두 겹으로 쓰고, y는 df['점수']처럼 열 하나(1차원)로 쓴다.",
+        "회귀는 집값·매출·점수처럼 크기가 있는 숫자를 예측하는 문제이다. 분류는 합격/불합격, 스팸/정상처럼 정해진 범주(클래스) 중 하나를 고르는 문제이다.",
+        "같은 데이터라도 무엇을 y로 정하느냐에 따라 문제가 달라진다. 점수 자체를 맞히면 회귀, 60점 이상인지(1/0)를 맞히면 분류이다."
+      ],
+      "tip": "X는 표(2차원) df[[...]], y는 열 하나(1차원) df['...']",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'공부시간': [1, 2, 3, 4, 5],\n                   '결석': [3, 2, 2, 1, 0],\n                   '점수': [55, 62, 70, 78, 85]})\nX = df[['공부시간', '결석']]   # 특성: 2차원 표\ny = df['점수']                # 타깃: 1차원 Series\nprint(X.shape, y.shape)       # (5, 2) (5,)",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "특성(feature)",
+            "desc": "모델이 예측에 쓰는 입력 열로 독립변수라고도 부른다"
+          },
+          {
+            "term": "타깃(target)",
+            "desc": "모델이 맞혀야 하는 정답 열로 종속변수라고도 부른다"
+          },
+          {
+            "term": "분류",
+            "desc": "정해진 범주 가운데 하나를 고르는 지도 학습 문제"
+          }
+        ],
+        "distractor": "회귀"
+      }
+    },
+    {
+      "id": "t3",
+      "title": "과적합과 학습·평가 데이터 나누기",
+      "points": [
+        "과적합은 모델이 학습 데이터를 지나치게 외워, 처음 보는 데이터에서는 예측 성능이 떨어지는 현상이다. 문제집 답만 외운 학생이 새 문제를 못 푸는 것과 같다.",
+        "반대로 모델이 너무 단순해서 학습 데이터의 규칙조차 제대로 잡지 못하는 것은 과소적합이라 한다.",
+        "그래서 데이터를 학습 데이터(train)와 평가 데이터(test)로 나눈다. 학습 데이터로만 fit하고, 모델이 본 적 없는 평가 데이터로 성능을 재야 과적합을 알아챌 수 있다.",
+        "sklearn.model_selection의 train_test_split(df, train_size=0.8, random_state=123)은 행을 섞은 뒤 80%는 학습용, 나머지는 평가용으로 나눠 두 표를 돌려준다.",
+        "비율을 주지 않으면 기본값 test_size=0.25에 따라 75:25로 나뉜다. random_state를 같은 수로 고정하면 몇 번을 실행해도 같은 행이 뽑힌다."
+      ],
+      "tip": "학습 점수만 높고 평가 점수가 뚝 떨어지면 과적합을 의심한다",
+      "code": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\ndf = pd.DataFrame({'x': range(20), 'y': range(20)})\ntr, te = train_test_split(df, random_state=123)\nprint(len(tr), len(te))      # 15 5  (기본 75:25)\ntr, te = train_test_split(df, train_size=0.8, random_state=123)\nprint(len(tr), len(te))      # 16 4",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "과적합",
+            "desc": "학습 데이터를 너무 외워 새 데이터에서 성능이 떨어지는 현상"
+          },
+          {
+            "term": "train_size",
+            "desc": "전체 데이터 중 학습용으로 쓸 비율을 정하는 인자"
+          },
+          {
+            "term": "random_state",
+            "desc": "무작위로 섞는 결과를 매번 똑같이 재현하도록 고정하는 값"
+          }
+        ],
+        "distractor": "과소적합"
+      }
+    },
+    {
+      "id": "t4",
+      "title": "LinearRegression: coef_·predict",
+      "points": [
+        "선형 회귀는 X와 y의 관계를 가장 잘 나타내는 직선(y = 기울기 × x + 절편)을 찾는 회귀 모델이다. 예: 매장 면적이 1 늘 때 매출이 얼마나 느는지 알아보기.",
+        "from sklearn.linear_model import LinearRegression으로 불러와 model = LinearRegression().fit(X, y)처럼 학습시킨다. fit은 학습을 마친 모델 자신을 돌려준다.",
+        "model.coef_는 X에 넣은 열 순서대로 회귀계수(기울기)가 담긴 배열이라 첫 열의 계수는 coef_[0]이다. model.intercept_는 절편이다.",
+        "model.predict(새 X)는 예측값 배열을 돌려준다. sklearn 결과에는 statsmodels ols처럼 p-value가 든 요약표가 없고, 결정계수 R²는 model.score(X, y)로 구한다.",
+        "X와 y를 따로 넘기면 train_test_split은 X_train, X_test, y_train, y_test 네 개를 이 순서대로 돌려준다."
+      ],
+      "tip": "statsmodels는 params·rsquared, sklearn은 coef_·intercept_·score()",
+      "code": "import pandas as pd\nfrom sklearn.linear_model import LinearRegression\ndf = pd.DataFrame({'x': [1, 2, 3, 4, 5],\n                   'y': [3, 5, 7, 9, 11]})\nmodel = LinearRegression().fit(X=df[['x']], y=df['y'])\nprint(round(model.coef_[0], 2), round(model.intercept_, 2))  # 2.0 1.0\nnew = pd.DataFrame({'x': [10]})\nprint(round(model.predict(new)[0], 2))                       # 21.0",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "coef_",
+            "desc": "X에 넣은 열 순서대로 회귀계수(기울기)가 담긴 배열 속성"
+          },
+          {
+            "term": "intercept_",
+            "desc": "학습으로 찾은 직선의 절편 값을 담은 속성"
+          },
+          {
+            "term": "predict",
+            "desc": "새 입력을 넣으면 예측값 배열을 돌려주는 메서드"
+          }
+        ],
+        "distractor": "params"
+      }
+    },
+    {
+      "id": "t5",
+      "title": "LogisticRegression: 이름은 회귀, 하는 일은 분류",
+      "points": [
+        "로지스틱 회귀는 이름에 '회귀'가 붙지만 합격(1)/불합격(0)처럼 범주를 예측하는 분류 모델이다.",
+        "입력으로 계산한 점수를 시그모이드 함수로 0~1 사이의 확률로 바꾸고, 그 확률이 0.5를 넘으면 1, 아니면 0으로 판정한다.",
+        "from sklearn.linear_model import LogisticRegression으로 불러오며, fit(X, y)로 학습하고 predict(X)로 예측하는 방법은 LinearRegression과 같다.",
+        "predict는 0·1 같은 예측 클래스를, predict_proba는 클래스마다 속할 확률을 돌려준다. 결과는 정밀도·재현율 같은 분류 지표로 평가한다."
+      ],
+      "tip": "LogisticRegression = 분류, LinearRegression = 회귀. 이름에 속지 말자",
+      "code": "import pandas as pd\nfrom sklearn.linear_model import LogisticRegression\ndf = pd.DataFrame({'시간': [1, 2, 3, 4, 5, 6, 7, 8],\n                   '합격': [0, 0, 0, 0, 1, 1, 1, 1]})\nmodel = LogisticRegression().fit(df[['시간']], df['합격'])\nnew = pd.DataFrame({'시간': [2, 7]})\nprint(model.predict(new).tolist())                # [0, 1]\nprint(model.predict_proba(new)[:, 1].round(2))    # [0.05 0.95] 합격 확률",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "LogisticRegression",
+            "desc": "범주(클래스)를 예측하는 sklearn의 분류 모델 클래스"
+          },
+          {
+            "term": "시그모이드",
+            "desc": "계산된 점수를 0과 1 사이의 확률로 바꿔 주는 함수"
+          },
+          {
+            "term": "predict_proba",
+            "desc": "클래스마다 속할 확률을 돌려주는 메서드"
+          }
+        ],
+        "distractor": "LinearRegression"
+      }
+    },
+    {
+      "id": "t6",
+      "title": "회귀 평가 지표: MAE·MSE·RMSE·MAPE",
+      "points": [
+        "회귀 모델은 오차(실제값 − 예측값)가 작을수록 좋다. 오차를 그냥 더하면 +와 −가 서로 지워지므로 절댓값이나 제곱으로 바꾼 뒤 평균한다.",
+        "MAE는 오차 절댓값의 평균, MSE는 오차 제곱의 평균이다. MSE는 큰 오차를 제곱으로 더 크게 벌주지만 단위도 제곱이 된다.",
+        "RMSE는 MSE에 제곱근을 씌워 단위를 원래대로 되돌린 값이다. MAE·MSE·RMSE는 0에 가까울수록 좋은 모델이다.",
+        "MAPE는 |오차| ÷ 실제값을 평균해 백분율로 나타낸다. 실제값이 0인 행이 있으면 0으로 나누게 되어 쓰기 곤란하다.",
+        "결정계수 R²는 반대로 1에 가까울수록 좋다. 정밀도·재현율·F1은 분류 지표라서 회귀 모델 평가에는 쓰지 않는다."
+      ],
+      "table": {
+        "head": [
+          "지표",
+          "계산 (실제 10·20·30·40, 예측 12·18·33·40)",
+          "값"
+        ],
+        "rows": [
+          [
+            "MAE",
+            "(2 + 2 + 3 + 0) ÷ 4",
+            "1.75"
+          ],
+          [
+            "MSE",
+            "(4 + 4 + 9 + 0) ÷ 4",
+            "4.25"
+          ],
+          [
+            "RMSE",
+            "√4.25",
+            "약 2.06"
+          ],
+          [
+            "MAPE",
+            "(2/10 + 2/20 + 3/30 + 0/40) ÷ 4",
+            "0.1 = 10%"
+          ]
+        ]
+      },
+      "tip": "R²만 클수록 좋고, MAE·MSE·RMSE·MAPE는 작을수록 좋다",
+      "code": "from sklearn.metrics import mean_absolute_error, mean_squared_error\ny_true = [10, 20, 30, 40]\ny_pred = [12, 18, 33, 40]\nmae = mean_absolute_error(y_true, y_pred)\nmse = mean_squared_error(y_true, y_pred)\nprint(mae, mse, round(mse ** 0.5, 2))     # 1.75 4.25 2.06",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "MAE",
+            "desc": "오차 절댓값을 그대로 평균해 원래 단위로 나타낸 지표"
+          },
+          {
+            "term": "RMSE",
+            "desc": "제곱 오차의 평균에 제곱근을 씌워 단위를 되돌린 지표"
+          },
+          {
+            "term": "MAPE",
+            "desc": "실제값 대비 오차의 비율을 평균해 백분율로 나타낸 지표"
+          }
+        ],
+        "distractor": "F1"
+      }
+    },
+    {
+      "id": "t7",
+      "title": "분류 평가 지표: 정밀도·재현율·F1",
+      "points": [
+        "분류 결과는 혼동행렬로 정리한다. 양성(1)을 양성으로 맞히면 TP, 음성을 양성으로 잘못 예측하면 FP, 양성을 음성으로 놓치면 FN, 음성을 음성으로 맞히면 TN이다.",
+        "정확도는 (TP + TN) ÷ 전체이다. 양성이 아주 드문 데이터에서는 모두 음성이라고만 해도 정확도가 높게 나와 속기 쉽다.",
+        "정밀도(precision)는 TP ÷ (TP + FP)로, 모델이 양성이라고 한 것 중 진짜 양성의 비율이다. 예: 스팸으로 분류한 메일 중 실제 스팸의 비율.",
+        "재현율(recall)은 TP ÷ (TP + FN)으로, 실제 양성 중 모델이 찾아낸 비율이다. 예: 실제 환자 중 검사로 환자를 잡아낸 비율.",
+        "F1 점수는 정밀도와 재현율의 조화평균 2PR ÷ (P + R)이라 둘 다 높아야 높다. MAE·RMSE 같은 오차 지표는 분류 평가에 쓰지 않는다."
+      ],
+      "table": {
+        "head": [
+          "실제 ↓ / 예측 →",
+          "양성(1)",
+          "음성(0)"
+        ],
+        "rows": [
+          [
+            "양성(1)",
+            "TP (맞힘)",
+            "FN (놓침)"
+          ],
+          [
+            "음성(0)",
+            "FP (헛경보)",
+            "TN (맞힘)"
+          ]
+        ]
+      },
+      "tip": "정밀도는 '예측한 양성' 기준, 재현율은 '실제 양성' 기준으로 나눈다",
+      "code": "from sklearn.metrics import precision_score, recall_score, f1_score\ny_true = [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]   # 1 = 스팸\ny_pred = [1, 1, 1, 0, 1, 1, 0, 0, 0, 0]\nprint(precision_score(y_true, y_pred))     # 0.6  (3 ÷ 5)\nprint(recall_score(y_true, y_pred))        # 0.75 (3 ÷ 4)\nprint(round(f1_score(y_true, y_pred), 3))  # 0.667",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "정밀도",
+            "desc": "양성이라고 예측한 것 가운데 실제 양성의 비율"
+          },
+          {
+            "term": "재현율",
+            "desc": "실제 양성 가운데 모델이 양성으로 찾아낸 비율"
+          },
+          {
+            "term": "F1 점수",
+            "desc": "두 분류 지표를 조화평균해 하나로 묶은 점수"
+          }
+        ],
+        "distractor": "정확도"
+      }
+    },
+    {
+      "id": "t8",
+      "title": "군집 분석: KMeans와 계층적 군집",
+      "points": [
+        "군집 분석은 정답 없이 비슷한 데이터끼리 묶는 비지도 학습이다. 예: 방문 횟수·구매 금액이 비슷한 고객끼리 묶어 고객 유형을 나눈다.",
+        "KMeans는 군집 수 k를 사람이 n_clusters로 정해 주면, 중심점(군집의 평균)에 가까운 점을 배정하고 중심을 다시 구하는 일을 반복한다. 모든 점이 한 군집에 들어간다.",
+        "KMeans(n_clusters=3, random_state=123, n_init=10).fit(X)로 학습하면 labels_에 행마다 군집 번호(0부터)가, cluster_centers_에 중심 좌표가 담긴다.",
+        "처음 중심을 무작위로 잡으므로 random_state를 고정하고, n_init(시작을 몇 번 해 볼지)도 정해 두면 버전이 달라도 결과가 안정적이다.",
+        "계층적 군집(sklearn의 AgglomerativeClustering)은 가까운 것끼리 차례로 합쳐 나무 모양을 만든다. n_clusters로 군집 수를, linkage로 군집 사이 거리 계산 방식을 정한다."
+      ],
+      "tip": "k는 자동으로 정해지지 않는다. 군집 번호 0·1·2는 이름일 뿐 크기 순서가 아니다",
+      "code": "import pandas as pd\nfrom sklearn.cluster import KMeans, AgglomerativeClustering\ndf = pd.DataFrame({'x': [1, 2, 1, 8, 9, 8, 9],\n                   'y': [1, 1, 2, 8, 8, 9, 9]})\nkm = KMeans(n_clusters=2, random_state=0, n_init=10).fit(df)\nprint(pd.Series(km.labels_).value_counts().max())      # 4\nag = AgglomerativeClustering(n_clusters=2, linkage='ward').fit(df)\nprint(sorted(pd.Series(ag.labels_).value_counts().tolist()))  # [3, 4]",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "n_clusters",
+            "desc": "만들 군집의 개수를 사람이 직접 정해 주는 인자"
+          },
+          {
+            "term": "labels_",
+            "desc": "학습 후 행마다 배정된 군집 번호가 담긴 속성"
+          },
+          {
+            "term": "linkage",
+            "desc": "군집과 군집 사이의 거리를 어떻게 잴지 정하는 인자"
+          }
+        ],
+        "distractor": "cluster_centers_"
+      }
+    },
+    {
+      "id": "t9",
+      "title": "의사결정나무와 지니 지수",
+      "points": [
+        "의사결정나무는 '공부시간이 3 이상인가?' 같은 질문으로 데이터를 계속 둘로 나누고, 맨 끝 마디(잎)에서 클래스나 값을 정하는 지도 학습 모델이다.",
+        "좋은 질문은 나눈 뒤 각 마디에 한 클래스만 모이게 한다. 한 마디에 여러 클래스가 섞여 있는 정도를 불순도라 한다.",
+        "지니 지수는 1 − (각 클래스 비율의 제곱의 합)으로 불순도를 잰다. 한 클래스뿐이면 0(순수), 두 클래스가 반반이면 0.5로 가장 크다.",
+        "sklearn의 DecisionTreeClassifier는 기본으로 criterion='gini'를 쓰며, 나눈 뒤 지니 지수가 가장 많이 줄어드는 질문을 골라 마디를 나눈다.",
+        "나무를 끝없이 깊게 키우면 학습 데이터를 외워 과적합되므로 max_depth로 깊이를 제한한다."
+      ],
+      "tip": "지니 지수는 작을수록 순수하다. 0이면 한 클래스만 남은 마디",
+      "code": "def gini(counts):\n    n = sum(counts)\n    return 1 - sum((c / n) ** 2 for c in counts)\n\nprint(gini([8, 0]))             # 0.0  한 클래스뿐: 순수\nprint(gini([5, 5]))             # 0.5  반반: 가장 섞임\nprint(round(gini([6, 2]), 3))   # 0.375",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "불순도",
+            "desc": "한 마디 안에 여러 클래스가 섞여 있는 정도"
+          },
+          {
+            "term": "지니 지수",
+            "desc": "1에서 각 클래스 비율의 제곱합을 뺀 값"
+          },
+          {
+            "term": "max_depth",
+            "desc": "나무가 자랄 수 있는 깊이를 제한하는 인자"
+          }
+        ],
+        "distractor": "criterion"
+      }
+    },
+    {
+      "id": "t10",
+      "title": "작업형 답안 쓰기: ※ 조건과 solution()",
+      "points": [
+        "작업형은 짧은 코드로 값을 구해 답하는 문제이다. ※ 조건에 파일·열 이름, 써야 할 함수, random_state, 반올림 자리, 절댓값 여부가 다 있으니 하나씩 표시하며 읽는다.",
+        "답안은 보통 필터 → 계산 → 정리 순서로 쓴다. '결과는 절댓값'은 abs(), '소수 둘째 자리까지 반올림'은 round(값, 2)이고 함께 쓰면 round(abs(값), 2)이다.",
+        "말은 기호로 정확히 옮긴다. 이상 >=, 초과·넘는 >, 이하 <=, 미만 <, '1개인'은 == 1이다. 조건이 여러 개면 (조건1) & (조건2)처럼 괄호로 묶는다.",
+        "'정답은 solution 함수의 반환값으로'라는 조건이 있으면 def solution(): 안에서 result를 구해 return result로 돌려준다. print만 하면 반환값은 None이다.",
+        "'결과를 df2 객체에 저장하시오'처럼 이름이 정해지면 그 이름 그대로 쓴다. 정답 예시 0.123은 소수 셋째 자리 소수로, 12는 정수로 답하라는 뜻이다."
+      ],
+      "tip": "이상 >=, 초과 >, 이하 <=, 미만 <. 답은 print가 아니라 return으로!",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'area': [30, 50, 40, 70, 60],\n                   'sales': [100, 180, 150, 260, 210]})\n# ※ area가 50 이상인 매장과 전체 매장의 sales 평균 차이\n# ※ 결과는 절댓값, 소수 둘째 자리까지 반올림\ndf_big = df.loc[df['area'] >= 50, ]\ndef solution():\n    result = round(abs(df_big['sales'].mean() - df['sales'].mean()), 2)\n    return result\n\nprint(solution())    # 36.67",
+      "ext": false,
+      "match": {
+        "pairs": [
+          {
+            "term": "abs()",
+            "desc": "음수가 나와도 크기만 남도록 절댓값을 취하는 함수"
+          },
+          {
+            "term": "round",
+            "desc": "정해진 소수 자리까지 반올림하는 파이썬 내장 함수"
+          },
+          {
+            "term": "solution",
+            "desc": "정답을 반환값으로 돌려주도록 이름이 정해진 사용자 정의 함수"
+          }
+        ],
+        "distractor": "print"
+      }
+    }
+  ],
+  "bank": [
+    "지도 학습",
+    "비지도 학습",
+    "강화 학습",
+    "분류",
+    "과적합",
+    "train_size",
+    "random_state",
+    "coef_",
+    "predict",
+    "LogisticRegression",
+    "RMSE",
+    "MAPE",
+    "재현율",
+    "F1 점수",
+    "n_clusters",
+    "labels_",
+    "linkage",
+    "지니 지수",
+    "round",
+    "return",
+    "회귀",
+    "능동 학습",
+    "과소적합",
+    "test_size",
+    "intercept_",
+    "fit",
+    "MAE",
+    "정밀도",
+    "n_init",
+    "print"
+  ],
+  "fill": [
+    {
+      "id": "f1",
+      "text": "문제와 정답(라벨)을 함께 주고 둘 사이의 규칙을 찾게 하는 학습 방법으로, 교사 학습이라고도 하는 것은 ____이다.",
+      "answer": "지도 학습",
+      "exp": "정답을 알려 주며 가르치므로 교사 학습이라 한다. 회귀와 분류가 여기에 속한다."
+    },
+    {
+      "id": "f2",
+      "text": "정답 없이 데이터만 주고 비슷한 것끼리 묶거나 숨은 구조를 찾게 하는 학습으로, 군집 분석이 대표 예인 것은 ____이다.",
+      "answer": "비지도 학습",
+      "exp": "라벨이 없는 데이터에서 구조를 찾는다. KMeans·계층적 군집이 대표적이다."
+    },
+    {
+      "id": "f3",
+      "text": "정답 대신 행동의 결과로 보상을 주어, 보상이 커지는 행동을 시행착오로 익히게 하는 학습은 ____이다.",
+      "answer": "강화 학습",
+      "exp": "보상(점수)을 신호로 배우며 게임 AI·로봇 제어에 쓰인다."
+    },
+    {
+      "id": "f4",
+      "text": "지도 학습 중 합격/불합격, 스팸/정상처럼 정해진 범주 가운데 하나를 고르는 문제를 ____라고 한다.",
+      "answer": "분류",
+      "exp": "범주를 고르면 분류, 집값처럼 크기가 있는 숫자를 예측하면 회귀이다."
+    },
+    {
+      "id": "f5",
+      "text": "모델이 학습 데이터를 지나치게 외워 처음 보는 데이터에서 예측 성능이 떨어지는 현상을 ____이라 한다.",
+      "answer": "과적합",
+      "exp": "학습 점수는 높고 평가 점수는 낮게 나온다. 너무 단순해 못 맞히는 것은 과소적합이다."
+    },
+    {
+      "id": "f6",
+      "text": "train_test_split(df, ____=0.8, random_state=123)은 행의 80%를 학습 데이터로 뽑는다.",
+      "answer": "train_size",
+      "exp": "train_size는 학습용 비율, test_size는 평가용 비율이다. 둘 다 안 주면 75:25이다."
+    },
+    {
+      "id": "f7",
+      "text": "train_test_split이나 KMeans에 ____를 같은 수로 정해 두면 무작위로 정해지는 결과를 매번 똑같이 재현할 수 있다.",
+      "answer": "random_state",
+      "exp": "작업형 ※ 조건에 random_state 값이 나오면 반드시 그대로 넣어야 답이 맞는다."
+    },
+    {
+      "id": "f8",
+      "text": "LinearRegression으로 학습한 모델에서 X의 열 순서대로 회귀계수(기울기)가 담긴 배열은 model.____이다.",
+      "answer": "coef_",
+      "exp": "첫 열의 계수는 coef_[0]이다. 절편은 intercept_에 따로 들어 있다."
+    },
+    {
+      "id": "f9",
+      "text": "학습을 마친 모델에 새로운 X를 넣어 예측값을 얻을 때는 model.____(X_new)를 쓴다.",
+      "answer": "predict",
+      "exp": "fit은 학습, predict는 예측이다. 회귀는 숫자, 분류는 클래스를 돌려준다."
+    },
+    {
+      "id": "f10",
+      "text": "이름에 '회귀'가 들어가지만 0과 1 같은 범주를 예측하는 sklearn의 분류 모델은 ____이다.",
+      "answer": "LogisticRegression",
+      "exp": "시그모이드로 구한 확률이 0.5를 넘으면 1로 분류한다. LinearRegression은 숫자를 예측하는 회귀 모델이다."
+    },
+    {
+      "id": "f11",
+      "text": "오차 제곱의 평균(MSE)에 제곱근을 씌워 단위를 원래대로 되돌린 회귀 평가 지표는 ____이다.",
+      "answer": "RMSE",
+      "exp": "Root Mean Squared Error. MSE가 4.25이면 RMSE는 약 2.06이다."
+    },
+    {
+      "id": "f12",
+      "text": "|오차| ÷ 실제값을 평균해 백분율로 나타내는 ____는 실제값에 0이 있으면 계산하기 곤란하다.",
+      "answer": "MAPE",
+      "exp": "실제값으로 나누기 때문에 실제값 0이면 0으로 나누는 문제가 생긴다."
+    },
+    {
+      "id": "f13",
+      "text": "실제 양성 가운데 모델이 양성으로 찾아낸 비율, 즉 TP ÷ (TP + FN)을 ____이라 한다.",
+      "answer": "재현율",
+      "exp": "재현율(recall)은 실제 양성이 분모이다. 예측한 양성이 분모인 것은 정밀도이다."
+    },
+    {
+      "id": "f14",
+      "text": "정밀도와 재현율의 조화평균으로 두 지표를 하나로 묶은 분류 평가 지표는 ____이다.",
+      "answer": "F1 점수",
+      "exp": "F1 = 2PR ÷ (P + R). 정밀도와 재현율이 모두 높아야 높게 나온다."
+    },
+    {
+      "id": "f15",
+      "text": "KMeans는 군집 수 k를 알고리즘이 정해 주지 않으므로 ____ 인자로 사람이 직접 지정해야 한다.",
+      "answer": "n_clusters",
+      "exp": "KMeans(n_clusters=3)처럼 쓴다. n_init은 시작을 몇 번 해 볼지 정하는 인자이다."
+    },
+    {
+      "id": "f16",
+      "text": "KMeans 모델을 학습한 뒤 각 행에 배정된 군집 번호는 model.____에서 확인한다.",
+      "answer": "labels_",
+      "exp": "pd.Series(model.labels_).value_counts()로 군집별 개수를 셀 수 있다."
+    },
+    {
+      "id": "f17",
+      "text": "계층적 군집(AgglomerativeClustering)에서 군집과 군집 사이의 거리를 재는 방식은 ____ 인자로 정한다.",
+      "answer": "linkage",
+      "exp": "ward·complete·average·single 중에서 고를 수 있다."
+    },
+    {
+      "id": "f18",
+      "text": "의사결정나무에서 1 − (클래스 비율 제곱의 합)으로 불순도를 재며, 0이면 한 클래스만 남은 순수한 마디라는 뜻인 지표는 ____이다.",
+      "answer": "지니 지수",
+      "exp": "두 클래스가 반반이면 1 − (0.25 + 0.25) = 0.5로 가장 섞인 상태이다."
+    },
+    {
+      "id": "f19",
+      "text": "'결과는 반올림하여 소수 셋째 자리까지 계산하시오'라는 ※ 조건은 파이썬 코드로 ____(값, 3)이라고 쓴다.",
+      "answer": "round",
+      "exp": "절댓값 조건도 있으면 round(abs(값), 3)처럼 함께 쓴다."
+    },
+    {
+      "id": "f20",
+      "text": "정답을 solution 함수의 반환값으로 내라는 조건이 있으면, 함수 안에서 print가 아니라 ____ result로 결과를 돌려준다.",
+      "answer": "return",
+      "exp": "print만 하면 화면에 보일 뿐 함수가 돌려주는 값은 None이다."
+    }
+  ],
+  "basic": [
+    {
+      "id": "b1",
+      "q": "다음 설명에 해당하는 학습 방법은?\n「컴퓨터에 문제와 그 정답을 함께 주고, 둘 사이를 가장 잘 잇는 규칙을 찾아 가게 한다. 선생님이 답을 알려 주는 것과 같아 교사 학습이라고도 한다.」",
+      "o": [
+        "비지도 학습",
+        "강화 학습",
+        "지도 학습",
+        "능동 학습"
+      ],
+      "a": 2,
+      "exp": "문제와 정답(라벨)을 함께 주는 것이 지도 학습(교사 학습)이다. 비지도 학습은 정답 없이 구조를 찾고, 강화 학습은 정답 대신 보상을 준다.",
+      "area": "ML"
+    },
+    {
+      "id": "b2",
+      "q": "다음 중 비지도 학습에 해당하는 작업은?",
+      "o": [
+        "쇼핑 기록이 비슷한 고객끼리 묶어 고객 유형을 나눈다",
+        "합격 여부가 적힌 지난 자료로 올해 지원자의 합격 여부를 예측한다",
+        "지난 거래 가격으로 새 아파트의 가격을 예측한다",
+        "게임에서 점수를 많이 얻는 행동을 시행착오로 익힌다"
+      ],
+      "a": 0,
+      "exp": "정답 없이 비슷한 것끼리 묶는 군집은 비지도 학습이다. 합격 여부 예측은 분류, 가격 예측은 회귀로 둘 다 지도 학습이고, 점수(보상)로 배우는 것은 강화 학습이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b3",
+      "q": "다음 중 회귀가 아니라 분류에 해당하는 문제는?",
+      "o": [
+        "매장 면적으로 월 매출액 예측하기",
+        "공부 시간으로 시험 점수 예측하기",
+        "날씨 자료로 내일 최고 기온 예측하기",
+        "메일 내용을 보고 스팸인지 정상인지 판정하기"
+      ],
+      "a": 3,
+      "exp": "스팸/정상처럼 정해진 범주 중 하나를 고르면 분류이다. 매출액·점수·기온은 크기가 있는 숫자를 예측하므로 회귀이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b4",
+      "q": "과적합(overfitting)에 대한 설명으로 옳은 것은?",
+      "o": [
+        "모델이 너무 단순해 학습 데이터의 규칙조차 잡지 못하는 상태이다",
+        "학습 데이터에서는 성능이 매우 좋지만 처음 보는 데이터에서는 성능이 떨어진다",
+        "학습 데이터와 평가 데이터의 성능이 모두 높고 비슷한 상태이다",
+        "평가 데이터까지 학습에 넣으면 과적합 여부를 더 정확히 알 수 있다"
+      ],
+      "a": 1,
+      "exp": "과적합은 학습 데이터를 지나치게 외워 새 데이터에서 성능이 떨어지는 현상이다. 너무 단순해 못 맞히는 것은 과소적합이고, 평가 데이터를 학습에 넣으면 성능을 공정하게 잴 수 없다.",
+      "area": "ML"
+    },
+    {
+      "id": "b5",
+      "q": "학습 데이터와 평가 데이터를 나누는 train_test_split 함수를 불러오는 코드로 옳은 것은?",
+      "o": [
+        "from sklearn.model_selection import train_test_split",
+        "from sklearn.linear_model import train_test_split",
+        "from sklearn.cluster import train_test_split",
+        "from sklearn.metrics import train_test_split"
+      ],
+      "a": 0,
+      "exp": "train_test_split은 sklearn.model_selection 모듈에 있다. linear_model에는 LinearRegression·LogisticRegression, cluster에는 KMeans, metrics에는 평가 지표 함수가 있다.",
+      "area": "ML"
+    },
+    {
+      "id": "b6",
+      "q": "train_test_split(df, random_state=1)처럼 train_size와 test_size를 모두 생략하면 학습 데이터와 평가 데이터의 비율은?",
+      "o": [
+        "80% : 20%",
+        "50% : 50%",
+        "75% : 25%",
+        "70% : 30%"
+      ],
+      "a": 2,
+      "exp": "둘 다 생략하면 test_size 기본값 0.25가 적용되어 75:25로 나뉜다. 80:20으로 나누려면 train_size=0.8(또는 test_size=0.2)을 직접 넣어야 한다.",
+      "area": "ML"
+    },
+    {
+      "id": "b7",
+      "q": "train_test_split이나 KMeans에 random_state=123을 넣는 이유로 가장 알맞은 것은?",
+      "o": [
+        "학습 데이터를 정확히 123개만 뽑으려고",
+        "데이터를 123개의 군집으로 나누려고",
+        "결측치가 있는 행을 자동으로 지우려고",
+        "무작위로 정해지는 결과를 실행할 때마다 똑같이 재현하려고"
+      ],
+      "a": 3,
+      "exp": "random_state는 무작위 섞기·초기값을 고정해 같은 결과를 다시 얻게 하는 값이다. 뽑을 개수는 train_size, 군집 수는 n_clusters로 정한다.",
+      "area": "ML"
+    },
+    {
+      "id": "b8",
+      "q": "model = LinearRegression().fit(X, y)로 학습한 모델에서 X의 각 열에 대한 회귀계수(기울기)가 담긴 것은?",
+      "o": [
+        "model.intercept_",
+        "model.coef_",
+        "model.params",
+        "model.labels_"
+      ],
+      "a": 1,
+      "exp": "sklearn 선형 회귀의 회귀계수는 coef_에 X의 열 순서대로 담긴다. intercept_는 절편, params는 statsmodels 결과의 속성, labels_는 KMeans의 군집 번호이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b9",
+      "q": "학습을 마친 sklearn 모델로 새 데이터의 예측값을 얻을 때 쓰는 메서드는?",
+      "o": [
+        ".fit()",
+        ".score()",
+        ".sample()",
+        ".predict()"
+      ],
+      "a": 3,
+      "exp": "predict(새 X)가 예측값을 돌려준다. fit은 학습, score는 결정계수 같은 점수 계산, sample은 pandas에서 행을 무작위로 뽑는 메서드이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b10",
+      "q": "공부 시간으로 시험 합격(1)·불합격(0)을 예측하려 한다. sklearn에서 가장 알맞은 모델은?",
+      "o": [
+        "LogisticRegression()",
+        "LinearRegression()",
+        "KMeans(n_clusters=2)",
+        "AgglomerativeClustering(n_clusters=2)"
+      ],
+      "a": 0,
+      "exp": "정답 라벨(합격 1/0)이 있는 분류 문제이므로 분류 모델인 LogisticRegression을 쓴다. LinearRegression은 숫자를 예측하는 회귀, KMeans와 AgglomerativeClustering은 정답을 쓰지 않는 군집 모델이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b11",
+      "q": "로지스틱 회귀(LogisticRegression)에 대한 설명으로 옳은 것은?",
+      "o": [
+        "정답(라벨) 없이 학습하는 비지도 학습 모델이다",
+        "평가할 때는 MAPE·RMSE 같은 회귀 지표를 쓴다",
+        "이름에 '회귀'가 들어가지만 범주를 예측하는 분류 모델이다",
+        "predict_proba는 예측한 클래스 번호만 돌려준다"
+      ],
+      "a": 2,
+      "exp": "로지스틱 회귀는 확률을 구해 0/1 같은 클래스로 분류하는 지도 학습 모델이므로 정밀도·재현율 같은 분류 지표로 평가한다. predict_proba는 클래스별 확률을 돌려준다.",
+      "area": "ML"
+    },
+    {
+      "id": "b12",
+      "q": "집값을 예측하는 회귀 모델의 성능을 평가하는 지표로 알맞은 것은?",
+      "o": [
+        "재현율(recall)",
+        "RMSE",
+        "F1 점수",
+        "정밀도(precision)"
+      ],
+      "a": 1,
+      "exp": "RMSE는 오차 제곱 평균의 제곱근으로 회귀 지표이다. 재현율·F1 점수·정밀도는 모두 분류 모델을 평가하는 지표이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b13",
+      "q": "가게별 하루 매출을 예측하는 모델을 평가하려 한다. 휴무일이라 실제 매출이 0원인 날이 섞여 있을 때 계산이 곤란한 지표는?",
+      "o": [
+        "MAE",
+        "MSE",
+        "RMSE",
+        "MAPE"
+      ],
+      "a": 3,
+      "exp": "MAPE는 |오차|를 실제값으로 나누므로 실제값이 0이면 0으로 나누게 된다. MAE·MSE·RMSE는 오차만으로 계산해 실제값이 0이어도 문제없다.",
+      "area": "ML"
+    },
+    {
+      "id": "b14",
+      "q": "스팸 필터가 '스팸'이라고 표시한 메일 가운데 실제로 스팸인 메일의 비율을 나타내는 지표는?",
+      "o": [
+        "정밀도(precision)",
+        "재현율(recall)",
+        "정확도(accuracy)",
+        "MAE"
+      ],
+      "a": 0,
+      "exp": "모델이 양성(스팸)이라고 예측한 것이 분모이면 정밀도 TP ÷ (TP + FP)이다. 실제 스팸이 분모이면 재현율, 전체가 분모이면 정확도이고 MAE는 회귀 지표이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b15",
+      "q": "질병 검사 모델에서 '실제 환자 가운데 검사가 환자로 찾아낸 비율'이 가장 중요하다. 이때 중점적으로 볼 지표는?",
+      "o": [
+        "정밀도(precision)",
+        "MSE",
+        "재현율(recall)",
+        "결정계수(R²)"
+      ],
+      "a": 2,
+      "exp": "실제 양성(환자)이 분모인 비율은 재현율 TP ÷ (TP + FN)이다. 정밀도는 환자라고 예측한 사람이 분모이고, MSE와 결정계수는 회귀 지표이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b16",
+      "q": "KMeans 군집 분석에 대한 설명으로 옳지 않은 것은?",
+      "o": [
+        "정답(라벨) 없이 학습하는 비지도 학습이다",
+        "군집의 개수 k는 데이터를 보고 알고리즘이 자동으로 정한다",
+        "학습이 끝나면 모든 데이터가 어느 한 군집에 배정된다",
+        "각 군집의 중심은 그 군집에 속한 점들의 평균으로 계산한다"
+      ],
+      "a": 1,
+      "exp": "KMeans는 군집 수를 스스로 정하지 못해 n_clusters로 사람이 정해 주어야 한다. 나머지는 KMeans의 올바른 특징이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b17",
+      "q": "KMeans 모델 km을 학습시킨 뒤 각 행이 몇 번 군집에 배정되었는지 확인하려면 무엇을 보아야 하는가?",
+      "o": [
+        "km.labels_",
+        "km.cluster_centers_",
+        "km.coef_",
+        "km.intercept_"
+      ],
+      "a": 0,
+      "exp": "labels_에 행마다 군집 번호(0부터)가 들어 있다. cluster_centers_는 군집 중심 좌표이고, coef_와 intercept_는 선형 회귀 모델의 속성이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b18",
+      "q": "계층적 군집에 대한 설명으로 옳은 것은?",
+      "o": [
+        "정답(라벨)이 있어야 학습할 수 있는 지도 학습이다",
+        "군집 수를 정할 수 없어 항상 두 군집으로 나뉜다",
+        "sklearn에는 없고 pandas의 DataFrame 메서드로만 할 수 있다",
+        "sklearn의 AgglomerativeClustering으로 할 수 있고, linkage로 군집 사이 거리 계산 방식을 정할 수 있다"
+      ],
+      "a": 3,
+      "exp": "계층적 군집은 비지도 학습이며 sklearn.cluster의 AgglomerativeClustering(n_clusters=…, linkage=…)으로 군집 수와 연결 방식을 정할 수 있다.",
+      "area": "ML"
+    },
+    {
+      "id": "b19",
+      "q": "의사결정나무에서 한 마디(노드)에 여러 클래스가 섞여 있는 정도, 즉 불순도를 재는 지표는?",
+      "o": [
+        "결정계수",
+        "재현율",
+        "지니 지수",
+        "MAPE"
+      ],
+      "a": 2,
+      "exp": "지니 지수는 1 − (각 클래스 비율의 제곱합)으로, 0이면 한 클래스만 있는 순수한 마디이다. DecisionTreeClassifier의 기본 기준(criterion='gini')이다.",
+      "area": "ML"
+    },
+    {
+      "id": "b20",
+      "q": "※ 정답은 이름이 \"solution\"인 사용자 정의 함수의 반환값으로 설정하시오.\n이 조건에 맞게 쓴 코드는?",
+      "o": [
+        "def solution(): print(round(df['x'].mean(), 2))",
+        "def solution(): return round(df['x'].mean(), 2)",
+        "solution = round(df['x'].mean(), 2)",
+        "def result(): return round(df['x'].mean(), 2)"
+      ],
+      "a": 1,
+      "exp": "이름이 solution인 함수가 return으로 값을 돌려주어야 한다. print만 하면 반환값이 None이고, 변수에 담기만 하면 함수가 아니며, 함수 이름이 다르면 조건에 어긋난다.",
+      "area": "ANAL"
+    }
+  ],
   "summary": {
-    "keys": [],
-    "compare": [],
-    "traps": []
+    "keys": [
+      {
+        "k": "머신러닝의 세 종류",
+        "v": "지도(정답 있음: 회귀·분류, 교사 학습) · 비지도(정답 없음: 군집) · 강화(보상으로 학습)"
+      },
+      {
+        "k": "과적합",
+        "v": "학습 데이터는 잘 맞히고 새 데이터는 못 맞힘. 평가 데이터로 확인하고 max_depth 제한 등으로 줄인다"
+      },
+      {
+        "k": "train_test_split",
+        "v": "sklearn.model_selection. train_size·test_size(생략 시 75:25), random_state로 재현. (X, y)를 넣으면 X_train, X_test, y_train, y_test"
+      },
+      {
+        "k": "LinearRegression",
+        "v": "LinearRegression().fit(X, y), X는 2차원 df[['x']]. coef_(열 순서대로)·intercept_·predict(새 X)·score = R²"
+      },
+      {
+        "k": "LogisticRegression",
+        "v": "이름은 회귀지만 분류 모델. 시그모이드로 0~1 확률, predict는 클래스, predict_proba는 클래스별 확률"
+      },
+      {
+        "k": "회귀 지표",
+        "v": "MAE(|오차| 평균)·MSE(오차² 평균)·RMSE(√MSE)·MAPE(실제값 0이면 곤란). 작을수록 좋고 R²는 1에 가까울수록 좋음"
+      },
+      {
+        "k": "분류 지표",
+        "v": "정밀도 TP÷(TP+FP), 재현율 TP÷(TP+FN), F1 = 둘의 조화평균. 정확도는 (TP+TN)÷전체"
+      },
+      {
+        "k": "군집 분석",
+        "v": "KMeans(n_clusters, random_state, n_init).fit(X) → labels_. k는 직접 정함. 계층적은 AgglomerativeClustering(linkage)"
+      },
+      {
+        "k": "지니 지수",
+        "v": "1 − Σ(클래스 비율²). 0이면 순수, 두 클래스 반반이면 0.5. DecisionTreeClassifier의 기본 criterion"
+      },
+      {
+        "k": "작업형 답안",
+        "v": "※ 조건 표시 → 필터 → 계산 → round(abs(값), n) → def solution(): … return result, 정해진 객체 이름 그대로"
+      }
+    ],
+    "compare": [
+      {
+        "title": "평가 지표 한눈에",
+        "head": [
+          "구분",
+          "지표",
+          "좋은 방향",
+          "주의할 점"
+        ],
+        "rows": [
+          [
+            "회귀",
+            "MAE·MSE·RMSE",
+            "0에 가까울수록",
+            "MSE는 단위가 제곱, RMSE로 되돌림"
+          ],
+          [
+            "회귀",
+            "MAPE",
+            "0에 가까울수록",
+            "실제값이 0이면 계산 곤란"
+          ],
+          [
+            "회귀",
+            "결정계수 R²",
+            "1에 가까울수록",
+            "sklearn은 score(X, y)"
+          ],
+          [
+            "분류",
+            "정밀도·재현율·F1",
+            "1에 가까울수록",
+            "정밀도는 예측 양성, 재현율은 실제 양성이 분모"
+          ]
+        ]
+      },
+      {
+        "title": "statsmodels ols와 sklearn LinearRegression",
+        "head": [
+          "비교",
+          "statsmodels ols",
+          "sklearn LinearRegression"
+        ],
+        "rows": [
+          [
+            "학습",
+            "ols('y ~ x', data=df).fit()",
+            "LinearRegression().fit(X, y)"
+          ],
+          [
+            "회귀계수",
+            "params['x']",
+            "coef_[0] (X 열 순서)"
+          ],
+          [
+            "절편",
+            "params['Intercept']",
+            "intercept_"
+          ],
+          [
+            "결정계수",
+            "rsquared",
+            "score(X, y)"
+          ],
+          [
+            "p-value 요약표",
+            "summary()로 확인",
+            "없음"
+          ]
+        ]
+      },
+      {
+        "title": "KMeans와 계층적 군집",
+        "head": [
+          "비교",
+          "KMeans",
+          "계층적 군집"
+        ],
+        "rows": [
+          [
+            "sklearn 클래스",
+            "KMeans",
+            "AgglomerativeClustering"
+          ],
+          [
+            "군집 수",
+            "n_clusters로 직접 지정",
+            "n_clusters로 지정"
+          ],
+          [
+            "묶는 방법",
+            "중심(평균)에 가까운 점 배정을 반복",
+            "가까운 것끼리 차례로 합침"
+          ],
+          [
+            "자주 쓰는 인자",
+            "random_state·n_init",
+            "linkage('ward'·'complete'·'average'·'single')"
+          ]
+        ]
+      }
+    ],
+    "traps": [
+      "LogisticRegression은 이름과 달리 분류 모델이다. 0/1을 예측하는 문제에는 LinearRegression이 아니라 LogisticRegression을 고른다.",
+      "train_test_split의 기본 비율은 80:20이 아니라 75:25이다. ※ 조건에 80%가 나오면 train_size=0.8을 꼭 넣는다.",
+      "X는 df[['x']]처럼 2차원, y는 df['y']처럼 1차원이다. coef_[0]은 X에 넣은 첫 열의 계수이므로 열 순서를 확인한다.",
+      "KMeans의 군집 수는 자동으로 정해지지 않는다. 군집 번호 0·1·2는 이름일 뿐 크기 순서가 아니므로 value_counts()로 센다.",
+      "MAPE는 실제값이 0이면 쓰기 곤란하다. 정밀도·재현율·F1은 분류 지표, MAE·RMSE는 회귀 지표이다.",
+      "정밀도는 '양성이라고 예측한 것', 재현율은 '실제 양성'이 분모이다. 두 분모를 바꿔 쓰지 않는다.",
+      "'1개인'은 == 1, '이상'은 >=, '초과'는 >이다. 조건 여러 개는 괄호와 &로 묶고 and를 쓰지 않는다.",
+      "solution()은 print가 아니라 return으로 값을 돌려준다. ※ 조건의 반올림 자리·abs·random_state를 하나도 빠뜨리지 않는다."
+    ]
   },
-  "advanced": []
+  "advanced": [
+    {
+      "id": "a1",
+      "q": "평가 지표에 대한 설명으로 옳지 않은 것은?",
+      "o": [
+        "MAE·MSE·RMSE는 0에 가까울수록 좋은 회귀 모델이다",
+        "MAPE는 실제값이 0인 데이터가 있으면 계산이 곤란하다",
+        "정밀도와 재현율이 모두 높을수록 F1 점수도 높다",
+        "F1 점수는 회귀 모델의 오차 크기를 원래 단위로 나타낸다"
+      ],
+      "a": 3,
+      "exp": "F1 점수는 정밀도와 재현율의 조화평균으로 분류 지표이다. 오차를 원래 단위로 나타내는 회귀 지표는 MAE나 RMSE이다.",
+      "area": "ML",
+      "type": "부정형"
+    },
+    {
+      "id": "a2",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\nfrom sklearn.linear_model import LinearRegression\ndf = pd.DataFrame({'a': [1, 2, 3, 4, 5, 6],\n                   'b': [2, 1, 4, 3, 6, 5],\n                   'y': [13, 10, 27, 24, 41, 38]})\nmodel = LinearRegression().fit(df[['b', 'a']], df['y'])\nprint(round(model.coef_[0], 2), round(model.intercept_, 2))",
+      "o": [
+        "5.0 1.0",
+        "2.0 1.0",
+        "1.0 5.0",
+        "5.0 2.0"
+      ],
+      "a": 0,
+      "exp": "y는 정확히 2a + 5b + 1을 따른다. X에 ['b', 'a'] 순서로 넣었으므로 coef_[0]은 b의 계수 5.0이고 절편은 1.0이다. 2.0은 a의 계수로, 열 순서를 a, b로 착각한 경우이다.",
+      "area": "ML",
+      "type": "코드"
+    },
+    {
+      "id": "a3",
+      "q": "실제값이 [3, 5, 8, 10], 예측값이 [4, 5, 6, 13]일 때 MAE와 MSE를 바르게 짝지은 것은?",
+      "o": [
+        "MAE 3.5, MSE 1.5",
+        "MAE -0.5, MSE 3.5",
+        "MAE 1.5, MSE 3.5",
+        "MAE 1.5, MSE 14"
+      ],
+      "a": 2,
+      "exp": "오차는 −1, 0, 2, −3이다. MAE = (1 + 0 + 2 + 3) ÷ 4 = 1.5, MSE = (1 + 0 + 4 + 9) ÷ 4 = 3.5이다. −0.5는 부호를 그대로 둔 평균, 14는 제곱 오차를 평균하지 않은 합이다.",
+      "area": "ML",
+      "type": "계산"
+    },
+    {
+      "id": "a4",
+      "q": "어떤 분류 모델이 실제 양성 60건 중 40건을 양성으로 예측했고, 실제 음성 40건 중 10건을 양성으로 잘못 예측했다. 정밀도와 재현율은?",
+      "o": [
+        "정밀도 약 0.67, 재현율 0.8",
+        "정밀도 0.8, 재현율 약 0.67",
+        "정밀도 0.8, 재현율 0.75",
+        "정밀도 0.7, 재현율 0.8"
+      ],
+      "a": 1,
+      "exp": "TP = 40, FN = 20, FP = 10, TN = 30이다. 정밀도 = 40 ÷ (40 + 10) = 0.8, 재현율 = 40 ÷ (40 + 20) ≈ 0.67이다. 0.7은 정확도 70 ÷ 100, 0.75는 음성을 맞힌 비율 30 ÷ 40이다.",
+      "area": "ML",
+      "type": "계산"
+    },
+    {
+      "id": "a5",
+      "q": "의사결정나무의 한 마디에 합격 7명, 불합격 3명이 있다. 이 마디의 지니 지수는?",
+      "o": [
+        "0.58",
+        "0.5",
+        "0.3",
+        "0.42"
+      ],
+      "a": 3,
+      "exp": "지니 지수 = 1 − (0.7² + 0.3²) = 1 − (0.49 + 0.09) = 0.42이다. 0.58은 제곱합만 구하고 1에서 빼지 않은 값, 0.5는 반반일 때의 값이다.",
+      "area": "ML",
+      "type": "계산"
+    },
+    {
+      "id": "a6",
+      "q": "sklearn LinearRegression에 대한 설명으로 옳지 않은 것은?",
+      "o": [
+        "학습한 모델의 .rsquared 속성으로 결정계수를 바로 확인할 수 있다",
+        "X는 열이 하나여도 df[['x']]처럼 2차원으로 넘긴다",
+        "coef_에는 X에 넣은 열 순서대로 회귀계수가 담긴다",
+        "score(X, y)는 결정계수(R²)를 돌려준다"
+      ],
+      "a": 0,
+      "exp": ".rsquared는 statsmodels ols 결과의 속성이고 sklearn LinearRegression에는 없다. sklearn에서 결정계수는 score(X, y)로 구한다.",
+      "area": "ML",
+      "type": "부정형"
+    },
+    {
+      "id": "a7",
+      "q": "다음 코드에서 solution()이 돌려주는 값은?",
+      "code": "import pandas as pd\nfrom sklearn.cluster import KMeans\ndf = pd.DataFrame({'member': [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1],\n                   'visit': [1, 2, 1, 2, 1, 8, 9, 8, 2, 15, 16],\n                   'spend': [1, 1, 2, 2, 2, 8, 8, 9, 1, 2, 1]})\ndf_sub = df.loc[df['member'] == 1, ['visit', 'spend']]\nmodel = KMeans(n_clusters=3, random_state=123, n_init=10).fit(df_sub)\nlabels = pd.Series(model.labels_)\ndef solution():\n    result = labels.value_counts().max()\n    return result",
+      "o": [
+        "6",
+        "9",
+        "4",
+        "3"
+      ],
+      "a": 2,
+      "exp": "회원(member == 1) 9명만 남기면 (1~2, 1~2) 근처 4명, (8~9, 8~9) 근처 3명, (15~16, 1~2) 근처 2명의 세 무리로 나뉜다. 가장 큰 군집은 4명이다. 6은 회원 필터를 빼먹었을 때, 9는 전체 행 수이다.",
+      "area": "ML",
+      "type": "코드"
+    },
+    {
+      "id": "a8",
+      "q": "※ 판매 중인 매물('is_sale'이 1) 가운데 방('room')이 2개인 매물만 남기시오.\n이 조건에 맞게 빈칸 ㉠에 들어갈 코드는?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'is_sale': [1, 1, 0, 1, 1, 0, 1, 1],\n                   'room': [2, 1, 2, 2, 3, 2, 0, 2]})\ndf_sub = ㉠\ndef solution():\n    result = len(df_sub)\n    return result",
+      "o": [
+        "df.loc[(df['is_sale'] == 1) & (df['room'] <= 2), ]",
+        "df.loc[(df['is_sale'] == 1) & (df['room'] == 2), ]",
+        "df.loc[(df['is_sale'] == 1) and (df['room'] == 2), ]",
+        "df.loc[(df['is_sale'] == 1) | (df['room'] == 2), ]"
+      ],
+      "a": 1,
+      "exp": "'2개인'은 == 2, 두 조건을 모두 만족은 괄호로 묶은 &이다. <= 2는 방 0·1개도 포함하고, and는 Series에 쓰면 ValueError가 나며, |는 둘 중 하나만 만족해도 남긴다. 바른 코드의 결과는 3이다.",
+      "area": "ANAL",
+      "type": "응용"
+    },
+    {
+      "id": "a9",
+      "q": "다음 코드에서 solution()이 돌려주는 값은?",
+      "code": "import pandas as pd\ndf = pd.DataFrame({'area': [20, 35, 50, 65, 80, 50],\n                   'sales': [120, 150, 210, 260, 300, 190]})\nm = df['area'].mean()\nup = df.loc[df['area'] > m, 'sales'].mean()\ndn = df.loc[df['area'] < m, 'sales'].mean()\ndef solution():\n    result = round(abs(dn - up), 1)\n    return result",
+      "o": [
+        "-145.0",
+        "105.0",
+        "112.5",
+        "145.0"
+      ],
+      "a": 3,
+      "exp": "면적 평균 m은 50이다. 50보다 큰 매장(65, 80)의 매출 평균은 280, 작은 매장(20, 35)은 135이고, 면적이 딱 50인 두 매장은 어느 쪽에도 들지 않는다. |135 − 280| = 145.0이다. −145.0은 abs를 빠뜨린 값이다.",
+      "area": "ANAL",
+      "type": "코드"
+    },
+    {
+      "id": "a10",
+      "q": "KMeans와 계층적 군집(AgglomerativeClustering)을 비교한 설명으로 옳은 것은?",
+      "o": [
+        "KMeans는 linkage로 군집 사이 거리 계산 방식을 정하고, 계층적 군집은 정할 수 없다",
+        "계층적 군집은 군집 중심을 평균으로 다시 구하는 일을 반복하며 군집을 만든다",
+        "둘 다 정답(라벨) 없이 학습하는 비지도 학습이며, n_clusters로 만들 군집 수를 정할 수 있다",
+        "KMeans는 군집 수를 자동으로 찾고, 계층적 군집은 항상 두 군집으로 나눈다"
+      ],
+      "a": 2,
+      "exp": "두 방법 모두 비지도 학습이고 n_clusters로 군집 수를 정한다. linkage는 계층적 군집의 인자이며, 중심을 평균으로 다시 구하며 반복하는 것은 KMeans의 방식이다.",
+      "area": "ML",
+      "type": "비교"
+    },
+    {
+      "id": "a11",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\ndf = pd.DataFrame({'x1': range(10), 'x2': range(10), 'y': range(10)})\nX = df[['x1', 'x2']]\ny = df['y']\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=0)\nprint(X_train.shape, y_test.shape)",
+      "o": [
+        "(8, 2) (2,)",
+        "(2, 2) (8,)",
+        "(8, 2) (8,)",
+        "(8, 3) (2,)"
+      ],
+      "a": 0,
+      "exp": "test_size=0.2이므로 10행 중 8행이 학습, 2행이 평가용이다. 돌려주는 순서는 X_train, X_test, y_train, y_test이고 X는 열 2개, y는 1차원이므로 (8, 2)와 (2,)이다.",
+      "area": "ML",
+      "type": "코드"
+    },
+    {
+      "id": "a12",
+      "q": "의사결정나무 모델의 정확도가 학습 데이터에서는 0.99, 평가 데이터에서는 0.65였다. 해석과 대처로 가장 알맞은 것은?",
+      "o": [
+        "과소적합이므로 나무를 더 깊게 키워 학습 정확도를 더 높인다",
+        "과적합이 의심되므로 max_depth로 나무 깊이를 제한해 다시 학습해 본다",
+        "평가 데이터도 학습에 넣어 다시 fit한 뒤 그 데이터로 다시 평가해 보고한다",
+        "학습 정확도가 0.99이므로 평가 결과와 관계없이 좋은 모델이다"
+      ],
+      "a": 1,
+      "exp": "학습 성능만 높고 평가 성능이 크게 낮으면 과적합이다. 나무 깊이를 제한하면 외우는 정도가 줄어든다. 평가 데이터로 학습하면 성능을 공정하게 잴 수 없다.",
+      "area": "ML",
+      "type": "응용"
+    },
+    {
+      "id": "a13",
+      "q": "다음 코드의 실행 결과는?",
+      "code": "import pandas as pd\nfrom sklearn.linear_model import LogisticRegression\ndf = pd.DataFrame({'hours': [1, 2, 2, 3, 6, 7, 8, 9],\n                   'pass': [0, 0, 0, 0, 1, 1, 1, 1]})\nmodel = LogisticRegression().fit(df[['hours']], df['pass'])\nnew = pd.DataFrame({'hours': [1, 8, 9]})\nprint(model.predict(new).tolist(), model.predict_proba(new).shape)",
+      "o": [
+        "[0, 1, 1] (3, 1)",
+        "[1, 8, 9] (3, 2)",
+        "[0, 1, 1] (3, 2)",
+        "[0, 0, 1] (3, 2)"
+      ],
+      "a": 2,
+      "exp": "공부 시간이 짧으면 0, 길면 1로 학습되어 1시간은 0, 8·9시간은 1로 분류된다. predict_proba는 행마다 클래스 0과 1의 확률 두 개를 돌려주므로 모양이 (3, 2)이다.",
+      "area": "ML",
+      "type": "코드"
+    },
+    {
+      "id": "a14",
+      "q": "합격 5명·불합격 5명인 마디를 질문 하나로 나누었더니 왼쪽은 합격 4·불합격 1, 오른쪽은 합격 1·불합격 4가 되었다. 나눈 뒤 두 마디 지니 지수의 가중 평균과 부모 마디 대비 변화는?",
+      "o": [
+        "0.32, 0.18 감소",
+        "0.68, 0.18 증가",
+        "0.5, 변화 없음",
+        "0.16, 0.34 감소"
+      ],
+      "a": 0,
+      "exp": "부모는 1 − (0.5² + 0.5²) = 0.5이다. 각 자식은 1 − (0.8² + 0.2²) = 0.32이고 둘 다 5명이라 가중 평균도 0.32이므로 0.18 줄었다. 의사결정나무는 이렇게 불순도가 가장 많이 줄어드는 질문을 고른다.",
+      "area": "ML",
+      "type": "확장"
+    },
+    {
+      "id": "a15",
+      "q": "다음 ※ 조건에 맞게 빈칸 ㉠을 채운 것은?\n※ 데이터의 80%를 학습 데이터로 임의 추출하시오.\n※ train_test_split()의 random_state는 123으로 하시오.\n※ 종속변수는 price, 독립변수는 size와 rooms이다.",
+      "code": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\ndf = pd.DataFrame({'size': [50, 60, 70, 80, 90, 100, 110, 120, 130, 140],\n                   'rooms': [1, 2, 2, 3, 3, 3, 4, 4, 5, 5],\n                   'price': [20, 25, 27, 33, 35, 38, 44, 46, 52, 55]})\ndf_train, df_test = ㉠\nmodel = LinearRegression().fit(X=df_train[['size', 'rooms']],\n                               y=df_train['price'])\ndef solution():\n    result = round(model.coef_[0], 2)\n    return result",
+      "o": [
+        "train_test_split(df, random_state=123)",
+        "train_test_split(df, test_size=0.8, random_state=123)",
+        "train_test_split(df, train_size=0.8)",
+        "train_test_split(df, train_size=0.8, random_state=123)"
+      ],
+      "a": 3,
+      "exp": "80%를 학습용으로 하려면 train_size=0.8, 재현을 위해 random_state=123이 모두 있어야 한다. 비율을 빼면 기본 75:25, test_size=0.8은 평가용이 80%, random_state를 빼면 실행마다 결과가 달라진다.",
+      "area": "ML",
+      "type": "응용"
+    }
+  ]
 }
