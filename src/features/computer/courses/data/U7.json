@@ -334,7 +334,7 @@
           },
           {
             "term": "join",
-            "desc": "공통 열 대신 인덱스가 같은 행끼리 옆으로 붙이는 메서드"
+            "desc": "인덱스가 같은 행끼리 옆으로 붙이며 how 기본값이 left인 메서드"
           },
           {
             "term": "inner",
@@ -910,7 +910,7 @@
       },
       {
         "k": "merge",
-        "v": "pd.merge(L, R, on='키', how=…)는 공통 열 기준(기본 inner), L.join(R)은 인덱스 기준(기본 left). 짝 없으면 NaN, 겹친 열은 _x·_y"
+        "v": "pd.merge(L, R, on='키', how=…)는 공통 열 기준(기본 inner), L.join(R)은 인덱스 기준(기본 left). 짝 없으면 NaN, merge에서 겹친 열은 _x·_y"
       },
       {
         "k": "concat",
