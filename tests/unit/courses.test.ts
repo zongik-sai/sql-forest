@@ -114,8 +114,8 @@ describe('3단원 과목의 기록 모델', () => {
     expect(nextPlantGoal(passSteps(emptyCgState(), 4), COURSE)).toBe('2단계 더 통과하면 다음 모습으로 자라요.');
     const full = addMock(passSteps(emptyCgState(), 15), mock('set1', 30, 'm1'));
     expect(plantStage(full, COURSE)).toBe(6);
-    // 같은 기록을 컴퓨터 일반(40단계) 기준으로 보면 아직 15/40
-    expect(plantStage(full)).toBe(3);
+    // 같은 기록을 컴퓨터 일반(40단계) 기준으로 보면 아직 15/40(줄기)
+    expect(plantStage(full)).toBe(2);
   });
   it('읽기: 이 과목 단원만 받고 이상한 키는 버린다', () => {
     const s = normalizeCgState({
@@ -123,7 +123,7 @@ describe('3단원 과목의 기록 모델', () => {
       wrong: { 'U3-a2': { at: T(1) }, 'U4-b1': { at: T(1) }, 'U12-b1': { at: T(1) }, constructor: { at: T(1) } },
       cards: { 'U2-t1': T(1), 'U9-t1': T(1), 'U2-x1': T(1) },
       locks: { U3: [T(1)], U4: [T(1)] },
-      resets: { U1: { at: T(2), n: 2 }, __proto__: { at: T(3) } },
+      resets: { U1: { at: T(2), n: 2 }, constructor: { at: T(3) } },
     }, COURSE);
     expect(Object.keys(s.units)).toEqual(['U1']);
     expect(Object.keys(s.wrong)).toEqual(['U3-a2']);
