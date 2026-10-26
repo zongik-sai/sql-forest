@@ -904,7 +904,7 @@
       },
       {
         "k": "crosstab",
-        "v": "pd.crosstab(행 열, 열 열)로 조합별 개수표. 없는 조합은 0, margins=True 합계, normalize 비율"
+        "v": "pd.crosstab(행 기준, 열 기준)으로 조합별 개수표. 없는 조합은 0, margins=True 합계, normalize 비율"
       },
       {
         "k": "merge",
