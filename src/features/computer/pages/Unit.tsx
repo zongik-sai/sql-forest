@@ -112,8 +112,10 @@ export function LevelPage() {
   const u = course.unitById(unitId ?? '');
   const lv = Number(level) as CgLevel;
   const { state } = useCg();
-  const [force, setForce] = useState(false);
+  // "그래도 풀어보기"는 그 단계에만(같은 화면 컴포넌트로 다른 단계로 옮겨 가도 이어지지 않게)
+  const [forced, setForced] = useState<string | null>(null);
   if (!u || !CG_LEVELS.includes(lv)) return <Navigate to={base} replace />;
+  const force = forced === `${u.id}/${lv}`;
   const open = isOpen(state, u.id, lv);
   return (
     <div className="stack" style={{ maxWidth: 860, margin: '0 auto', width: '100%', minWidth: 0 }}>
@@ -129,7 +131,7 @@ export function LevelPage() {
           <p style={{ margin: 0 }}>앞 단계 <b>{lv - 1}단계 {CG_LEVEL_NAME[(lv - 1) as CgLevel]}</b>{objParticle(CG_LEVEL_NAME[(lv - 1) as CgLevel])} 통과하면 열려요.</p>
           <div className="row">
             <Link className="btn btn-primary" to={`${base}/unit/${u.id}/${lv - 1}`}>앞 단계로</Link>
-            <button className="btn" onClick={() => setForce(true)}>그래도 풀어보기</button>
+            <button className="btn" onClick={() => setForced(`${u.id}/${lv}`)}>그래도 풀어보기</button>
           </div>
           <p className="small muted" style={{ margin: 0 }}>미리 풀어서 기준을 넘으면 이 단계도 통과로 기록돼요.</p>
         </div>
