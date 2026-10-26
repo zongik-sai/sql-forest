@@ -496,3 +496,18 @@ input[type='search'] { font: inherit; padding: 0.35rem 0.6rem; border: 1px solid
 pre.cg-code { white-space: pre; word-break: normal; overflow-wrap: normal; overflow-x: auto; max-width: 100%; min-width: 0; tab-size: 4; line-height: 1.5; margin: 0.35rem 0; }
 pre.cg-code:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
 .cg-card, .cg-review, .cg-card-peek, .cg-wrong-list li { min-width: 0; max-width: 100%; }
+
+/* 보충 학습 */
+/* 첫 화면: 정규 과목 아래 작은 카드(2진법 이해·IP 이해) */
+.supplement { margin-top: 2rem; display: grid; gap: 0.5rem; }
+.supplement > h2 { margin: 0; font-size: 1.2rem; }
+.supplement > p { margin: 0; }
+.supplement-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 0.75rem; max-width: 960px; }
+.supplement-card { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 0.75rem; align-items: start; padding: 0.8rem 0.95rem; color: var(--ink); text-decoration: none; transition: border-color 0.15s; }
+.supplement-card:hover { border-color: var(--teal); }
+.supplement-card h3 { font-size: 1.05rem; }
+.supplement-art { display: grid; place-items: center; background: var(--surface-2); border-radius: var(--radius-s); padding: 0.15rem 0; }
+.supplement-facts { color: var(--ink-soft); }
+/* 과목 홈(네트워크·컴퓨터 일반): 기초가 어렵다면 보충 학습으로 — 눈에 띄지 않게 */
+.cg-bridge { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 0.45rem 0.75rem; color: var(--ink-soft); }
+.cg-bridge a, .cg-bridge-back a { color: var(--teal); font-weight: 600; }
