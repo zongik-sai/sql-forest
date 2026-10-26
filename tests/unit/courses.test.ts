@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { adaptUnits, type RawQ, type RawUnit } from '../../src/features/computer/content/adapt';
 import { makeCourse, unitHasContent } from '../../src/features/computer/course';
@@ -310,6 +311,22 @@ describe('짧은 과목 모의고사: 20문항 · 20분', () => {
     expect(new Set(r.items.map((x) => x.id)).size).toBe(20);
     const many = SHORT.units.flatMap((u) => u.basic.map((x) => x.id));
     expect(buildMock(SHORT.units, 'wrong', { ...shortOpts, wrongIds: many }).items).toHaveLength(20);
+  });
+  it('실제 보충 학습 문제은행(bin·ip): 20문항, 중복 없음, 영역 순서, 고정 1·2회는 서로 다른 문항', () => {
+    for (const id of ['bin', 'ip'] as const) {
+      const def = NEW_COURSES.find((c) => c.id === id)!;
+      const c = buildNewCourse(id, [1, 2, 3].map((n) => JSON.parse(readFileSync(`src/features/computer/courses/${id}/U${n}.json`, 'utf8'))));
+      const o = mockOptionsOf(c);
+      const [a, b] = (['set1', 'set2'] as const).map((k) => buildMock(c.units, k, o).items);
+      for (const items of [a, b]) {
+        expect(items, id).toHaveLength(20);
+        expect(new Set(items.map((x) => x.id)).size, id).toBe(20);
+        const idx = items.map((x) => def.areas.findIndex((ar) => ar.id === x.area));
+        expect([...idx].sort((p, q2) => p - q2), id).toEqual(idx);
+      }
+      expect(a.filter((x) => b.some((y) => y.id === x.id)), id).toEqual([]);
+      expect(fixedSetCount(c.units, o), id).toBe(2);
+    }
   });
   it('컴퓨터 일반 화면 옵션(mockOptionsOf)은 예전 옵션과 같은 회차를 만든다', () => {
     for (const k of ['set1', 'set2', 'set3'] as const) {

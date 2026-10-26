@@ -74,3 +74,85 @@ export function downloadText(filename: string, text: string, type = 'text/csv;ch
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/* ---------------- 더 자세히(선생님 화면) ---------------- */
+
+const LV = [1, 2, 3, 4, 5] as const;
+
+/** 단원별 반 통계: 단계별 통과율(0~1), 평균 레벨, 지금 잠김 합계, 초기화 합계와 초기화된 학생 수 */
+export interface UnitClassStat {
+  unitId: CgUnitId;
+  passRate: number[];
+  avgLevel: number;
+  locksNow: number;
+  resets: number;
+  studentsReset: number;
+}
+
+export function unitClassStats(students: CgStudent[], shape: CourseShape = CG_SHAPE): UnitClassStat[] {
+  const n = students.length;
+  return shape.unitIds.map((u) => ({
+    unitId: u,
+    passRate: LV.map((lv) => (n ? students.filter((s) => !!s.state.units[u]?.[`lv${lv}`]?.passedAt).length / n : 0)),
+    avgLevel: n ? students.reduce((a, s) => a + (s.levels[u] ?? 0), 0) / n : 0,
+    locksNow: students.reduce((a, s) => a + (s.state.locks[u]?.length ?? 0), 0),
+    resets: students.reduce((a, s) => a + (s.state.resets[u]?.n ?? 0), 0),
+    studentsReset: students.filter((s) => (s.state.resets[u]?.n ?? 0) > 0).length,
+  }));
+}
+
+/**
+ * 문항별 오답: 틀린 적 있는 학생 수(오답노트에 한 번이라도 들어간 학생), 지금 오답노트에 남은 학생 수, 틀린 횟수 합.
+ * 학생이 고른 보기는 기록하지 않으므로 '가장 많이 고른 오답'은 알 수 없다.
+ */
+export interface QuestionStat { id: string; students: number; active: number; times: number }
+
+export function questionStats(students: CgStudent[]): QuestionStat[] {
+  const m = new Map<string, QuestionStat>();
+  for (const s of students) {
+    const act = new Set(activeWrongIds(s.state));
+    for (const [id, w] of Object.entries(s.state.wrong)) {
+      const q = m.get(id) ?? { id, students: 0, active: 0, times: 0 };
+      q.students++;
+      q.times += w.n;
+      if (act.has(id)) q.active++;
+      m.set(id, q);
+    }
+  }
+  return [...m.values()].sort((a, b) => b.students - a.students || b.times - a.times || (a.id < b.id ? -1 : 1));
+}
+
+/** 반에서 가장 최근 활동 시각 */
+export const lastActivity = (students: CgStudent[]): string | null => students.reduce<string | null>((a, s) => (!a || s.lastAt > a ? s.lastAt : a), null);
+
+export interface StudentUnitDetail {
+  unitId: CgUnitId;
+  levels: { lv: number; passed: boolean; best?: number; total?: number; passedAt?: string; lastAt?: string }[];
+  /** 개념 맞추기를 마친 카드 수 */
+  cards: number;
+  /** 마지막 초기화 이후 잠김 횟수 */
+  locks: number;
+  /** 단원 초기화 횟수와 마지막 시각 */
+  resets: number;
+  lastResetAt?: string;
+}
+
+/** 학생 한 명의 자세한 기록: 단원 × 단계, 잠김·초기화, 모의고사(최근 순), 오답노트 */
+export function studentDetail(s: CgStudent, shape: CourseShape = CG_SHAPE) {
+  const st = s.state;
+  const units: StudentUnitDetail[] = shape.unitIds.map((u) => ({
+    unitId: u,
+    levels: LV.map((lv) => {
+      const r = st.units[u]?.[`lv${lv}`];
+      return { lv, passed: !!r?.passedAt, ...(r?.best !== undefined ? { best: r.best } : {}), ...(r?.total !== undefined ? { total: r.total } : {}), ...(r?.passedAt ? { passedAt: r.passedAt } : {}), ...(r?.lastAt ? { lastAt: r.lastAt } : {}) };
+    }),
+    cards: Object.keys(st.cards).filter((k) => k.startsWith(`${u}-t`)).length,
+    locks: st.locks[u]?.length ?? 0,
+    resets: st.resets[u]?.n ?? 0,
+    ...(st.resets[u]?.at ? { lastResetAt: st.resets[u]!.at } : {}),
+  }));
+  const mocks = [...st.mock].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  const active = activeWrongIds(st);
+  const wrongTop = Object.entries(st.wrong).sort((a, b) => b[1].n - a[1].n || (a[1].at < b[1].at ? 1 : -1)).slice(0, 10).map(([id, w]) => ({ id, n: w.n, active: active.includes(id) }));
+  return { units, mocks, wrongActive: active.length, wrongTotal: Object.keys(st.wrong).length, wrongTop };
+}
