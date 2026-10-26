@@ -1,19 +1,20 @@
 {
  "unit": 8,
  "title": "시각화와 결과 해석",
- "intro": "matplotlib과 pandas plot으로 선·막대·히스토그램·산점도·상자 그림·파이 차트를 그리고, 목적에 맞는 그래프 고르기, 제목·축 이름·범례 달기, 그래프 해석, 잘못된 시각화 찾기, 분석 결과 보고까지 익힌다.",
+ "intro": "matplotlib과 pandas plot 접근자(.plot.hist·bar·line·pie, df.plot.scatter)로 그래프를 그리고, value_counts·sort_index·isna로 세어 그리기, 목적에 맞는 그래프 고르기, 제목·축 이름·범례·격자 달기, 그래프 해석과 잘못된 시각화, 결과 보고까지 익힌다.",
  "theory": [
   {
    "id": "t1",
-   "title": "시각화와 matplotlib 시작하기",
+   "title": "matplotlib 시작과 그래프 꾸미기",
    "points": [
     "시각화는 숫자 데이터를 그래프 같은 그림으로 나타내 비교와 경향을 한눈에 보게 하는 것이다. 예: 12달 판매량 표보다 선 그래프가 오르내림을 바로 보여 준다.",
-    "matplotlib은 파이썬의 대표 그래프 라이브러리이다. 그 안에서 그래프 그리기 함수를 모은 pyplot 모듈을 import matplotlib.pyplot as plt로 불러 plt라는 별칭으로 쓴다.",
-    "그리는 순서는 ① 데이터 준비 → ② plt.plot·plt.bar 등으로 그리기 → ③ 제목·축 이름 달기 → ④ plt.show()로 화면에 보여 주기이다.",
-    "plt.plot(y)처럼 값 목록 하나만 주면 x축은 자동으로 위치 번호 0, 1, 2, …가 된다. 아래 코드는 x가 0~3, y가 12·15·11·18인 꺾은선을 그린다."
+    "matplotlib은 파이썬의 기본 그래프 라이브러리로, pandas의 plot도 이것으로 그린다. 그리기 함수를 모은 pyplot 모듈을 import matplotlib.pyplot as plt로 불러 쓴다.",
+    "순서는 데이터 준비 → plt.plot 등으로 그리기 → 꾸미기 → plt.show()로 화면에 보여 주기이다. plt.plot(y)처럼 값 목록 하나만 주면 x는 0, 1, 2, …가 된다.",
+    "제목은 plt.title, 축 이름은 plt.xlabel·plt.ylabel로 단다(단위 포함). 격자(grid)는 눈금마다 그은 가로·세로 보조선으로, plt.grid(True)로 켜면 값을 읽기 쉽다.",
+    "범례(legend)는 선·막대가 여러 개일 때 각각이 무엇인지 알려 주는 안내 상자로, label='A반'처럼 이름을 주고 plt.legend()를 불러야 나타난다."
    ],
-   "tip": "import matplotlib.pyplot as plt를 먼저 해야 plt.○○ 함수를 쓸 수 있다",
-   "code": "import matplotlib.pyplot as plt\n\nsales = [12, 15, 11, 18]\nplt.plot(sales)\nplt.show()",
+   "tip": "한글이 □로 깨지면 plt.rcParams['font.family']에 한글 글꼴(예: 'Malgun Gothic')을 정한다",
+   "code": "import matplotlib.pyplot as plt\n\nplt.figure(figsize=(6, 4))   # 그림 크기(가로, 세로)\nplt.plot([1, 2, 3], [120, 150, 135], label='A반')\nplt.title('주별 도서 대출 수')\nplt.xlabel('주')\nplt.ylabel('대출 수(권)')\nplt.grid(True)\nplt.legend()\nplt.savefig('loan.png')      # 파일 저장은 show보다 먼저\nplt.show()",
    "ext": false,
    "match": {
     "pairs": [
@@ -22,12 +23,12 @@
       "desc": "데이터를 그림으로 나타내 비교와 경향을 한눈에 보게 하는 것"
      },
      {
-      "term": "pyplot",
-      "desc": "matplotlib 안에서 그래프 그리기 함수를 모아 둔 모듈"
+      "term": "격자",
+      "desc": "눈금 위치마다 가로·세로로 그어 값을 읽기 쉽게 돕는 보조선"
      },
      {
-      "term": "plt.show",
-      "desc": "그려 둔 그래프를 화면에 띄워 보여 주는 함수"
+      "term": "범례",
+      "desc": "선·막대가 여러 개일 때 각각이 무엇인지 알려 주는 안내 상자"
      }
     ],
     "distractor": "plt.title"
@@ -285,63 +286,64 @@
   },
   {
    "id": "t8",
-   "title": "제목·축 이름·범례로 그래프 완성하기",
+   "title": "pandas plot 접근자로 바로 그리기",
    "points": [
-    "plt.title('제목'), plt.xlabel('x축 이름'), plt.ylabel('y축 이름')으로 제목과 축 이름을 단다. 축 이름에는 단위(명, 원, ℃)를 함께 쓴다.",
-    "범례(legend)는 선·막대가 여러 개일 때 각각이 무엇인지 알려 주는 안내 상자이다. 그릴 때 label='1반'처럼 이름을 주고 plt.legend()를 불러야 나타난다.",
-    "plt.figure(figsize=(8, 4))는 그림 크기를 가로 8, 세로 4인치로 정한다. plt.xticks(rotation=45)는 x축 눈금 글자를 45도 기울이고, plt.grid(True)는 격자선을 긋는다.",
-    "한글이 네모(□)로 깨지면 plt.rcParams['font.family'] = 'Malgun Gothic'(Windows)처럼 한글 글꼴을 정하고, 마이너스 부호가 깨지면 axes.unicode_minus를 False로 한다.",
-    "그래프를 이미지 파일로 남기려면 plt.savefig('파일.png')를 plt.show()보다 먼저 부른다. show 창을 닫은 뒤 저장하면 빈 그림이 저장될 수 있다."
+    "pandas의 Series·DataFrame은 .plot으로 matplotlib 그래프를 바로 그린다. .plot은 그리기 메서드를 모은 plot 접근자(accessor)로, ser.plot.hist()처럼 뒤에 종류 메서드를 붙인다.",
+    "주요 종류 메서드는 .line()·.bar()·.barh()·.hist()·.box()·.pie()·.scatter()이다. ser.plot(kind='hist')는 ser.plot.hist()와 같은 그래프이고, kind를 생략한 ser.plot()은 선 그래프이다.",
+    "인덱스는 x축 눈금(막대 이름)이나 파이 조각 이름이 되고, 값은 막대 높이·조각 크기가 된다. 막대 이름으로 쓸 열은 df.set_index('반')으로 인덱스로 옮긴 뒤 그린다.",
+    "DataFrame은 수치형 열마다 선·막대를 하나씩 그리고 열 이름으로 범례를 단다. 산점도는 DataFrame 전용이라 df.plot.scatter(x='bed', y='bath')처럼 x·y 열을 꼭 정한다.",
+    "꾸미기 인자는 괄호 안에 바로 준다: title='제목', bins=30(히스토그램 막대 개수), grid=True(격자). kind='boxplot'·'histogram'처럼 없는 종류는 ValueError이다."
    ],
-   "tip": "label만 주거나 legend()만 부르면 범례가 생기지 않는다 — 둘 다 필요",
-   "code": "plt.figure(figsize=(6, 4))\nplt.plot([1, 2, 3], [120, 150, 135], label='A반')\nplt.title('주별 도서 대출 수')\nplt.xlabel('주')\nplt.ylabel('대출 수(권)')\nplt.legend()\nplt.savefig('loan.png')\nplt.show()",
+   "tip": "산점도만은 df.plot.scatter(x=, y=) — Series에서 ser.plot.scatter(x=, y=)는 ValueError",
+   "code": "import pandas as pd\nimport matplotlib.pyplot as plt\n\ndf = pd.DataFrame({'bed': [1, 2, 2, 3, 4],\n                   'bath': [1, 1, 2, 2, 3]})\ndf['bed'].plot.hist(bins=4)   # = df['bed'].plot(kind='hist', bins=4)\nplt.show()\ndf.plot.scatter(x='bed', y='bath', title='Rooms')\nplt.show()",
    "ext": false,
    "match": {
     "pairs": [
      {
-      "term": "범례",
-      "desc": "선이나 막대가 여러 개일 때 각각이 무엇인지 알려 주는 안내 상자"
+      "term": "접근자",
+      "desc": "그리기 메서드를 모아 두어 .plot 뒤에 hist·bar 등을 붙여 쓰게 하는 통로"
      },
      {
-      "term": "figsize",
-      "desc": "그림 전체의 가로·세로 크기를 인치 단위로 정하는 인자"
+      "term": "kind",
+      "desc": "그래프 종류를 'hist'처럼 문자열로 정하는 인자로, 생략하면 선 그래프이다"
      },
      {
-      "term": "plt.savefig",
-      "desc": "완성한 그래프를 이미지 파일로 저장하는 함수"
+      "term": "scatter",
+      "desc": "DataFrame에서만 쓰며 x·y 두 열 이름을 꼭 정하는 그래프 종류"
      }
     ],
-    "distractor": "plt.xlabel"
+    "distractor": "boxplot"
    }
   },
   {
    "id": "t9",
-   "title": "pandas로 바로 그리기: df.plot",
+   "title": "세고 골라서 그리기: 작업형 패턴",
    "points": [
-    "pandas의 Series·DataFrame에는 plot 메서드가 있어 df.plot(kind='종류') 한 줄로 matplotlib 그래프를 그린다. kind를 생략하면 선 그래프('line')이다.",
-    "kind 값은 'line'(선), 'bar'(세로 막대), 'barh'(가로 막대), 'hist'(히스토그램), 'box'(상자 그림), 'scatter'(산점도), 'pie'(파이)이다. 'boxplot'·'histogram'은 ValueError이다.",
-    "df.plot()은 인덱스를 x축에 놓고 수치형 열마다 선(또는 막대)을 하나씩 그리며, 열 이름으로 범례를 자동으로 단다. 아래 코드는 반마다 국어·수학 막대 2개씩, 모두 6개를 그린다.",
-    "산점도는 df.plot(kind='scatter', x='키', y='몸무게')처럼 x·y 열 이름을 꼭 정한다. 범주별 개수는 df['반'].value_counts().plot(kind='bar')로 그리며, 개수가 많은 범주부터 놓인다.",
-    "df.plot은 그래프 영역(Axes)을 돌려주므로 ax.set_ylabel('점수')처럼 이어서 꾸밀 수 있고, plt.title 같은 plt 함수도 함께 쓸 수 있다."
+    "범주별 개수는 ser.value_counts().plot.bar()로 그린다. value_counts는 개수가 많은 순으로 정렬하므로 막대도 많은 범주부터 놓인다.",
+    "연도·월처럼 순서가 있는 값은 value_counts() 뒤에 .sort_index()를 붙여 연도 순으로 다시 정렬한 뒤 .plot.line()·.plot.bar()로 그린다. 정렬하지 않으면 막대는 개수 순으로 놓이고 선은 연도를 오가며 뒤엉킨다.",
+    "df.isna().sum()은 열마다 결측치 개수를 담은 Series라 .plot.bar()를 붙이면 열 이름마다 막대가 선다. 결측치가 없는 열도 x축에 남고 막대 높이가 0이다.",
+    "두 집단 비율: (df['sales'] > 50000) + 0은 True/False를 1/0으로 바꾼다. 여기에 .value_counts().plot.pie(title='...')를 붙이면 1·0 두 조각 파이가 된다.",
+    "조건에 맞는 행을 먼저 고른 뒤 그린다: df.loc[df['cust'] >= 500, 'sales'].plot.hist(bins=30). 날짜는 pd.to_datetime으로 바꾼 뒤 .dt.year == 2020처럼 연도로 고른다."
    ],
-   "code": "import pandas as pd\n\ndf = pd.DataFrame({'국어': [80, 75, 90],\n                   '수학': [70, 85, 95]},\n                  index=['1반', '2반', '3반'])\nax = df.plot(kind='bar', title='반별 평균')\nax.set_ylabel('점수')\nplt.show()",
+   "tip": "'이상'은 >=, '넘는·초과'는 > — 조건 글자를 연산자로 정확히 옮긴다",
+   "code": "import pandas as pd\nimport matplotlib.pyplot as plt\n\ndf = pd.DataFrame({'year': [2021, 2019, 2021, 2020, 2021],\n                   'sales': [42000, 51000, 50000, 63000, 70000]})\n# 연도별 건수: 연도 순으로 정렬한 뒤 선 그래프\ndf['year'].value_counts().sort_index().plot.line()\nplt.show()\n# 매출 5만 초과(1)·이하(0) 비율: 1이 3곳, 0이 2곳\nup = (df['sales'] > 50000) + 0\nup.value_counts().plot.pie(title='Sales > 50000')\nplt.show()",
    "ext": false,
    "match": {
     "pairs": [
      {
-      "term": "kind",
-      "desc": "그래프 종류를 문자열로 정하는 인자로, 생략하면 선 그래프이다"
-     },
-     {
-      "term": "scatter",
-      "desc": "x·y 두 열 이름을 반드시 정해야 하는 그래프 종류"
-     },
-     {
       "term": "value_counts",
-      "desc": "열의 범주마다 개수를 세어 많은 순으로 돌려주는 메서드"
+      "desc": "범주마다 개수를 세어 많은 순으로 돌려주는 메서드"
+     },
+     {
+      "term": "sort_index",
+      "desc": "개수 순으로 놓인 결과를 연도·월 같은 인덱스 순서로 다시 정렬하는 메서드"
+     },
+     {
+      "term": "isna",
+      "desc": "빈 값을 True로 표시해 sum과 함께 열별 결측치 개수를 세게 하는 메서드"
      }
     ],
-    "distractor": "boxplot"
+    "distractor": "sort_values"
    }
   },
   {
@@ -377,10 +379,10 @@
  ],
  "bank": [
   "시각화",
-  "plt",
-  "show",
+  "격자",
+  "isna",
   "선 그래프",
-  "marker",
+  "sort_index",
   "막대 그래프",
   "xlabel",
   "bins",
@@ -389,10 +391,10 @@
   "양의 상관",
   "인과",
   "중앙값",
-  "IQR",
+  "scatter",
   "이상치",
   "파이 차트",
-  "autopct",
+  "value_counts",
   "범례",
   "kind",
   "축 자르기",
@@ -403,7 +405,7 @@
   "평균",
   "savefig",
   "ylabel",
-  "pd",
+  "sort_values",
   "3D 효과",
   "상자 그림"
  ],
@@ -416,15 +418,15 @@
   },
   {
    "id": "f2",
-   "text": "matplotlib의 pyplot 모듈은 보통 import matplotlib.pyplot as ____로 불러 쓴다.",
-   "answer": "plt",
-   "exp": "별칭 plt를 정해 두고 plt.plot, plt.show처럼 쓴다."
+   "text": "눈금 위치마다 가로·세로로 그어 값을 읽기 쉽게 돕는 보조선을 ____라 하며, plt.grid(True)로 켠다.",
+   "answer": "격자",
+   "exp": "격자(grid)는 그래프 뒤의 보조선이다. 범례는 선·막대 이름을 알려 주는 안내 상자, 제목은 그래프 이름이다."
   },
   {
    "id": "f3",
-   "text": "그려 둔 그래프를 화면에 띄워 보여 주는 함수는 plt.____()이다.",
-   "answer": "show",
-   "exp": "plt.show()는 그래프를 화면에 보여 준다. 파일 저장은 savefig이다."
+   "text": "열마다 결측치 개수를 세어 막대 그래프로 그리려면 df.____().sum().plot.bar()를 쓴다.",
+   "answer": "isna",
+   "exp": "isna()는 빈 값을 True로 표시하고 sum()이 True를 1로 세어, 열 이름을 인덱스로 하는 결측치 개수 Series가 된다."
   },
   {
    "id": "f4",
@@ -434,9 +436,9 @@
   },
   {
    "id": "f5",
-   "text": "plt.plot에서 선 위 각 점에 동그라미 표시를 붙이려면 ____='o'를 준다.",
-   "answer": "marker",
-   "exp": "marker='o'는 데이터 점마다 동그라미를 그린다."
+   "text": "value_counts()는 개수가 많은 순이므로, 연도별 건수를 연도 순서대로 선 그래프로 그리려면 인덱스를 정렬하는 ____()를 먼저 붙인다.",
+   "answer": "sort_index",
+   "exp": "value_counts().sort_index().plot.line()처럼 쓴다. sort_values()는 값(개수) 기준 정렬이라 연도 순이 되지 않는다."
   },
   {
    "id": "f6",
@@ -452,9 +454,9 @@
   },
   {
    "id": "f8",
-   "text": "plt.hist에서 구간 개수를 정하는 인자는 ____이며, 생략하면 구간 10개로 나눈다.",
+   "text": "히스토그램의 막대(구간) 개수를 정하는 인자는 ____이며, 생략하면 plt.hist와 pandas의 .plot.hist() 모두 10개로 나눈다.",
    "answer": "bins",
-   "exp": "bins=5이면 최솟값~최댓값을 같은 폭 5구간으로 나눈다."
+   "exp": "bins=5이면 최솟값~최댓값을 같은 폭 5구간으로 나눈다. 막대 30개는 ser.plot.hist(bins=30)처럼 쓴다."
   },
   {
    "id": "f9",
@@ -488,9 +490,9 @@
   },
   {
    "id": "f14",
-   "text": "상자 그림에서 상자의 길이는 Q3 − Q1, 곧 ____이다.",
-   "answer": "IQR",
-   "exp": "IQR(사분위수 범위)은 가운데 50% 데이터가 퍼진 폭이다."
+   "text": "산점도는 DataFrame 전용이라 두 열의 관계를 df.plot.____(x='키', y='몸무게')로 그리며, Series에서 부르면 오류가 난다.",
+   "answer": "scatter",
+   "exp": "산점도는 x·y 두 열 이름을 정해야 하므로 DataFrame에서 그린다. ser.plot.scatter(...)는 ValueError이다."
   },
   {
    "id": "f15",
@@ -506,9 +508,9 @@
   },
   {
    "id": "f17",
-   "text": "plt.pie에서 조각마다 '25.0%'처럼 퍼센트를 써 넣으려면 ____='%.1f%%'를 준다.",
-   "answer": "autopct",
-   "exp": "autopct='%.1f%%'는 소수 첫째 자리 퍼센트를 표시한다."
+   "text": "(df['sales'] > 50000) + 0으로 만든 1·0 열에 .____()를 붙여 개수를 센 뒤 .plot.pie()를 이으면 두 집단 비율 파이 차트가 된다.",
+   "answer": "value_counts",
+   "exp": "value_counts()가 1과 0의 개수를 세고, pie는 그 개수를 조각 크기로, 인덱스 1·0을 조각 이름으로 쓴다."
   },
   {
    "id": "f18",
@@ -518,9 +520,9 @@
   },
   {
    "id": "f19",
-   "text": "pandas의 df.plot에서 그래프 종류를 'bar'·'hist'처럼 정하는 인자는 ____이다.",
+   "text": "pandas에서 ser.plot(____='hist')는 ser.plot.hist()와 같은 그래프를 그리며, 이 인자를 생략하면 선 그래프가 된다.",
    "answer": "kind",
-   "exp": "kind를 생략하면 선 그래프('line')가 그려진다."
+   "exp": "kind='bar'는 .plot.bar(), kind='pie'는 .plot.pie()와 같다. kind를 생략하면 'line'이다."
   },
   {
    "id": "f20",
@@ -545,15 +547,15 @@
   },
   {
    "id": "b2",
-   "q": "matplotlib으로 그린 그래프를 화면에 띄워 보여 주는 함수는?",
+   "q": "그래프에서 눈금 위치마다 가로·세로로 옅게 그어 값을 읽기 쉽게 돕는 보조선을 무엇이라 하는가?",
    "o": [
-    "plt.plot()",
-    "plt.figure()",
-    "plt.title()",
-    "plt.show()"
+    "범례(legend)",
+    "제목(title)",
+    "축 이름(label)",
+    "격자(grid)"
    ],
    "a": 3,
-   "exp": "plt.show()가 그래프를 화면에 보여 준다. plt.plot()은 선을 그리기만 하고, plt.figure()는 새 그림을 만들며, plt.title()은 제목을 단다.",
+   "exp": "격자(grid)는 눈금마다 그은 보조선으로 plt.grid(True)나 .plot(grid=True)로 켠다. 범례는 선·막대가 각각 무엇인지 알려 주는 안내 상자, 제목은 그래프 이름, 축 이름은 x·y축이 무엇인지 적은 글자이다.",
    "area": "VIS"
   },
   {
@@ -571,16 +573,16 @@
   },
   {
    "id": "b4",
-   "q": "다음 코드로 그린 선 그래프에서 세 점의 x좌표는?",
-   "code": "import matplotlib.pyplot as plt\nplt.plot([3, 5, 4])\nplt.show()",
+   "q": "연도별 사고 건수를 value_counts()로 셌더니 개수가 많은 연도부터 나왔다. 연도 순서대로 선 그래프를 그리려 할 때 빈칸 ㉠에 들어갈 메서드는?",
+   "code": "cnt = df['year'].value_counts().㉠()\ncnt.plot.line()",
    "o": [
-    "3, 5, 4",
-    "1, 2, 3",
-    "0, 1, 2",
-    "x값이 없어 오류가 난다"
+    "sort_values",
+    "sort_index",
+    "isna",
+    "reset_index"
    ],
-   "a": 2,
-   "exp": "값 목록 하나만 주면 그 값이 y가 되고, x는 위치 번호 0, 1, 2가 자동으로 쓰인다. 1부터 시작하지 않으며 오류도 나지 않는다. 3, 5, 4는 y좌표이다.",
+   "a": 1,
+   "exp": "value_counts 결과의 인덱스가 연도이므로 sort_index()로 인덱스(연도) 순서로 정렬해야 선이 연도 순으로 이어진다. sort_values()는 개수 기준 정렬이고, reset_index()는 인덱스를 열로 옮길 뿐 순서를 바꾸지 않으며, isna()는 결측치 여부를 표시한다.",
    "area": "VIS"
   },
   {
@@ -650,29 +652,29 @@
   },
   {
    "id": "b10",
-   "q": "상자 그림에서 상자 안에 그어진 선이 나타내는 값은?",
+   "q": "DataFrame df의 '공부시간'과 '점수' 열로 두 변수의 관계를 보는 산점도를 그리는 pandas 코드로 옳은 것은?",
    "o": [
-    "평균",
-    "최빈값",
-    "중앙값",
-    "최댓값"
+    "df.plot.line(x='공부시간', y='점수')",
+    "df['공부시간'].plot.scatter(y='점수')",
+    "df.plot.scatter(x='공부시간', y='점수')",
+    "df.plot.hist(x='공부시간', y='점수')"
    ],
    "a": 2,
-   "exp": "상자 안의 선은 50% 위치의 값인 중앙값(Q2)이다. 평균은 상자 그림의 기본 요소가 아니며, 이상치에 끌려가는 평균과 혼동하기 쉬운 함정이다.",
-   "area": "STAT"
+   "exp": "산점도는 DataFrame 전용 메서드 df.plot.scatter에 x·y 열 이름을 정해 그린다. Series인 df['공부시간']에서는 산점도를 그릴 수 없어 오류가 나고, line은 선 그래프, hist는 히스토그램을 그린다.",
+   "area": "VIS"
   },
   {
    "id": "b11",
-   "q": "plt.boxplot의 기본 설정으로 그린 상자 그림에서 수염 밖에 점으로 따로 찍히는 값은?",
+   "q": "DataFrame df에서 열마다 결측치가 몇 개인지 막대 그래프로 나타내는 코드로 옳은 것은?",
    "o": [
-    "평균보다 큰 값",
-    "Q1 − 1.5×IQR보다 작거나 Q3 + 1.5×IQR보다 큰 값",
-    "Q1보다 작거나 Q3보다 큰 모든 값",
-    "가장 큰 값과 가장 작은 값"
+    "df.isna().sum().plot.bar()",
+    "df.notna().sum().plot.bar()",
+    "df.sum().isna().plot.bar()",
+    "df.isna().sum().plot.line()"
    ],
-   "a": 1,
-   "exp": "수염은 1.5×IQR 경계 안의 끝 값까지 그려지고, 경계를 벗어난 값만 이상치 점으로 찍힌다. Q1 아래·Q3 위 값이라도 경계 안이면 수염에 포함된다.",
-   "area": "STAT"
+   "a": 0,
+   "exp": "isna()가 빈 값을 True로 표시하고 sum()이 열마다 True를 세어 결측치 개수 Series를 만들며, .plot.bar()가 열 이름마다 막대를 세운다. notna()는 결측이 아닌 값을 세고, sum()을 먼저 하면 결측치 개수가 아니며, line()은 선 그래프이다.",
+   "area": "VIS"
   },
   {
    "id": "b12",
@@ -689,15 +691,16 @@
   },
   {
    "id": "b13",
-   "q": "plt.pie(values, labels=names, autopct='%.1f%%')에서 autopct의 역할은?",
+   "q": "다음 코드로 그린 파이 차트에서 '버스' 조각의 중심각은?",
+   "code": "import pandas as pd\ns = pd.Series([3, 1], index=['버스', '도보'])\ns.plot.pie()",
    "o": [
-    "조각마다 비율을 소수 첫째 자리 퍼센트로 표시한다",
-    "조각마다 범주 이름을 붙인다",
-    "가장 큰 조각을 떼어 낸다",
-    "조각을 크기 순서로 정렬한다"
+    "90°",
+    "270°",
+    "180°",
+    "300°"
    ],
-   "a": 0,
-   "exp": "autopct='%.1f%%'는 각 조각의 비율을 25.0%처럼 소수 첫째 자리 퍼센트로 써 준다. 이름을 붙이는 것은 labels이다.",
+   "a": 1,
+   "exp": "Series의 pie는 값(3, 1)으로 조각 크기를, 인덱스('버스', '도보')로 조각 이름을 정한다. 버스는 3 ÷ (3 + 1) = 75%이므로 360° × 0.75 = 270°이다.",
    "area": "VIS"
   },
   {
@@ -728,15 +731,15 @@
   },
   {
    "id": "b16",
-   "q": "matplotlib 그래프에서 한글 제목이 네모(□)로 깨져 보일 때 알맞은 해결 방법은?",
+   "q": "Series ser에 대해 ser.plot.hist(bins=30)과 같은 그래프를 그리는 코드는?",
    "o": [
-    "plt.show()를 두 번 호출한다",
-    "plt.rcParams['font.family']에 한글 글꼴 이름(예: 'Malgun Gothic')을 지정한다",
-    "제목을 plt.xlabel로 바꾼다",
-    "figsize를 크게 한다"
+    "ser.plot(kind='hist', bins=30)",
+    "ser.plot(bins=30)",
+    "ser.plot(kind='bar', bins=30)",
+    "ser.plot(kind='histogram', bins=30)"
    ],
-   "a": 1,
-   "exp": "기본 글꼴에 한글이 없어서 생기는 문제이므로 font.family에 한글 글꼴을 지정한다. 마이너스 부호가 깨지면 axes.unicode_minus를 False로 한다. 크기나 함수 바꾸기로는 해결되지 않는다.",
+   "a": 0,
+   "exp": "plot 접근자의 .hist()는 kind='hist'와 같아 막대 30개짜리 히스토그램을 그린다. kind를 빼면 선 그래프, 'bar'는 막대 그래프 종류인데 둘 다 bins 인자를 받지 못해 오류가 나고, 'histogram'은 없는 종류라 ValueError이다.",
    "area": "VIS"
   },
   {
@@ -795,8 +798,8 @@
  "summary": {
   "keys": [
    {
-    "k": "그리기 기본 순서",
-    "v": "import matplotlib.pyplot as plt → plt.함수로 그리기 → title·xlabel·ylabel·legend로 꾸미기 → plt.show()"
+    "k": "그리기 순서와 꾸미기",
+    "v": "import matplotlib.pyplot as plt → 그리기 → title·xlabel·ylabel(단위)·grid(격자)·legend(label 필요) → plt.show(). savefig는 show보다 먼저"
    },
    {
     "k": "선 그래프 plt.plot",
@@ -823,12 +826,12 @@
     "v": "합이 100%인 비율. autopct='%.1f%%'로 퍼센트 표시. 조각이 많거나 비율이 비슷하면 막대 그래프가 낫다"
    },
    {
-    "k": "꾸미기",
-    "v": "title·xlabel·ylabel(단위 포함), label + plt.legend(), figsize=(가로, 세로), 한글 글꼴은 rcParams, savefig는 show보다 먼저"
+    "k": "pandas plot 접근자",
+    "v": "ser.plot.hist(bins=30) = ser.plot(kind='hist', bins=30). .line·.bar·.barh·.box·.pie(title=). 인덱스가 x축·조각 이름. 산점도는 df.plot.scatter(x=, y=)만"
    },
    {
-    "k": "df.plot(kind=...)",
-    "v": "기본은 'line'. 'bar'·'barh'·'hist'·'box'·'scatter'(x·y 필수)·'pie'. 인덱스가 x축, 열 이름이 범례"
+    "k": "세고 골라서 그리기",
+    "v": "value_counts().plot.bar()는 많은 순, 연도 순은 .sort_index() 뒤 .plot.line(). isna().sum().plot.bar(), (조건) + 0 → value_counts().plot.pie(), loc로 고른 뒤 그리기"
    },
    {
     "k": "해석·보고",
@@ -842,44 +845,44 @@
      "보여 줄 것",
      "그래프",
      "matplotlib",
-     "df.plot kind"
+     "pandas 접근자 (kind)"
     ],
     "rows": [
      [
       "시간에 따른 추세",
       "선 그래프",
       "plt.plot",
-      "'line'"
+      ".plot.line() ('line')"
      ],
      [
       "범주끼리 비교",
       "막대 그래프",
       "plt.bar / plt.barh",
-      "'bar' / 'barh'"
+      ".plot.bar() / .plot.barh()"
      ],
      [
       "수치의 분포",
       "히스토그램",
       "plt.hist",
-      "'hist'"
+      ".plot.hist(bins=) ('hist')"
      ],
      [
       "두 변수의 관계",
       "산점도",
       "plt.scatter",
-      "'scatter'"
+      "df.plot.scatter(x=, y=)"
      ],
      [
       "퍼짐·이상치",
       "상자 그림",
       "plt.boxplot",
-      "'box'"
+      ".plot.box() ('box')"
      ],
      [
       "전체 중 비율",
       "파이 차트",
       "plt.pie",
-      "'pie'"
+      ".plot.pie() ('pie')"
      ]
     ]
    },
@@ -952,10 +955,10 @@
   "traps": [
    "막대 그래프(범주 비교, 틈 있음)와 히스토그램(수치 분포, 틈 없음)을 혼동하지 않는다. 키·점수 분포는 히스토그램이다.",
    "상자 안의 선은 평균이 아니라 중앙값이고, 수염은 최솟값·최댓값이 아니라 1.5×IQR 경계 안의 끝 값까지이다.",
-   "plt.plot(y)처럼 x를 생략하면 x축은 1이 아니라 0부터 시작한다.",
+   "산점도는 DataFrame 전용이다. df.plot.scatter(x=, y=)처럼 x·y 열을 모두 정하고, Series에서 ser.plot.scatter(x=, y=)를 부르면 ValueError이다.",
    "plt.hist에서 구간 경계와 같은 값은 오른쪽 구간에 들어간다. 단, 최댓값은 마지막 구간에 포함된다.",
    "범례는 label을 주고 plt.legend()까지 불러야 나타난다. label이 없는 선은 범례에 나오지 않는다.",
-   "pandas 상자 그림은 kind='box', 히스토그램은 kind='hist'이다. 'boxplot'·'histogram'은 ValueError이고, scatter는 x·y를 꼭 지정한다.",
+   "value_counts()는 개수 많은 순이라 연도·월 그래프는 sort_index()로 다시 정렬한다. kind는 'box'·'hist'이며 'boxplot'·'histogram'은 ValueError이다.",
    "파이 차트는 합이 100%인 데이터에만 쓴다. 복수 응답처럼 합이 100%를 넘으면 막대 그래프를 쓴다.",
    "산점도의 상관이 뚜렷해도 인과관계는 아니다. 막대 그래프 y축이 0부터가 아니면 축 자르기로 차이가 과장된다."
   ]
@@ -1006,60 +1009,60 @@
   },
   {
    "id": "a4",
-   "q": "다음 코드로 그린 파이 차트에 표시되는 퍼센트 글자를 차례대로 나열한 것은?",
-   "code": "import matplotlib.pyplot as plt\nplt.pie([3, 5, 12], labels=['버스', '도보', '지하철'],\n        autopct='%.1f%%')\nplt.show()",
+   "q": "다음 코드로 그린 파이 차트에 대한 설명으로 옳은 것은?",
+   "code": "import pandas as pd\ndf = pd.DataFrame({'sales': [42000, 51000, 50000, 63000,\n                             38000, 70000, 50500]})\ndf['up'] = (df['sales'] > 50000) + 0\ndf['up'].value_counts().plot.pie(title='Sales > 50000')",
    "o": [
-    "3.0%, 5.0%, 12.0%",
-    "15%, 25%, 60%",
-    "30.0%, 50.0%, 120.0%",
-    "15.0%, 25.0%, 60.0%"
+    "조각 2개: '1'이 4곳, '0'이 3곳만큼의 크기이다",
+    "조각 2개: '1'이 5곳, '0'이 2곳만큼의 크기이다",
+    "조각 2개: 'True'가 4곳, 'False'가 3곳만큼의 크기이다",
+    "매장마다 조각이 하나씩, 모두 7개이다"
    ],
-   "a": 3,
-   "exp": "합 20에 대한 비율은 3/20 = 15%, 5/20 = 25%, 12/20 = 60%이다. '%.1f%%'는 소수 첫째 자리까지 쓰므로 15.0%처럼 표시된다. 값을 그대로 퍼센트로 쓰지 않는다.",
+   "a": 0,
+   "exp": "50000을 넘는 값은 51000·63000·70000·50500의 4곳이고, 50000은 넘지 않으므로 0이다. + 0으로 True/False가 1/0이 되어 조각 이름은 1과 0이며, value_counts가 센 4와 3이 조각 크기가 된다. 제목은 title 인자로 붙는다.",
    "area": "VIS",
    "type": "계산"
   },
   {
    "id": "a5",
-   "q": "다음 코드로 그려지는 그래프에 대한 설명으로 옳은 것은?",
-   "code": "import pandas as pd\nimport matplotlib.pyplot as plt\ndf = pd.DataFrame({'국어': [80, 75, 90],\n                   '수학': [70, 85, 95]},\n                  index=['1반', '2반', '3반'])\ndf.plot(kind='bar')\nplt.show()",
+   "q": "다음 코드로 그린 막대 그래프에 대한 설명으로 옳은 것은?",
+   "code": "import numpy as np\nimport pandas as pd\ndf = pd.DataFrame({'name': ['가', '나', '다', '라', '마'],\n                   'height': [160, np.nan, 172, np.nan, np.nan],\n                   'club': ['축구', None, '미술', '독서', '축구']})\nna_cnt = df.isna().sum()\nna_cnt.plot.bar()",
    "o": [
-    "x축에 1반·2반·3반이 놓이고 반마다 국어·수학 막대가 2개씩, 모두 6개 그려진다",
-    "x축에 국어·수학이 놓이고 막대가 2개만 그려진다",
-    "x축에 인덱스 대신 0·1·2가 놓인다",
-    "범례가 없어 어느 막대가 국어인지 알 수 없다"
+    "x축에 열 이름 2개만 놓이고, 결측치가 없는 name 열은 빠진다",
+    "x축에 행 번호 5개가 놓이고, 행마다 결측치 개수를 그린다",
+    "x축에 열 이름 3개가 놓이고, height 막대가 3으로 가장 높다",
+    "x축에 열 이름 3개가 놓이고, 결측이 아닌 값의 개수를 높이로 그린다"
    ],
-   "a": 0,
-   "exp": "df.plot은 인덱스(1반·2반·3반)를 x축에 놓고 수치형 열마다 막대를 그려 반마다 2개, 모두 6개가 된다. 열 이름 국어·수학으로 범례도 자동으로 붙는다.",
+   "a": 2,
+   "exp": "isna().sum()은 열마다 결측치를 세어 name 0, height 3, club 1인 Series를 만들고, .plot.bar()는 그 인덱스(열 이름)를 x축에 놓는다. 결측치가 없는 name도 x축에 남고 막대 높이가 0일 뿐이다. 행별 개수는 sum(axis=1), 결측이 아닌 값의 개수는 notna().sum()이다.",
    "area": "VIS",
    "type": "코드"
   },
   {
    "id": "a6",
-   "q": "다음 코드로 그린 막대 그래프에서 왼쪽부터 놓이는 막대의 이름(높이)으로 옳은 것은?",
-   "code": "import pandas as pd\nimport matplotlib.pyplot as plt\ns = pd.Series(['B', 'A', 'B', 'C', 'B', 'A'])\ns.value_counts().plot(kind='bar')\nplt.show()",
+   "q": "다음 코드로 그린 막대 그래프에서 왼쪽부터 막대의 높이를 차례로 나열한 것은?",
+   "code": "import pandas as pd\ndf = pd.DataFrame({'date': ['2021-03-02', '2019-07-15', '2021-11-30',\n                            '2020-01-05', '2021-06-11', '2019-12-24']})\ndf['year'] = pd.to_datetime(df['date']).dt.year\ncnt = df['year'].value_counts().sort_index()\ncnt.plot.bar()",
    "o": [
-    "A(2), B(3), C(1)",
-    "C(1), A(2), B(3)",
-    "B(3), A(2), C(1)",
-    "B, A, B, C, B, A 순서로 막대 6개"
+    "3, 2, 1",
+    "1, 2, 3",
+    "3, 1, 2",
+    "2, 1, 3"
    ],
-   "a": 2,
-   "exp": "value_counts는 값마다 개수를 세어 많은 순(B 3, A 2, C 1)으로 돌려주고, plot은 그 순서대로 막대를 놓는다. 원래 데이터 순서나 이름 순서로 놓이지 않는다.",
-   "area": "ANAL",
+   "a": 3,
+   "exp": "pd.to_datetime으로 날짜로 바꾼 뒤 dt.year로 뽑은 연도는 2021이 3건, 2019가 2건, 2020이 1건이다. value_counts만 쓰면 개수 순이라 막대가 2021·2019·2020 순으로 놓여 3, 2, 1이 되지만, sort_index()로 연도 순 2019 → 2020 → 2021이 되어 높이는 2, 1, 3이다. 1, 2, 3은 개수를 오름차순으로 정렬하는 sort_values()의 결과이다.",
+   "area": "VIS",
    "type": "코드"
   },
   {
    "id": "a7",
-   "q": "DataFrame df에 수치형 열 '키'와 '몸무게'가 있다. 다음 중 실행하면 ValueError가 나는 코드는?",
+   "q": "DataFrame df에 수치형 열 '키'와 '몸무게'가 있다. 다음 중 실행하면 오류가 나는 코드는?",
    "o": [
-    "df.plot(kind='box')",
-    "df.plot(kind='hist', bins=5)",
-    "df.plot(kind='scatter', x='키', y='몸무게')",
-    "df.plot(kind='scatter', x='키')"
+    "df.plot.scatter(x='키', y='몸무게', title='키와 몸무게')",
+    "df['키'].plot.hist(bins=30)",
+    "df['키'].plot.scatter(x='키', y='몸무게')",
+    "df.plot(kind='scatter', x='키', y='몸무게')"
    ],
-   "a": 3,
-   "exp": "kind='scatter'는 x와 y 열을 모두 지정해야 하므로 y가 빠지면 ValueError(scatter requires an x and y column)가 난다. 'box'·'hist'는 열 지정 없이도 그려진다.",
+   "a": 2,
+   "exp": "산점도는 DataFrame 전용이다. Series인 df['키']에서 .plot.scatter를 부르면 ValueError(plot kind scatter can only be used for data frames)가 난다. df.plot.scatter와 df.plot(kind='scatter')는 x·y를 모두 정해 정상이고, Series 히스토그램도 정상이다.",
    "area": "VIS",
    "type": "코드"
   },
@@ -1094,16 +1097,16 @@
   },
   {
    "id": "a10",
-   "q": "상자 그림에 대한 설명으로 옳지 않은 것은?",
+   "q": "그래프 구성 요소와 pandas plot 인자에 대한 설명으로 옳지 않은 것은?",
    "o": [
-    "상자 안의 선은 데이터의 평균을 나타낸다",
-    "상자의 길이는 IQR(Q3 − Q1)이다",
-    "수염 밖에 따로 찍힌 점은 이상치로 볼 수 있다",
-    "여러 집단의 상자를 나란히 그리면 중앙값과 퍼짐을 비교할 수 있다"
+    "df.plot.line()은 수치형 열이 여럿이면 열 이름으로 범례를 자동으로 단다",
+    "ser.plot.pie(title='매출')의 title은 그래프 위에 제목을 붙인다",
+    "ser.plot.hist(bins=30)의 bins는 히스토그램의 막대(구간) 개수를 정한다",
+    "격자는 선·막대가 여러 개일 때 각각이 무엇인지 알려 주는 안내 상자이다"
    ],
-   "a": 0,
-   "exp": "상자 안의 선은 평균이 아니라 중앙값이다. 상자 길이 = IQR, 경계 밖 점 = 이상치, 여러 상자 나란히 비교는 모두 옳다.",
-   "area": "STAT",
+   "a": 3,
+   "exp": "선·막대가 각각 무엇인지 알려 주는 안내 상자는 범례(legend)이다. 격자(grid)는 눈금마다 그은 보조선으로 plt.grid(True)나 grid=True로 켠다. 범례 자동 표시, title, bins 설명은 모두 옳다.",
+   "area": "VIS",
    "type": "부정형"
   },
   {
@@ -1122,17 +1125,17 @@
   },
   {
    "id": "a12",
-   "q": "df의 인덱스가 '1반'·'2반'·'3반'이고 '수학' 열이 [70, 85, 95]이다. plt.bar(df.index, df['수학'])와 df['수학'].plot(kind='bar')를 비교한 설명으로 옳은 것은?",
+   "q": "매장 데이터 df로 히스토그램을 그리려 한다. 다음 ※ 조건을 만족하는 코드로 옳은 것은?\n※ 방문객 수(cust)가 500명 이상인 매장만 사용한다.\n※ 매출(sales)을 Series의 .plot 접근자로 그린다.\n※ 막대 개수는 30개로 한다.",
    "o": [
-    "plt.bar는 막대를, df['수학'].plot(kind='bar')는 선을 그린다",
-    "둘 다 1반·2반·3반 자리에 수학 점수 높이의 막대 3개를 그린다",
-    "df['수학'].plot은 인덱스를 쓰지 않아 x축이 0·1·2가 된다",
-    "plt.bar는 pandas 데이터를 받을 수 없다"
+    "df['sales'].plot.hist(bins=30)",
+    "df.loc[df['cust'] >= 500, 'sales'].plot.hist(bins=30)",
+    "df.loc[df['cust'] > 500, 'sales'].plot.hist(bins=30)",
+    "df.loc[df['sales'] >= 500, 'cust'].plot.hist(bins=30)"
    ],
    "a": 1,
-   "exp": "plt.bar는 x 자리에 인덱스(반 이름)를, Series의 plot(kind='bar')는 인덱스를 x축으로 써서 둘 다 1반·2반·3반에 70·85·95 높이의 막대 3개를 그린다. plt 함수도 Series를 그대로 받는다.",
+   "exp": "'이상'은 500을 포함하므로 >= 500이다. df.loc[행 조건, '열']로 조건에 맞는 매출만 고른 뒤 .plot.hist(bins=30)을 붙인다. 필터 없이 그리면 모든 매장이 들어가고, > 500은 방문객이 딱 500명인 매장을 빼며, 조건과 열을 바꾸면 방문객 수를 그린다.",
    "area": "VIS",
-   "type": "비교"
+   "type": "응용"
   },
   {
    "id": "a13",

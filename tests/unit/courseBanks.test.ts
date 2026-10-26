@@ -60,7 +60,7 @@ function checkMcq(q: RawQ, id: string, areas: string[], where: string, check: bo
   expect(q.exp.length, `${where} 해설`).toBeGreaterThanOrEqual(15);
   // 보기는 화면에서 섞여 ①~④로 다시 붙는다: 문항·보기·해설에 ①~④를 쓰거나 해설이 보기 순서를 가리키면 엉뚱한 보기를 가리킨다
   for (const t of [q.q, q.exp, ...q.o]) expect(/[①②③④]/.test(t), `${where} ①~④는 보기 표시와 헷갈림(㉠㉡㉢ 사용): ${t}`).toBe(false);
-  expect(/(첫|둘|셋|넷)\s*째\s*보기|(첫|두|세|네)\s*번째\s*(보기|는|것)|[1-4]번\s*보기|보기\s*[1-4]/.test(q.exp), `${where} 해설이 보기 순서를 가리킴(보기는 섞임): ${q.exp}`).toBe(false);
+  expect(/(첫|둘|셋|넷|마지막)\s*(째|번째)\s*(는|가|와|도|보기|선택지|것)|(첫|두|세|네)\s*번째\s*(보기|는|가|것)|[1-4]번\s*보기|보기\s*[1-4]/.test(q.exp), `${where} 해설이 보기 순서를 가리킴(보기는 섞임): ${q.exp}`).toBe(false);
   expect(areas, `${where} 영역`).toContain(q.area);
   if (check) expect(TYPES, `${where} 유형`).toContain(q.type);
 }

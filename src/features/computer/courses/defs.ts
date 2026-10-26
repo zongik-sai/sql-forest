@@ -1,6 +1,6 @@
 /**
  * 컴퓨터 일반과 같은 구조(단원 × 5단계 · 모의고사 · 오답노트)로 만드는 새 과목들(2026-10-26).
- * 내용은 courses/<과목>/U1~U8.json(원본 형식은 컴퓨터 일반 pc_bank.json 단원과 같고,
+ * 내용은 courses/<과목>/U1~U<n>.json(원본 형식은 컴퓨터 일반 pc_bank.json 단원과 같고,
  * 이론 카드에 개념 맞추기 match·선택 code, 문항에 선택 code가 더 있다).
  */
 export type NewCourseId = 'net' | 'prog' | 'data' | 'bin' | 'ip';
@@ -86,21 +86,24 @@ export const NEW_COURSES: NewCourseDef[] = [
   },
   {
     id: 'data', name: 'Data', path: '/data',
-    basis: 'YBM DATA(데이터분석기술평가) 2급 파이썬 수준: 데이터 이해·기초 통계·pandas 데이터 처리·집계·시각화(공식 세부 범위는 시행처 안내 기준으로 확인 필요)',
-    summary: '데이터의 종류와 기초 통계부터 파이썬 pandas로 데이터를 읽고·고르고·다듬고·묶어 보고, 그래프로 해석하기까지 8단원을 단계별로 익혀요.',
+    basis: 'YBM DATA(데이터분석기술평가) 2급 파이썬 수준: 교재 단원(도입부 파이썬·빅데이터·데이터 수집 및 전처리·데이터 탐색과 이해·데이터 분석·데이터 시각화)의 객관식·작업형 범위(2026-10-26 선생님 제공 교재 단원 문제 기준)',
+    summary: '데이터의 종류와 기초 통계, 파이썬 pandas로 데이터를 읽고·고르고·다듬고·묶고·그리기부터 빅데이터 분석 방법론, 통계 검정·회귀, 머신러닝 기초와 작업형 답안 쓰기까지 11단원을 단계별로 익혀요.',
     areas: [
       { id: 'CONCEPT', label: '데이터 이해' }, { id: 'STAT', label: '통계 기초' }, { id: 'PREP', label: '데이터 처리' },
-      { id: 'ANAL', label: '데이터 분석' }, { id: 'VIS', label: '시각화·해석' },
+      { id: 'ANAL', label: '데이터 분석' }, { id: 'VIS', label: '시각화·해석' }, { id: 'ML', label: '머신러닝·모델' },
     ],
     units: [
       { num: 1, title: '데이터와 데이터 분석의 이해', areas: ['CONCEPT'], scope: '데이터·정보·지식, 정형·반정형·비정형 데이터, 범주형(명목·순서)과 수치형(이산·연속), 척도(명목·서열·등간·비율), 데이터 분석 절차(문제 정의→수집→전처리→분석→시각화→해석), 데이터 수집 방법(설문·로그·공공데이터·센서), 개인정보·데이터 윤리, CSV 파일' },
-      { num: 2, title: '기초 통계', areas: ['STAT'], scope: '평균·중앙값·최빈값과 쓰임, 범위·분산·표준편차, 사분위수·IQR·이상치 판단(1.5×IQR), 분포 모양(치우침), 상관관계(양·음·없음, 상관계수 −1~1, 상관과 인과의 차이), 모집단·표본' },
-      { num: 3, title: '파이썬과 NumPy 기초', areas: ['PREP'], scope: '리스트·딕셔너리로 데이터 다루기, 반복으로 합계·평균 구하기, 함수, import와 별칭(import pandas as pd, import numpy as np), NumPy 배열(np.array)·벡터 연산·mean·sum·max·min·round, 배열 크기(shape)' },
-      { num: 4, title: 'pandas 시작: Series와 DataFrame', areas: ['PREP'], scope: 'Series·DataFrame 만들기, read_csv(인코딩·sep 기초), head·tail·shape·info·describe·dtypes·columns, 열 하나·여러 개 선택(df[\'열\'], df[[...]]), value_counts·unique·nunique, 기본 통계 메서드(mean·sum·max·count)' },
+      { num: 2, title: '기초 통계', areas: ['STAT'], scope: '평균·중앙값·최빈값과 쓰임, 범위·분산·표준편차, 사분위수·IQR·이상치 판단(1.5×IQR), 분포 모양(치우침), 상관관계(양·음·없음, 상관계수 −1~1, 상관과 인과의 차이), 모집단·표본, 탐색적 데이터 분석(EDA)과 기술통계 세 갈래(위치·변이·모양), quantile(q), 첨도 kurt()와 왜도 skew(), 평균 ± k×표준편차 이상치 후보' },
+      { num: 3, title: '파이썬과 NumPy 기초', areas: ['PREP'], scope: '리스트·딕셔너리로 데이터 다루기, 반복으로 합계·평균 구하기, 함수, import와 별칭(import pandas as pd, import numpy as np), NumPy 배열(np.array)·벡터 연산·mean·sum·max·min·round, 배열 크기(shape), 숫자·문자 표기(지수 표기·따옴표·이스케이프)와 type(), 연산자(**·round 음수 자리), 문자열 메서드(lower·upper·find·count), 튜플(수정 불가)·딕셔너리 keys/values/items, np.arange·np.where, Series max·idxmax·argmax' },
+      { num: 4, title: 'pandas 시작: Series와 DataFrame', areas: ['PREP'], scope: 'Series·DataFrame 만들기, read_csv(인코딩·sep 기초), head·tail·shape·info·describe·dtypes·columns, 열 하나·여러 개 선택(df[\'열\'], df[[...]]), value_counts·unique·nunique, 기본 통계 메서드(mean·sum·max·count), 다른 파일 읽기(read_json·read_excel·read_fwf), dtype과 dtypes, len(df)·iloc 행·열 위치 선택, nunique·unique·count 구분' },
       { num: 5, title: '데이터 선택·필터링·정렬', areas: ['ANAL'], scope: 'loc(이름)·iloc(위치) 행·열 선택, 불리언 인덱싱(조건, & | ~ 와 괄호), isin·between, sort_values(by·ascending)·sort_index, nlargest·nsmallest, reset_index, 조건에 맞는 행 개수 세기' },
-      { num: 6, title: '데이터 전처리', areas: ['PREP'], scope: '결측치 확인·처리(isna·isnull·sum, dropna, fillna 평균·0), 중복(duplicated·drop_duplicates), 자료형 변환(astype, to_datetime과 dt.year·dt.month), 열 이름 바꾸기(rename)·열 삭제(drop), 파생 변수(열 계산, apply, np.where), 문자열 열 처리(str.contains·str.replace·str.upper), 이상치 처리' },
-      { num: 7, title: '그룹 집계와 데이터 결합', areas: ['ANAL'], scope: 'groupby와 집계(mean·sum·count·size·agg 여러 개), 여러 열로 묶기, pivot_table(index·columns·values·aggfunc), crosstab, merge(on·how=inner·left·right·outer), concat(행·열 방향), 비율·백분율 계산' },
-      { num: 8, title: '시각화와 결과 해석', areas: ['VIS'], scope: 'matplotlib·pandas plot 기초(plt.plot·bar·hist·scatter·boxplot, df.plot(kind=...)), 그래프 고르기(추세=선, 범주 비교=막대, 분포=히스토그램, 관계=산점도, 이상치=상자 그림, 비율=파이의 주의점), 제목·축 이름·범례, 그래프 읽기와 해석, 잘못된 시각화(축 자르기·3D 왜곡), 분석 결과 보고' },
+      { num: 6, title: '데이터 전처리', areas: ['PREP'], scope: '결측치 확인·처리(isna·isnull·sum, dropna, fillna 평균·0), 중복(duplicated·drop_duplicates), 자료형 변환(astype, to_datetime과 dt.year·dt.month), 열 이름 바꾸기(rename)·열 삭제(drop), 파생 변수(열 계산, apply, np.where), 문자열 열 처리(str.contains·str.replace·str.upper), 이상치 처리, notna·notnull·pd.NA, 결측 처리 방법(삭제·대체)과 MCAR, -1 같은 결측 코드 바꾸기, 마스크로 채우기, 글자로 된 숫자 정리($·단위 B/M·astype), dt.weekday, 한 번만 나온 id 거르기(value_counts·isin), 최소-최대 정규화와 MinMaxScaler' },
+      { num: 7, title: '그룹 집계와 데이터 결합', areas: ['ANAL'], scope: 'groupby와 집계(mean·sum·count·size·agg 여러 개), 여러 열로 묶기, pivot_table(index·columns·values·aggfunc), crosstab, merge(on·how=inner·left·right·outer), concat(행·열 방향), 비율·백분율 계산, join(인덱스로 붙이기)과 merge 비교, concat axis, 조건 개수·비율(sum·mean), value_counts().index[0], str.len().max()' },
+      { num: 8, title: '시각화와 결과 해석', areas: ['VIS'], scope: 'matplotlib·pandas plot 기초(plt.plot·bar·hist·scatter·boxplot, df.plot(kind=...)), pandas plot 접근자(Series/DataFrame .plot.hist(bins=)·.plot.bar()·.plot.line()·.plot.pie(title=)·.plot.scatter(x=, y=, title=)), value_counts()·sort_index()·isna().sum()과 이어 그리기, 그래프 고르기(추세=선, 범주 비교=막대, 분포=히스토그램, 관계=산점도, 이상치=상자 그림, 비율=파이의 주의점), 제목·축 이름·범례, 그래프 읽기와 해석, 잘못된 시각화(축 자르기·3D 왜곡), 분석 결과 보고' },
+      { num: 9, title: '빅데이터와 분석 방법론', areas: ['CONCEPT'], scope: '빅데이터의 뜻과 3V(규모·속도·다양성)와 가치·정확성(4V·5V), 정형·반정형(XML·JSON)·비정형(이미지·영상·이메일) 복습, 빅데이터 조직의 역할(데이터 엔지니어·분석가·과학자·데이터 오너), 분석 언어(Python·R·SQL)와 오픈소스·상용 소프트웨어(SAS, 페이웨어 특징), 분석 성숙도 모델(도입→활용→확산→최적화, 활용 단계 전담 부서), 사일로 효과, 빅데이터 분석 절차(문제 정의→데이터 준비→전처리→모델링→보고, 반복 가능), KDD(Selection·Preprocessing·Transformation·Data Mining·Interpretation/Evaluation), CRISP-DM 6단계(Business Understanding·Data Understanding·Data Preparation·Modeling·Evaluation·Deployment), ETL(Extract·Transform·Load), 데이터 수집: 로컬 파일(csv·json·xls·fwf·sav)과 데이터베이스, DB의 특징(실시간 접근성·계속적인 변화·동시 공용·내용에 의한 참조), ERD와 기본키·외래키' },
+      { num: 10, title: '통계 분석: 가설 검정과 회귀', areas: ['STAT'], scope: '탐색적 데이터 분석(EDA)과 기술통계 분류(위치·변이·모양 통계량, quantile·kurt 복습), 표본 추출 df.sample(n·frac·random_state), 가설 검정의 흐름(귀무가설·대립가설·p-value·유의수준 0.05 판단), 정규성 검정(scipy.stats.shapiro), 상관 분석(df.corr() vs scipy.stats.pearsonr: 상관계수와 p-value, stat, p = …), t-검정(ttest_1samp·ttest_rel·ttest_ind)과 쓰임, 일원 분산분석(scipy.stats.f_oneway, 세 집단 이상), 선형 회귀(statsmodels.formula.api ols("y ~ x1 + x2", data=df).fit(), .params·.rsquared, 단순·다중 회귀 = 독립변수 개수), 결과를 round·abs로 정리하기' },
+      { num: 11, title: '머신러닝 기초와 작업형 답안 쓰기', areas: ['ML'], scope: '지도(교사) 학습·비지도 학습·강화 학습, 과적합, 학습·평가 데이터 나누기(sklearn train_test_split: train_size·test_size·random_state, 기본 75:25), 선형 회귀 LinearRegression(fit(X, y)·coef_·intercept_·predict), 로지스틱 회귀 LogisticRegression(분류), 평가 지표(회귀: MSE·RMSE·MAE·MAPE(실제값 0이면 곤란), 분류: 정밀도·재현율·F1), 군집 분석: KMeans(n_clusters·random_state·labels_, k는 직접 정함)와 계층적 군집(AgglomerativeClustering, linkage), 의사결정나무와 지니 지수, 작업형 답안 형식(※ 조건 읽기, 필터→계산→round·abs, 결과를 solution() 함수의 return으로 돌려주기, 정해진 객체 이름에 저장)' },
     ],
   },
   {
