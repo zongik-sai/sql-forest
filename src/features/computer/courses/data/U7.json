@@ -1092,7 +1092,7 @@
         "df.pivot_table(index='반', columns='성별', values='점수', aggfunc='sum')"
       ],
       "a": 1,
-      "exp": "행은 index='반', 열은 columns='성별', 값은 values='점수'이고 aggfunc를 생략하면 평균이다. 첫 번째는 행·열이 뒤바뀌었고, crosstab은 개수를, aggfunc='sum'은 합계를 구한다.",
+      "exp": "행은 index='반', 열은 columns='성별', 값은 values='점수'이고 aggfunc를 생략하면 평균이다. index='성별'·columns='반'은 행·열이 뒤바뀌었고, crosstab은 개수를, aggfunc='sum'은 합계를 구한다.",
       "area": "ANAL",
       "type": "응용"
     },
