@@ -1,12 +1,13 @@
 import { createContext, createElement, useContext, type ReactNode } from 'react';
 import type { CourseShape } from './model';
+import type { NewCourseId } from './courses/defs';
 import { CG_PASS, type CgMcq, type CgUnit, type CgUnitId } from './types';
 
 /**
  * 단원 × 5단계 과목 정의(컴퓨터 일반·네트워크·프로그래밍·Data가 같은 학습 구조를 쓴다).
  * 화면·저장소·모의고사·선생님 현황은 모두 지금 과목(useCourse)을 따른다.
  */
-export type CourseId = 'cg' | 'net' | 'prog' | 'data';
+export type CourseId = 'cg' | NewCourseId;
 export type NewCourseKey = Exclude<CourseId, 'cg'>;
 
 export interface CourseArea { id: string; label: string }

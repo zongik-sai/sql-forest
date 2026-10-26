@@ -21,6 +21,8 @@ const ComputerRoutes = lazy(() => import('../features/computer/ComputerApp'));
 const NetworkRoutes = lazy(() => import('../features/computer/courses/net'));
 const ProgrammingRoutes = lazy(() => import('../features/computer/courses/prog'));
 const DataRoutes = lazy(() => import('../features/computer/courses/data'));
+const BinaryRoutes = lazy(() => import('../features/computer/courses/bin'));
+const IpRoutes = lazy(() => import('../features/computer/courses/ip'));
 const loadingCourse = <div className="page" role="status">불러오는 중…</div>;
 // 데이터베이스 단원 단계 콘텐츠(이론 카드·개념 점검·실습 예제)도 단계 화면을 열 때만 내려받는다
 const StagePage = lazy(() => import('../features/learning/stages').then((m) => ({ default: m.StagePage })));
@@ -305,6 +307,9 @@ export function App() {
         <Route path="/programming/*" element={<Suspense fallback={loadingCourse}><ProgrammingRoutes /></Suspense>} />
         {/* 'Data' 과목(/data). 데이터베이스 과목 경로(/db·/garden·/learn …)와 겹치지 않는다 */}
         <Route path="/data/*" element={<Suspense fallback={loadingCourse}><DataRoutes /></Suspense>} />
+        {/* 보충 학습(짧은 3단원 과목) */}
+        <Route path="/binary/*" element={<Suspense fallback={loadingCourse}><BinaryRoutes /></Suspense>} />
+        <Route path="/ip/*" element={<Suspense fallback={loadingCourse}><IpRoutes /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { NEW_COURSES } from '../../src/features/computer/courses/defs';
+import { NEW_COURSES, UNIT_COUNTS } from '../../src/features/computer/courses/defs';
 
 /**
  * 새 과목(네트워크·프로그래밍·Data) 단원 원본 검사. 컴퓨터 일반 pc_bank.json 단원과 같은 형식 +
@@ -20,7 +20,6 @@ interface RawUnit {
   advanced: RawQ[];
 }
 
-const COUNTS = { theory: 10, fill: 20, bank: 30, basic: 20, advanced: 15 };
 const TYPES = ['계산', '응용', '부정형', '비교', '코드', '확장'];
 
 function checkTable(t: Table | undefined, where: string) {
@@ -68,6 +67,11 @@ function checkMcq(q: RawQ, id: string, areas: string[], where: string, check: bo
 
 for (const c of NEW_COURSES) {
   const areas = c.areas.map((a) => a.id);
+  const short = c.size === 'short';
+  const COUNTS = UNIT_COUNTS[c.size ?? 'full'];
+  // 정답 번호 분포: 문항 35개(full)는 번호마다 7~10개, 18개(short)는 3~6개
+  const spread = short ? [3, 6] : [7, 10];
+  const sum = short ? { keys: [4, 8], compare: [1, 2], traps: [3, 6] } : { keys: [6, 10], compare: [1, 3], traps: [4, 8] };
   for (const plan of c.units) {
     describe(`${c.id}-U${plan.num} ${plan.title}`, () => {
       const u = JSON.parse(readFileSync(`src/features/computer/courses/${c.id}/U${plan.num}.json`, 'utf8')) as RawUnit;
@@ -118,22 +122,22 @@ for (const c of NEW_COURSES) {
         const cnt = [0, 0, 0, 0];
         for (const q of [...u.basic, ...u.advanced]) cnt[q.a]++;
         for (const n of cnt) {
-          expect(n, `${w} 정답 번호 분포 ${cnt} (각 7~10개)`).toBeGreaterThanOrEqual(7);
-          expect(n, `${w} 정답 번호 분포 ${cnt} (각 7~10개)`).toBeLessThanOrEqual(10);
+          expect(n, `${w} 정답 번호 분포 ${cnt} (각 ${spread[0]}~${spread[1]}개)`).toBeGreaterThanOrEqual(spread[0]);
+          expect(n, `${w} 정답 번호 분포 ${cnt} (각 ${spread[0]}~${spread[1]}개)`).toBeLessThanOrEqual(spread[1]);
         }
       });
       it(`${w} 단원 요약`, () => {
-        expect(u.summary.keys.length).toBeGreaterThanOrEqual(6);
-        expect(u.summary.keys.length).toBeLessThanOrEqual(10);
+        expect(u.summary.keys.length).toBeGreaterThanOrEqual(sum.keys[0]);
+        expect(u.summary.keys.length).toBeLessThanOrEqual(sum.keys[1]);
         for (const k of u.summary.keys) {
           expect(k.k.length, `${w} 요약 제목`).toBeLessThanOrEqual(30);
           expect(k.v.length, `${w} 요약 내용`).toBeLessThanOrEqual(150);
         }
-        expect(u.summary.compare.length).toBeGreaterThanOrEqual(1);
-        expect(u.summary.compare.length).toBeLessThanOrEqual(3);
+        expect(u.summary.compare.length).toBeGreaterThanOrEqual(sum.compare[0]);
+        expect(u.summary.compare.length).toBeLessThanOrEqual(sum.compare[1]);
         u.summary.compare.forEach((t, i) => checkTable(t, `${w} 비교표 ${i + 1}`));
-        expect(u.summary.traps.length).toBeGreaterThanOrEqual(4);
-        expect(u.summary.traps.length).toBeLessThanOrEqual(8);
+        expect(u.summary.traps.length).toBeGreaterThanOrEqual(sum.traps[0]);
+        expect(u.summary.traps.length).toBeLessThanOrEqual(sum.traps[1]);
         for (const t of u.summary.traps) expect(t.length, `${w} 함정`).toBeLessThanOrEqual(170);
       });
     });
