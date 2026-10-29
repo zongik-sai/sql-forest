@@ -1,3 +1,4 @@
+import { compareStudentNo, studentId, type StudentId } from '../auth/accountKind';
 import { NEW_COURSES } from '../computer/courses/defs';
 import type { CourseId } from '../computer/course';
 import { MOCK_LABEL } from '../computer/model';
@@ -238,6 +239,8 @@ export interface LiveStudent {
   id: string;
   name: string;
   email: string;
+  /** 학생 계정(학번 형식)이면 연도·학번(이메일에서 읽음) */
+  sid: StudentId | null;
   state: LiveState;
   updatedAt: string;
   chip: LiveChip;
@@ -247,17 +250,18 @@ export function toLiveStudents(rows: LiveRow[], now: number): LiveStudent[] {
   return rows.map((r) => {
     const state = normalizeLiveState(r.state);
     return {
-      id: r.user_id, name: r.name || (r.email ?? '').split('@')[0] || '(이름 없음)', email: r.email ?? '',
+      id: r.user_id, name: r.name || (r.email ?? '').split('@')[0] || '(이름 없음)', email: r.email ?? '', sid: studentId(r.email),
       state, updatedAt: r.updated_at, chip: chipOf(state, r.updated_at, now),
     };
   });
 }
 
-export type LiveSort = 'status' | 'name' | 'recent';
+export type LiveSort = 'status' | 'name' | 'recent' | 'sid';
 export function sortLive(list: LiveStudent[], by: LiveSort): LiveStudent[] {
   const byName = (a: LiveStudent, b: LiveStudent) => a.name.localeCompare(b.name, 'ko');
   return [...list].sort((a, b) => {
     if (by === 'name') return byName(a, b);
+    if (by === 'sid') return compareStudentNo(a, b) || byName(a, b);
     if (by === 'recent') return b.updatedAt.localeCompare(a.updatedAt) || byName(a, b);
     return CHIP_ORDER.indexOf(a.chip) - CHIP_ORDER.indexOf(b.chip) || byName(a, b);
   });

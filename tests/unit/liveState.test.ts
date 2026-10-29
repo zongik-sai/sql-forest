@@ -132,6 +132,21 @@ describe('선생님 화면 상태 표시', () => {
     expect(sortLive(list, 'name').map((s) => s.name)).toEqual(['가온', '다온', '라온', 'nare']);
     expect(sortLive(list, 'recent').map((s) => s.id).slice(0, 2)).toEqual(['1', '2']);
   });
+  it('학생 계정은 학번을 읽고, 학번순 정렬(학생이 아닌 계정은 뒤)', () => {
+    const list = toLiveStudents([
+      { user_id: 't', name: '김선생', email: 'teacher@example.com', state: { focus: 'menu' }, updated_at: ago(5) },
+      { user_id: 'b', name: '나래', email: 'sai_209610201@seoulai.sen.hs.kr', state: { focus: 'learning' }, updated_at: ago(5) },
+      { user_id: 'a', name: '가온', email: 'sai_209610102@seoulai.sen.hs.kr', state: { focus: 'learning' }, updated_at: ago(5) },
+    ], now);
+    expect(list.map((s) => s.sid?.no ?? null)).toEqual([null, '10201', '10102']);
+    expect(sortLive(list, 'sid').map((s) => s.id)).toEqual(['a', 'b', 't']);
+  });
+  it('계정 관리 RPC: migration 미적용·관리자 아님 안내', () => {
+    const missing = { code: 'PGRST202', message: 'Could not find the function public.account_list without parameters in the schema cache' };
+    expect(rpcErrorText('account_list', missing)).toContain('20261029000000_roles.sql');
+    expect(rpcErrorText('set_teacher', { code: '42501', message: 'x' })).toBe('관리자 계정만 권한을 바꿀 수 있어요.');
+    expect(rpcErrorText('set_admin', { code: '55000', message: '마지막 관리자는 해제할 수 없어요' })).toBe('마지막 관리자는 해제할 수 없어요');
+  });
   it('migration 미적용 오류는 분명하게 안내', () => {
     const missing = { code: 'PGRST202', message: 'Could not find the function public.class_live_status(p_minutes) in the schema cache' };
     expect(isMissingFunction(missing)).toBe(true);

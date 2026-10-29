@@ -1,3 +1,4 @@
+import { parsedText, studentId, type StudentId } from '../auth/accountKind';
 import { activeWrongIds, bestRegularMock, CG_SHAPE, mockSizeOf, normalizeCgState, passedCount, plantStage, unitLevel, type CgState, type CourseShape } from './model';
 import type { CgUnitId } from './types';
 
@@ -17,6 +18,8 @@ export interface CgStudent {
   id: string;
   name: string;
   email: string;
+  /** 학생 계정(학번 형식)이면 연도·학번(이메일에서 읽음, 저장하지 않음) */
+  sid: StudentId | null;
   state: CgState;
   plant: number;
   passed: number;
@@ -33,7 +36,7 @@ export function toStudents(rows: CgClassRow[], shape: CourseShape = CG_SHAPE): C
     const levels = Object.fromEntries(shape.unitIds.map((u) => [u, unitLevel(s, u)])) as Record<CgUnitId, number>;
     const best = bestRegularMock(s, shape);
     return {
-      id: r.user_id, name: r.name || (r.email ?? '').split('@')[0] || '(이름 없음)', email: r.email ?? '', state: s,
+      id: r.user_id, name: r.name || (r.email ?? '').split('@')[0] || '(이름 없음)', email: r.email ?? '', sid: studentId(r.email), state: s,
       plant: plantStage(s, shape), passed: passedCount(s, shape), levels, mockBest: best, mockPassed: best >= mockSizeOf(shape).need,
       wrong: activeWrongIds(s).length, lastAt: r.updated_at,
     };
@@ -52,6 +55,10 @@ export function classSummary(students: CgStudent[], now = Date.now(), shape: Cou
   const topWrong = [...wrongCount.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 8);
   return { n, active7, avgPassed, mockPassed, unitAvg, topWrong };
 }
+
+/** CSV 학번 열(연도·학번·학년 반 번호): 학생 계정이 아니면 빈칸 */
+export const CSV_SID_HEADER = ['연도', '학번', '학년·반·번호'];
+export const csvSid = (sid: StudentId | null): string[] => (sid ? [String(sid.year), sid.no, parsedText(sid) ?? ''] : ['', '', '']);
 
 /** CSV(엑셀 한글 깨짐 방지 BOM 포함) */
 export function toCsv(header: string[], rows: (string | number)[][]): string {

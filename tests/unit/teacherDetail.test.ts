@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addLock, addMock, emptyCgState, markDone, noteAnswer, recordScore, type CgState } from '../../src/features/computer/model';
-import { lastActivity, questionStats, studentDetail, toStudents, unitClassStats } from '../../src/features/computer/teacher';
+import { classSummary, csvSid, CSV_SID_HEADER, lastActivity, questionStats, studentDetail, toCsv, toStudents, unitClassStats } from '../../src/features/computer/teacher';
+import { onlyStudents } from '../../src/features/auth/accountKind';
 import { CG_COURSE } from '../../src/features/computer/content';
 
 /** 선생님 화면 '더 자세히': 단원별 통과율·문항별 오답·학생 한 명의 단원 × 단계 기록 */
@@ -61,5 +62,25 @@ describe('선생님 화면: 더 자세히', () => {
   it('반의 마지막 활동', () => {
     expect(lastActivity(students)).toBe('2026-10-26T02:00:00Z');
     expect(lastActivity([])).toBeNull();
+  });
+});
+
+describe('선생님 화면: 학번·학생 계정만', () => {
+  const [a, b] = sample();
+  const all = toStudents([
+    { user_id: '1', name: '가온', email: 'sai_209610101@seoulai.sen.hs.kr', state: a, updated_at: '2026-10-26T01:00:00Z' },
+    { user_id: '2', name: '김선생', email: 'teacher@example.com', state: b, updated_at: '2026-10-26T02:00:00Z' },
+  ], CG_COURSE);
+  it('학생 계정은 학번을 읽고, 학생 계정만 켜면 반 통계에서 다른 계정이 빠진다', () => {
+    expect(all.map((s) => s.sid?.id ?? null)).toEqual(['209610101', null]);
+    const only = onlyStudents(all, true);
+    expect(classSummary(only, Date.parse('2026-10-27T00:00:00Z'), CG_COURSE).n).toBe(1);
+    expect(classSummary(onlyStudents(all, false), Date.parse('2026-10-27T00:00:00Z'), CG_COURSE).n).toBe(2);
+    expect(unitClassStats(only, CG_COURSE)[0].passRate[0]).toBe(1);
+    expect(questionStats(only)).toEqual([{ id: 'U1-b1', students: 1, active: 1, times: 2 }, { id: 'U1-b2', students: 1, active: 1, times: 1 }]);
+  });
+  it('CSV 학번 열: 연도·학번·학년 반 번호(학생이 아니면 빈칸)', () => {
+    const csv = toCsv(['이름', ...CSV_SID_HEADER], all.map((s) => [s.name, ...csvSid(s.sid)]));
+    expect(csv.split('\r\n')).toEqual(['\ufeff이름,연도,학번,학년·반·번호', '가온,2096,10101,1학년 1반 1번', '김선생,,,']);
   });
 });

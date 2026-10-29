@@ -29,6 +29,12 @@ export function askTeacher(userId: string): Promise<boolean> {
   return p;
 }
 
+/** 권한이 바뀌었을 때(예: 내 교사 권한 해제) 다음 확인에서 서버에 다시 묻게 한다 */
+export function forgetTeacher(userId?: string) {
+  if (userId) cache.delete(userId);
+  else cache.clear();
+}
+
 export function useIsTeacher(): boolean | null {
   const auth = useAuth();
   const uid = auth.identity?.kind === 'user' ? auth.identity.userId : null;

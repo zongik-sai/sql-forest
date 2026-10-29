@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AccountRow } from '../auth/accountKind';
 import type { LiveRow, LiveState } from './liveState';
 
 /**
@@ -44,6 +45,11 @@ export const MIGRATION_OF: Record<string, string> = {
   class_live_status: '20261026010000_monitoring.sql',
   report_live_status: '20261026010000_monitoring.sql',
   request_screen: '20261026010000_monitoring.sql',
+  am_i_admin: '20261029000000_roles.sql',
+  account_list: '20261029000000_roles.sql',
+  set_teacher: '20261029000000_roles.sql',
+  set_admin: '20261029000000_roles.sql',
+  role_audit_list: '20261029000000_roles.sql',
 };
 
 /** 선생님에게 보여 줄 오류 문구(migration 미적용은 분명하게) */
@@ -55,7 +61,7 @@ export function rpcErrorText(fn: string, e: unknown): string {
   if (x?.code === '22023' && /알 수 없는 과목/.test(x.message ?? '')) {
     return '서버의 과목 목록에 아직 이 과목이 없어요. 관리자가 최신 supabase/migrations/20261026000000_courses.sql을 다시 실행해야 해요.';
   }
-  if (x?.code === '42501') return '선생님 계정만 볼 수 있어요.';
+  if (x?.code === '42501') return fn === 'set_teacher' || fn === 'set_admin' ? '관리자 계정만 권한을 바꿀 수 있어요.' : '선생님 계정만 볼 수 있어요.';
   if (x?.code === '23505') return '다른 요청이 동시에 처리되고 있어요. 잠시 뒤 다시 시도해 주세요.';
   return x?.message || String(e);
 }
@@ -87,5 +93,45 @@ export function supabaseMonitorApi(sb: SupabaseClient): MonitorApi {
       return { status: r?.status ?? 'ended', answer: r?.answer ?? null };
     },
     endScreen: async (id) => { await call('end_screen', { p_id: id }); },
+  };
+}
+
+/* ---------------- 계정 관리(supabase/migrations/20261029000000_roles.sql) ---------------- */
+
+export type RoleAction = 'grant_teacher' | 'revoke_teacher' | 'grant_admin' | 'revoke_admin';
+export interface RoleAuditRow {
+  at: string;
+  actor: string | null;
+  actor_email: string | null;
+  actor_name: string | null;
+  target: string | null;
+  target_email: string | null;
+  target_name: string | null;
+  action: RoleAction;
+}
+
+/** 계정 목록(선생님 읽기)·교사/관리자 지정·해제(관리자). 권한은 서버가 다시 확인한다 */
+export interface AccountsApi {
+  amIAdmin(): Promise<boolean>;
+  list(): Promise<AccountRow[]>;
+  /** 바뀌었으면 true, 이미 그 상태면 false */
+  setTeacher(userId: string, on: boolean): Promise<boolean>;
+  setAdmin(userId: string, on: boolean): Promise<boolean>;
+  audit(limit: number): Promise<RoleAuditRow[]>;
+}
+
+export function supabaseAccountsApi(sb: SupabaseClient): AccountsApi {
+  const call = async <T,>(fn: string, args?: Record<string, unknown>): Promise<T> => {
+    const { data, error, status } = args ? await sb.rpc(fn, args) : await sb.rpc(fn);
+    if (error) throw new RpcError(fn, error.message, error.code, status);
+    return data as T;
+  };
+  return {
+    // 아직 migration이 없거나 오류면 관리자가 아닌 것으로(버튼만 숨김, 목록 화면이 오류를 따로 보여 줌)
+    amIAdmin: async () => (await call<boolean>('am_i_admin').catch(() => false)) === true,
+    list: async () => (await call<AccountRow[] | null>('account_list')) ?? [],
+    setTeacher: async (userId, on) => (await call<boolean>('set_teacher', { p_user: userId, p_on: on })) === true,
+    setAdmin: async (userId, on) => (await call<boolean>('set_admin', { p_user: userId, p_on: on })) === true,
+    audit: async (limit) => (await call<RoleAuditRow[] | null>('role_audit_list', { p_limit: limit })) ?? [],
   };
 }

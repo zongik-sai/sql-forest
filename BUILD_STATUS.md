@@ -108,6 +108,14 @@
   - 보강: 1(반복 절차·비정형 예), 2(EDA·위치/변이/모양 통계량·quantile·kurt), 3(숫자·문자 표기·이스케이프·round 음수·튜플·np.arange/where·idxmax), 4(읽기 함수·dtype·nunique·iloc), 6(notna·결측 처리 방법·MCAR·-1 코드·글자 숫자 정리·weekday·MinMaxScaler), 7(merge vs join·concat axis·조건 개수/비율·최빈값), 8(pandas plot 접근자·value_counts/sort_index/isna 이어 그리기·범례·격자). 바뀐 문항·카드는 같은 ID에 새 내용(오답노트에 남은 그 ID는 새 문항으로 보임).
   - 문항은 교재를 옮기지 않고 새로 만들었고, 모든 코드 출력·오류는 pandas 3.0.2·scipy 1.17.1·statsmodels 0.15.0·scikit-learn 1.8.0으로 실행해 맞춤. 단원별 별도 검토.
 
+- 2026-10-29 — 학생 계정(학번 형식) 구분 + 선생님용 계정 목록 + 관리자(교사 권한 지정·해제)(선생님 요청: "연도+학번 9자리로 학생 구분, 애매하면 교사가 계정 목록 확인, 교사인지 확인하는 관리자 권한 부여").
+  - 학생 계정 규칙: 도메인이 정확히 `seoulai.sen.hs.kr`(대소문자 무관) + 앞부분의 숫자 묶음 중 9자리가 딱 하나 + 그 묶음이 20으로 시작(연도 2000~2099, 뒤 5자리 학번). 앞뒤 ASCII 공백 제거·A~Z만 소문자. 서버 `private.student_id`(IMMUTABLE)와 앱 `src/features/auth/accountKind.ts`가 같은 규칙이며 공통 시험 자료 `tests/fixtures/student-emails.json`(39개: 다른 도메인·하위/앞 글자 도메인 흉내·8/10자리·9자리 둘·1999/2100·대문자·앞뒤 공백·켈빈 기호·전각 숫자·@ 둘)으로 둘 다 검사. 학번은 이메일에서 읽어 보여 줄 뿐 저장하지 않음. 학년 1~3·반 01~20·번호 01~40 모양일 때만 'n학년 n반 n번' 풀이.
+  - 서버 `supabase/migrations/20261029000000_roles.sql`: `private.admins`·`private.role_flags`·`private.role_audit`, `private.is_teacher()`를 같은 이름으로 다시 정의(학번 형식 제외), `is_admin`, `am_i_admin`, `account_list`(선생님만: 구분·학번·Google·인증·가입일·마지막 로그인·학습 기록 유무 — 학습 기록 표는 to_regclass로 있는 것만), `set_teacher`·`set_admin`(관리자만, advisory lock 뒤 다시 확인, 마지막 관리자 보호, 바뀐 것만 기록), `role_audit_list`(선생님만, 1~200). 학번 형식 이메일은 표 제약(NOT VALID → 깨끗하면 VALIDATE)으로 교사·관리자 목록에 못 넣고, 이미 있던 행은 WARNING만(권한 없음 처리). 처음 적용 때 관리자 목록이 비어 있으면 교사 목록을 한 번만 복사('admins_bootstrapped' 표시, 선생님이 없을 때는 표시하지 않음).
+  - 앱: 선생님 화면 마지막 탭 '계정 관리'(`src/features/monitor/Accounts.tsx`): 구분 칩·확인 필요 사유, 필터(개수, 처음은 확인 필요가 있으면 확인 필요), 이름·이메일·학번 검색, 정렬, 관리자만 권한 버튼(앱 안 확인 창: 계정·효과, 성공하면 새로고침·알림), 학생 계정은 버튼 없음(까닭 표시), 마지막 관리자 버튼 꺼짐, 권한 변경 기록. 휴대폰은 카드 모양. 과목별 반 현황·데이터베이스 반 현황·실시간 모니터링에 학번 열/표시·학번순, '학생 계정만'(기본 켬, 통계·통과율·CSV가 따름), CSV에 연도·학번·학년·반·번호 열. migration이 없으면 파일 이름을 알려 주는 안내.
+  - 문서: `public/privacy.html`(계정 목록·학번 비저장·권한 변경 기록, 시행일 10-29), README(migration 목록, 운영 안내: 관리자 규칙·처음 적용·비상용 SQL).
+  - 검증: tsc·eslint 통과, Vitest 851(새: PGlite roles 31 — 비로그인/학생/관리자 아닌 선생님/관리자 권한, 학번 형식·Google 아님·미인증 거부, 마지막 관리자(자기 자신·같은 이메일의 다른 계정·권한 없는 관리자 행), 기록·범위, 처음 적용 한 번만·선생님 없을 때·다시 적용 멱등·뒤 migration 없이 동작, 표 제약·WARNING; 단위 53 + 학번 정렬·CSV·안내 4), Playwright dev(accounts 6 + teacher·computer·courses) 24 통과 + 스크린샷(1280·390, 가짜 자료).
+  - 미검증: 운영 Supabase에 이 migration 적용(사이트 운영자가 직접), 실제 Google 로그인 선생님·관리자 계정으로 지정·해제 왕복, 실제 학생 계정 이메일이 이 규칙과 모두 맞는지(선생님이 준 예시 `sai?202610101` 형식만 확인), 두 관리자의 진짜 동시 실행(PGlite는 연결 하나라 순서대로 실행만 검사).
+
 ## 미검증·한계(정직한 보고)
 - Supabase·Google 설정은 실제로 완료했지만, 실제 Google 로그인 왕복(로그인·취소·만료·다기기)은 배포 주소에서 선생님 계정으로 확인해야 한다. mock 성공을 실제 검증으로 보고하지 않는다.
 - Google 대상은 '외부·프로덕션'(2026-10-12)이다. 개인 Gmail 실제 로그인과 만 18세 미만 학교 계정 차단 여부는 아직 확인하지 않았다.

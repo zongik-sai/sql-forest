@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { loadEnv } from 'vite';
 import { addLock, addMock, emptyCgState, markDone, noteAnswer, recordScore } from '../../src/features/computer/model';
@@ -38,10 +39,12 @@ const iso = (agoSec: number) => new Date(Date.now() - agoSec * 1000).toISOString
 function liveRows() {
   const st = (o: Record<string, unknown>) => ({ v: 1, path: '/', unit: null, step: null, detail: null, fs: false, locks: null, sharing: false, ...o });
   return [
-    { user_id: 'u1', name: '가온', email: 'gaon@school.example', updated_at: iso(8), state: st({ subject: 'cg', path: '/computer/unit/U3/3', unit: 'U3', step: '3', label: '3단원 · 3단계 기초 객관식', detail: '문항 7/20', focus: 'learning', fs: true, locks: 1 }) },
-    { user_id: 'u2', name: '나래', email: 'nare@school.example', updated_at: iso(20), state: st({ subject: 'net', path: '/network/unit/U2/5', unit: 'U2', step: '5', label: '2단원 · 5단계 실력점검', detail: '문항 3/15', focus: 'locked', fs: false, locks: 3 }) },
-    { user_id: 'u3', name: '다온', email: 'daon@school.example', updated_at: iso(40), state: st({ subject: 'db', path: '/learn/U03/U03-A02', unit: 'U03', step: 'activity:U03-A02', label: '3단원 · 활동 2', detail: '활동 2/4', focus: 'idle' }) },
-    { user_id: 'u4', name: '라온', email: 'raon@school.example', updated_at: iso(300), state: st({ subject: 'ip', path: '/ip', label: '단원 목록', focus: 'menu' }) },
+    { user_id: 'u1', name: '가온', email: 'sai_209610101@seoulai.sen.hs.kr', updated_at: iso(8), state: st({ subject: 'cg', path: '/computer/unit/U3/3', unit: 'U3', step: '3', label: '3단원 · 3단계 기초 객관식', detail: '문항 7/20', focus: 'learning', fs: true, locks: 1 }) },
+    { user_id: 'u2', name: '나래', email: 'sai_209610102@seoulai.sen.hs.kr', updated_at: iso(20), state: st({ subject: 'net', path: '/network/unit/U2/5', unit: 'U2', step: '5', label: '2단원 · 5단계 실력점검', detail: '문항 3/15', focus: 'locked', fs: false, locks: 3 }) },
+    { user_id: 'u3', name: '다온', email: 'sai_209610103@seoulai.sen.hs.kr', updated_at: iso(40), state: st({ subject: 'db', path: '/learn/U03/U03-A02', unit: 'U03', step: 'activity:U03-A02', label: '3단원 · 활동 2', detail: '활동 2/4', focus: 'idle' }) },
+    { user_id: 'u4', name: '라온', email: 'sai_209610104@seoulai.sen.hs.kr', updated_at: iso(300), state: st({ subject: 'ip', path: '/ip', label: '단원 목록', focus: 'menu' }) },
+    // 선생님의 테스트 계정(학번 형식 아님): '학생 계정만'(기본 켬)이면 숨김
+    { user_id: 'u5', name: '김선생', email: 'teacher@school.example', updated_at: iso(3), state: st({ subject: 'cg', path: '/computer', label: '단원 목록', focus: 'menu' }) },
   ];
 }
 
@@ -56,15 +59,18 @@ function cgRows() {
   a = addLock(addLock(a, 'U2', T(5)).state, 'U2', T(5)).state;
   let b = markDone(emptyCgState(), 'U1', 1, T(2));
   b = noteAnswer(b, 'U1-b1', false, T(4));
+  const t = noteAnswer(emptyCgState(), 'U1-b1', false, T(5)); // 선생님 테스트 계정
   return [
-    { user_id: 'u1', name: '가온', email: 'gaon@school.example', state: a, updated_at: T(5) },
-    { user_id: 'u2', name: '나래', email: 'nare@school.example', state: b, updated_at: T(4) },
+    { user_id: 'u1', name: '가온', email: 'sai_209610101@seoulai.sen.hs.kr', state: a, updated_at: T(5) },
+    { user_id: 'u2', name: '나래', email: 'sai_209610102@seoulai.sen.hs.kr', state: b, updated_at: T(4) },
+    { user_id: 'u5', name: '김선생', email: 'teacher@school.example', state: t, updated_at: T(5) },
   ];
 }
 
 const DB_ROWS = [
-  { user_id: 'u1', name: '가온', email: 'gaon@school.example', total_xp: 2450, activities: 20, checkpoints: 14, units: 5, finals: 0, last_activity: '2026-10-25T09:00:00Z' },
-  { user_id: 'u3', name: '다온', email: 'daon@school.example', total_xp: 600, activities: 6, checkpoints: 3, units: 1, finals: 0, last_activity: '2026-10-20T09:00:00Z' },
+  { user_id: 'u1', name: '가온', email: 'sai_209610101@seoulai.sen.hs.kr', total_xp: 2450, activities: 20, checkpoints: 14, units: 5, finals: 0, last_activity: '2026-10-25T09:00:00Z' },
+  { user_id: 'u3', name: '다온', email: 'sai_209610103@seoulai.sen.hs.kr', total_xp: 600, activities: 6, checkpoints: 3, units: 1, finals: 0, last_activity: '2026-10-20T09:00:00Z' },
+  { user_id: 'u5', name: '김선생', email: 'teacher@school.example', total_xp: 9900, activities: 48, checkpoints: 36, units: 12, finals: 12, last_activity: '2026-10-26T09:00:00Z' },
 ];
 
 type Handler = (body: Record<string, unknown> | null) => { status?: number; json: unknown };
@@ -170,16 +176,36 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     await expect(page).toHaveURL(/#\/teacher\?s=cg$/);
     await expect(page.getByRole('heading', { name: '선생님 화면' })).toBeVisible();
     const tabs = page.getByRole('tab');
-    await expect(tabs).toHaveText(['실시간 모니터링', '데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data', '2진법 이해', 'IP 이해']);
+    await expect(tabs).toHaveText(['실시간 모니터링', '데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data', '2진법 이해', 'IP 이해', '계정 관리']);
     await expect(page.getByRole('tab', { name: '컴퓨터 일반' })).toHaveAttribute('aria-selected', 'true');
 
     // 컴퓨터 일반: 더 자세히(단원별 통과율·많이 틀린 문항·학생 서랍)
     await expect(page.getByRole('heading', { name: '단원별 통과율' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '많이 틀린 문항' })).toBeVisible();
     await expect(page.getByText('틀린 학생 2명(100%)')).toBeVisible();
+    // 학생 계정만(기본 켬): 선생님 테스트 계정은 반 통계·표에서 빠지고, 학번 열·학번순
+    const only = page.getByRole('checkbox', { name: '학생 계정만' });
+    await expect(only).toBeChecked();
+    await expect(page.getByText('학생 계정(학번 형식)이 아닌 1명은 통계·표·CSV에서 뺐어요.')).toBeVisible();
+    const cls = page.locator('table.cg-class');
+    await expect(cls.getByRole('columnheader', { name: /학번/ })).toBeVisible();
+    await expect(cls.locator('tbody tr')).toHaveCount(2);
+    await expect(cls.locator('tbody tr').first()).toContainText('10101');
+    await expect(cls.locator('tbody tr').first()).toContainText('2096 · 1학년 1반 1번');
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'CSV 저장' }).click()]);
+    const csvText = readFileSync((await dl.path())!, 'utf8');
+    expect(csvText.split('\r\n')[0]).toContain('이름,이메일,연도,학번,학년·반·번호,식물');
+    expect(csvText).toContain('가온,sai_209610101@seoulai.sen.hs.kr,2096,10101,1학년 1반 1번,');
+    expect(csvText).not.toContain('teacher@school.example');
+    await only.uncheck();
+    await expect(page.getByText('틀린 학생 3명(100%)')).toBeVisible();
+    await expect(cls.locator('tbody tr')).toHaveCount(3);
+    await only.check();
+    await expect(page.getByText('틀린 학생 2명(100%)')).toBeVisible();
     await page.getByRole('button', { name: '가온' }).click();
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name: '가온' })).toBeVisible();
+    await expect(drawer).toContainText('학번 2096 · 10101 · 1학년 1반 1번');
     await expect(drawer.getByRole('heading', { name: '모의고사 (2회)' })).toBeVisible();
     await expect(drawer).toContainText('랜덤 모의고사 · 시간 종료');
     await expect(drawer).toContainText('27/30');
@@ -194,6 +220,16 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     // 상태순: 잠김 → 자리 비움 → … → 집중 학습 중 → 오프라인
     await expect(grid.locator('.t-live-name')).toHaveText(['나래', '다온', '가온', '라온']);
     const gaon = grid.getByRole('listitem').filter({ hasText: '가온' });
+    await expect(gaon).toContainText('학번 2096 · 10101 · 1학년 1반 1번');
+    // 학생 계정만(기본 켬): 선생님 테스트 계정은 숨김, 끄면 보임, 학번순 정렬
+    await expect(page.getByText('학생 계정이 아닌 1명 숨김')).toBeVisible();
+    await page.getByRole('checkbox', { name: '학생 계정만' }).uncheck();
+    await expect(grid.getByRole('listitem')).toHaveCount(5);
+    await page.getByLabel('정렬').selectOption('sid');
+    await expect(grid.locator('.t-live-name')).toHaveText(['가온', '나래', '다온', '라온', '김선생']);
+    await page.getByRole('checkbox', { name: '학생 계정만' }).check();
+    await page.getByLabel('정렬').selectOption('status');
+    await expect(grid.getByRole('listitem')).toHaveCount(4);
     await expect(gaon).toContainText('집중 학습 중');
     await expect(gaon).toContainText('3단원 · 3단계 기초 객관식');
     await expect(gaon).toContainText('문항 7/20');
@@ -216,6 +252,13 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     // 데이터베이스 탭
     await page.getByRole('tab', { name: '데이터베이스' }).click();
     await expect(page.getByRole('heading', { name: '완료한 단원 수 분포' })).toBeVisible();
+    // 학생 계정만: 선생님 테스트 계정(9,900XP)은 요약·표에서 빠짐, 학번순
+    await expect(page.getByText('학생 계정(학번 형식)이 아닌 1명은 통계·표·CSV에서 뺐어요.')).toBeVisible();
+    await expect(page.locator('.kpi').filter({ hasText: '12단원 모두 완료' }).locator('b')).toHaveText('0');
+    await expect(page.locator('table.data').last().locator('tbody tr th')).toHaveText([/가온/, /다온/]);
+    await page.getByRole('checkbox', { name: '학생 계정만' }).uncheck();
+    await expect(page.locator('.kpi').filter({ hasText: '12단원 모두 완료' }).locator('b')).toHaveText('1');
+    await page.getByRole('checkbox', { name: '학생 계정만' }).check();
     await page.getByRole('button', { name: '다온' }).click();
     await expect(page.getByRole('dialog')).toContainText('반 평균');
     await page.keyboard.press('Escape');

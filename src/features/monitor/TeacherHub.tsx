@@ -5,7 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../auth/supabase';
 import type { CourseConfig } from '../computer/course';
 import { CourseClass, DbClass } from '../computer/pages/Teacher';
-import { supabaseMonitorApi } from './api';
+import { AccountsPanel } from './Accounts';
+import { supabaseAccountsApi, supabaseMonitorApi } from './api';
 import { LiveMonitor } from './LiveMonitor';
 import { SUBJECT_LIST } from './liveState';
 import { useIsTeacher } from './useTeacher';
@@ -13,6 +14,7 @@ import { useIsTeacher } from './useTeacher';
 /**
  * 선생님 화면(/teacher, ?s=과목 ID로 그 탭을 연다). 지정된 선생님 계정만(am_i_teacher), 다른 사람에게는 설명만 보이고 자료는 읽지 않는다.
  * 자료를 읽는 RPC도 서버가 선생님인지 다시 확인한다. 과목 탭은 defs.ts의 과목 목록에서 만든다(새 과목은 자동으로 추가).
+ * 마지막 '계정 관리' 탭: 모든 계정의 구분(관리자·교사·학생·확인 필요), 관리자는 교사·관리자 지정·해제(Accounts.tsx).
  */
 const COURSE_MODULES = import.meta.glob<{ COURSE: CourseConfig }>('../computer/courses/*.tsx');
 
@@ -23,7 +25,7 @@ export async function loadCourse(id: string): Promise<CourseConfig> {
   return (await load()).COURSE;
 }
 
-const TABS = [{ id: 'live', name: '실시간 모니터링' }, ...SUBJECT_LIST.map((s) => ({ id: s.id as string, name: s.name }))];
+const TABS = [{ id: 'live', name: '실시간 모니터링' }, ...SUBJECT_LIST.map((s) => ({ id: s.id as string, name: s.name })), { id: 'accounts', name: '계정 관리' }];
 
 export function TeacherHub() {
   const auth = useAuth();
@@ -35,8 +37,12 @@ export function TeacherHub() {
     const sb = supabase();
     return sb ? supabaseMonitorApi(sb) : null;
   }, []);
+  const accountsApi = useMemo(() => {
+    const sb = supabase();
+    return sb ? supabaseAccountsApi(sb) : null;
+  }, []);
 
-  if (!isSupabaseConfigured || !api) {
+  if (!isSupabaseConfigured || !api || !accountsApi) {
     return <div className="page page-narrow"><h1>선생님 화면</h1><p className="notice notice-warn">로그인 설정(Supabase)이 없어 선생님 화면을 쓸 수 없어요.</p></div>;
   }
   if (auth.status === 'loading' || (auth.identity?.kind === 'user' && teacher === null)) {
@@ -72,7 +78,7 @@ export function TeacherHub() {
         ))}
       </div>
       <section id="t-panel" role="tabpanel" aria-labelledby={`t-tab-${tab}`}>
-        {tab === 'live' ? <LiveMonitor api={api} /> : tab === 'db' ? <DbClass /> : <CourseTab key={tab} id={tab} />}
+        {tab === 'live' ? <LiveMonitor api={api} /> : tab === 'accounts' ? <AccountsPanel api={accountsApi} /> : tab === 'db' ? <DbClass /> : <CourseTab key={tab} id={tab} />}
       </section>
       <p className="small muted">점수와 실시간 상태(위치·집중 상태·잠김 횟수)는 모두 학생 브라우저가 스스로 보내는 기록이라 조작될 수 있어요. 평가 근거가 아니라 학습 지원용으로 활용해 주세요.</p>
     </div>
