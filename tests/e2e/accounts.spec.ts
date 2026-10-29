@@ -28,28 +28,32 @@ function sessionFor(u: { id: string; email: string; name: string }) {
 const ME = { id: 'aaaaaaaa-0000-4000-8000-000000000001', email: 'teacher@school.example', name: '김선생' };
 const STUDENT = { id: 'bbbbbbbb-0000-4000-8000-000000000002', email: 'sai_209610101@seoulai.sen.hs.kr', name: '가온' };
 
-type Row = { user_id: string; email: string; name: string; google: boolean; email_verified: boolean; created_at: string; last_sign_in_at: string | null; kind: string; student_year: number | null; student_no: string | null; has_progress: boolean };
+type Row = { user_id: string | null; email: string; name: string | null; google: boolean; email_verified: boolean; created_at: string | null; last_sign_in_at: string | null; kind: string; student_year: number | null; student_no: string | null; has_progress: boolean; listed_as: string | null };
 const acc = (o: Partial<Row> & Pick<Row, 'user_id' | 'email' | 'name'>): Row => ({
   google: true, email_verified: true, created_at: '2026-09-02T00:00:00Z', last_sign_in_at: '2026-10-28T09:00:00Z', kind: 'unknown',
-  student_year: null, student_no: null, has_progress: false, ...o,
+  student_year: null, student_no: null, has_progress: false, listed_as: null, ...o,
 });
-/** 계정 10개: 확인 필요 4(학교 계정·학교 밖·Google 아님·미인증), 학생 3, 교사(나)·다른 교사·관리자 */
+/**
+ * 11줄: 확인 필요 4(학교 계정·학교 밖·Google 아님(교사 목록에 걸려 있음)·미인증), 등록만 됨 1(로그인한 계정 없는 목록 이메일),
+ * 학생 3, 교사(나)·다른 교사·관리자
+ */
 function accountRows(meKind: 'teacher' | 'admin'): Row[] {
   return [
     acc({ user_id: 'n1', email: 'example.newteacher@seoulai.sen.hs.kr', name: '박선생' }),
     acc({ user_id: 'n2', email: 'friend@example.org', name: '바깥', last_sign_in_at: null }),
-    acc({ user_id: 'n3', email: 'example.pw@seoulai.sen.hs.kr', name: 'pw', google: false }),
+    acc({ user_id: 'n3', email: 'example.pw@seoulai.sen.hs.kr', name: 'pw', google: false, listed_as: 'teacher' }),
     acc({ user_id: 'n4', email: 'unverified@example.org', name: '미인증', email_verified: false }),
-    acc({ user_id: ME.id, email: ME.email, name: ME.name, kind: meKind, last_sign_in_at: '2026-10-29T01:00:00Z' }),
-    acc({ user_id: 'a1', email: 'principal@school.example', name: '최관리', kind: 'admin' }),
-    acc({ user_id: 't2', email: 'teacher2@school.example', name: '이선생', kind: 'teacher' }),
+    acc({ user_id: null, email: 'former.teacher@example.com', name: null, kind: 'listed', listed_as: 'teacher', google: false, email_verified: false, created_at: null, last_sign_in_at: null }),
+    acc({ user_id: ME.id, email: ME.email, name: ME.name, kind: meKind, last_sign_in_at: '2026-10-29T01:00:00Z', listed_as: meKind }),
+    acc({ user_id: 'a1', email: 'principal@school.example', name: '최관리', kind: 'admin', listed_as: 'admin' }),
+    acc({ user_id: 't2', email: 'teacher2@school.example', name: '이선생', kind: 'teacher', listed_as: 'teacher' }),
     acc({ user_id: 's2', email: 'sai_209610102@seoulai.sen.hs.kr', name: '나래', kind: 'student', student_year: 2096, student_no: '10102' }),
     acc({ user_id: 's1', email: 'sai_209610101@seoulai.sen.hs.kr', name: '가온', kind: 'student', student_year: 2096, student_no: '10101', has_progress: true }),
     acc({ user_id: 's3', email: 'sai_209520115@seoulai.sen.hs.kr', name: '다온', kind: 'student', student_year: 2095, student_no: '20115', has_progress: true }),
   ];
 }
-type Audit = { at: string; actor: string | null; actor_email: string | null; actor_name: string | null; target: string | null; target_email: string; target_name: string | null; action: string };
-const BOOT_AUDIT: Audit[] = [{ at: '2026-10-29T00:00:00Z', actor: null, actor_email: null, actor_name: null, target: null, target_email: 'principal@school.example', target_name: null, action: 'grant_admin' }];
+type Audit = { at: string; actor: string | null; actor_email: string | null; actor_name: string | null; target: string | null; target_email: string; target_name: string | null; action: string; note?: string | null };
+const BOOT_AUDIT: Audit[] = [{ at: '2026-10-29T00:00:00Z', actor: null, actor_email: null, actor_name: null, target: null, target_email: 'principal@school.example', target_name: null, action: 'grant_admin', note: '처음 적용 때 교사 목록에서 자동 복사' }];
 
 type Handler = (body: Record<string, unknown> | null) => { status?: number; json: unknown };
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS', 'access-control-expose-headers': '*' };
@@ -83,6 +87,14 @@ async function fakeSupabase(page: Page, who: typeof ME, o: { teacher: boolean; a
     role_audit_list: () => (o.teacher ? { json: audit } : forbidden),
     set_teacher: o.admin ? change('set_teacher') : () => ({ status: 403, json: { code: '42501', message: '관리자만 권한을 바꿀 수 있어요' } }),
     set_admin: o.admin ? change('set_admin') : () => ({ status: 403, json: { code: '42501', message: '관리자만 권한을 바꿀 수 있어요' } }),
+    revoke_listed_email: (body) => {
+      if (!o.admin) return { status: 403, json: { code: '42501', message: '관리자만 권한을 바꿀 수 있어요' } };
+      const i = rows.findIndex((x) => x.kind === 'listed' && x.email === body?.p_email);
+      if (i < 0) return { json: false };
+      rows.splice(i, 1);
+      audit.unshift({ at: new Date().toISOString(), actor: who.id, actor_email: who.email, actor_name: who.name, target: null, target_email: String(body?.p_email), target_name: null, action: 'revoke_teacher', note: '목록의 이메일로 해제' });
+      return { json: true };
+    },
     ...extra,
   };
   await page.route(`${SB_URL}/**`, async (route) => {
@@ -140,16 +152,22 @@ test.describe('선생님 화면: 계정 관리(가짜 로그인)', () => {
     await expect(page.getByText('권한 변경은 관리자만 할 수 있어요.')).toBeVisible();
     // 처음 필터: 확인 필요가 있으니 확인 필요
     await expect(filter(page, /^확인 필요/)).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('group', { name: '구분 필터' }).getByRole('button')).toHaveText(['전체 10', '확인 필요 4', '학생 3', '교사 3', '관리자 1']);
+    await expect(page.getByRole('group', { name: '구분 필터' }).getByRole('button')).toHaveText(['전체 11', '확인 필요 5', '학생 3', '교사 3', '관리자 1']);
     const rows = table(page).locator('tbody tr');
-    await expect(rows).toHaveCount(4);
+    await expect(rows).toHaveCount(5);
+    // 등록만 됨: 목록에만 있고 그 이메일로 로그인한 계정이 없음
+    const listed = rows.filter({ hasText: 'former.teacher@example.com' });
+    await expect(listed).toContainText('등록만 됨');
+    await expect(listed).toContainText('이 이메일로 로그인한 계정 없음');
+    await expect(listed).toContainText('(계정 없음)');
+    await expect(rows.filter({ hasText: 'example.pw@seoulai.sen.hs.kr' })).toContainText('교사 목록에 있음');
     await expect(rows.filter({ hasText: '박선생' })).toContainText('학교 계정이지만 학번 형식 아님');
     await expect(rows.filter({ hasText: '바깥' })).toContainText('학교 밖 계정');
     await expect(rows.filter({ hasText: 'example.pw@seoulai.sen.hs.kr' })).toContainText('Google 로그인 아님');
     await expect(rows.filter({ hasText: '미인증' })).toContainText('이메일 미인증');
     // 읽기 전용: 권한 버튼·열이 없다
     await expect(table(page).getByRole('columnheader', { name: '권한' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /교사로 지정|교사 해제|관리자로 지정|관리자 해제/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /교사로 지정|교사 해제|관리자로 지정|관리자 해제|목록에서 해제/ })).toHaveCount(0);
     // 학생: 학번(연도·학번) 표시, 학번순
     await filter(page, /^학생/).click();
     await expect(rows).toHaveCount(3);
@@ -159,7 +177,7 @@ test.describe('선생님 화면: 계정 관리(가짜 로그인)', () => {
     await expect(rows.first()).toContainText('있음');
     // 검색: 이름·이메일·학번·학년 반
     await filter(page, /^전체/).click();
-    await expect(rows).toHaveCount(10);
+    await expect(rows).toHaveCount(11);
     const search = page.getByRole('searchbox', { name: '계정 검색' });
     await search.fill('10102');
     await expect(rows).toHaveCount(1);
@@ -176,13 +194,13 @@ test.describe('선생님 화면: 계정 관리(가짜 로그인)', () => {
     // 권한 변경 기록(처음 적용)
     await expect(page.getByRole('heading', { name: '권한 변경 기록' })).toBeVisible();
     await expect(page.locator('.acc-audit-list li')).toHaveCount(1);
-    await expect(page.locator('.acc-audit-list li').first()).toContainText('처음 적용(자동) → principal@school.example: 관리자로 지정');
+    await expect(page.locator('.acc-audit-list li').first()).toContainText('자동 → principal@school.example: 관리자로 지정 · 처음 적용 때 교사 목록에서 자동 복사');
     expect(calls.find((c) => c.fn === 'role_audit_list')!.body).toEqual({ p_limit: 20 });
     expect(calls.some((c) => c.fn === 'set_teacher' || c.fn === 'set_admin')).toBe(false);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await filter(page, /^전체/).click();
-    await expect(rows).toHaveCount(10);
+    await expect(rows).toHaveCount(11);
     expect(await noOverflow(page)).toBe(true);
   });
 
@@ -191,11 +209,25 @@ test.describe('선생님 화면: 계정 관리(가짜 로그인)', () => {
     await open(page, '/teacher?s=accounts');
     await expect(page.getByText('관리자는 교사·관리자를 지정하거나 해제할 수 있어요.', { exact: false })).toBeVisible();
     const rows = table(page).locator('tbody tr');
-    await expect(rows).toHaveCount(4);
-    // Google 아님·미인증은 지정 버튼이 꺼져 있고 까닭을 보여 줌
+    await expect(rows).toHaveCount(5);
+    // Google 아님·미인증은 지정 버튼이 꺼져 있고 까닭을 보여 줌. 교사 목록에 걸려 있으면 교사 해제(정리)는 할 수 있다
     await expect(page.getByRole('button', { name: 'pw 교사로 지정' })).toBeDisabled();
     await expect(rows.filter({ hasText: 'example.pw@seoulai.sen.hs.kr' })).toContainText('Google로 로그인한 계정만 지정할 수 있어요.');
+    await expect(page.getByRole('button', { name: 'pw 교사 해제' })).toBeEnabled();
     await expect(page.getByRole('button', { name: '미인증 교사로 지정' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '미인증 교사 해제' })).toHaveCount(0);
+
+    // 등록만 됨: 목록에서 해제(이메일로)
+    await page.getByRole('button', { name: 'former.teacher@example.com 목록에서 해제' }).click();
+    const ldlg = page.getByRole('dialog', { name: '목록에서 해제' });
+    await expect(ldlg).toContainText('등록만 된 이메일(로그인한 계정 없음)');
+    await expect(ldlg).toContainText('former.teacher@example.com');
+    await expect(ldlg).toContainText('목록에서 해제할까요? 이 이메일을 교사·관리자 목록에서 지워요.');
+    await ldlg.getByRole('button', { name: '목록에서 해제' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'former.teacher@example.com: 목록에서 해제했어요.' })).toBeVisible();
+    expect(calls.find((c) => c.fn === 'revoke_listed_email')!.body).toEqual({ p_email: 'former.teacher@example.com' });
+    await expect(rows).toHaveCount(4);
+    await expect(page.locator('.acc-audit-list li').first()).toContainText('목록의 이메일로 해제');
 
     // 취소하면 아무것도 바뀌지 않음
     const grant = page.getByRole('button', { name: '박선생 교사로 지정' });
@@ -270,7 +302,7 @@ test.describe('선생님 화면: 계정 관리(가짜 로그인)', () => {
     // 휴대폰 너비: 카드 모양, 가로 넘침 없음(확인 창 포함)
     await page.setViewportSize({ width: 390, height: 844 });
     await filter(page, /^전체/).click();
-    await expect(rows).toHaveCount(10);
+    await expect(rows).toHaveCount(11);
     expect(await noOverflow(page)).toBe(true);
     await page.getByRole('button', { name: '이선생 교사 해제' }).click();
     await expect(page.getByRole('dialog', { name: '교사 해제' })).toBeVisible();
@@ -296,7 +328,7 @@ test.describe('선생님 화면: 계정 관리(가짜 로그인)', () => {
       await page.setViewportSize({ width: w, height: w > 600 ? 900 : 844 });
       await open(page, '/teacher?s=accounts');
       await filter(page, /^전체/).click();
-      await expect(table(page).locator('tbody tr')).toHaveCount(10);
+      await expect(table(page).locator('tbody tr')).toHaveCount(11);
       await page.screenshot({ path: `${dir}/accounts-${w}.png`, fullPage: true });
       await page.getByRole('button', { name: '박선생 교사로 지정' }).click();
       await expect(page.getByRole('dialog', { name: '교사로 지정' })).toBeVisible();

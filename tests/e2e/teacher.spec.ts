@@ -222,7 +222,7 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     const gaon = grid.getByRole('listitem').filter({ hasText: '가온' });
     await expect(gaon).toContainText('학번 2096 · 10101 · 1학년 1반 1번');
     // 학생 계정만(기본 켬): 선생님 테스트 계정은 숨김, 끄면 보임, 학번순 정렬
-    await expect(page.getByText('학생 계정이 아닌 1명 숨김')).toBeVisible();
+    await expect(page.getByText('학생 계정(학번 형식)이 아닌 1명은 목록·상태별 수에서 뺐어요.')).toBeVisible();
     await page.getByRole('checkbox', { name: '학생 계정만' }).uncheck();
     await expect(grid.getByRole('listitem')).toHaveCount(5);
     await page.getByLabel('정렬').selectOption('sid');
@@ -242,6 +242,8 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     await expect(raon.getByRole('button', { name: '화면 보기 요청' })).toBeDisabled();
     await expect(gaon.getByRole('button', { name: '화면 보기 요청' })).toBeEnabled();
     await page.getByLabel('과목').selectOption('net');
+    // 숨긴 수도 과목 필터를 따른다(선생님 테스트 계정은 컴퓨터 일반에 있음)
+    await expect(page.getByText('목록·상태별 수에 학생 계정(학번 형식)만 넣어요.')).toBeVisible();
     await expect(grid.getByRole('listitem')).toHaveCount(1);
     await expect(grid).toContainText('나래');
     // 5초마다 새로고침
@@ -278,6 +280,23 @@ test.describe('선생님 화면·실시간 학습 위치(가짜 로그인)', () 
     await open(page, '/programming/teacher');
     await expect(page).toHaveURL(/#\/teacher\?s=prog$/);
     await expect(page.getByRole('tab', { name: '프로그래밍' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('학생 계정 형식이 하나도 없으면 학생 계정만을 끈 채로 보여 주고 계정 관리로 안내', async ({ page }) => {
+    const rows = cgRows().map((r, i) => ({ ...r, email: `student${i}@example.org` }));
+    await fakeSupabase(page, TEACHER, true, { course_class_overview: () => ({ json: rows }) });
+    await open(page, '/teacher?s=net');
+    const only = page.getByRole('checkbox', { name: '학생 계정만' });
+    await expect(only).not.toBeChecked();
+    await expect(page.getByText('모든 계정(선생님 테스트 계정 포함)을 넣었어요.')).toBeVisible();
+    await expect(page.locator('.t-only-none')).toHaveText('학생 계정 형식(연도+학번 9자리)으로 확인된 계정이 없어요. 계정 관리에서 확인해 주세요.');
+    await expect(page.locator('table.cg-class tbody tr')).toHaveCount(3);
+    // 직접 켜면 그 값을 따른다(모두 숨김)
+    await only.check();
+    await expect(page.locator('.kpi').first().locator('b')).toHaveText('0');
+    await page.locator('.t-only-none').getByRole('link', { name: '계정 관리' }).click();
+    await expect(page).toHaveURL(/#\/teacher\?s=accounts$/);
+    await expect(page.getByRole('tab', { name: '계정 관리' })).toHaveAttribute('aria-selected', 'true');
   });
 
   test('서버에 migration이 아직 없으면 분명하게 안내', async ({ page }) => {

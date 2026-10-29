@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
-  defaultFilter, filterCounts, FILTER_LABEL, FILTER_ORDER, grantBlock, KIND_LABEL, matchFilter, matchQuery, parsedText, REASON_LABEL, sortAccounts, toAccount,
+  defaultFilter, filterCounts, FILTER_LABEL, FILTER_ORDER, grantBlock, KIND_LABEL, LISTED_LABEL, matchFilter, matchQuery, parsedText, REASON_LABEL, sortAccounts, toAccount,
   type Account, type AccountFilter, type AccountSort,
 } from '../auth/accountKind';
 import { rpcErrorText, type AccountsApi, type RoleAction, type RoleAuditRow } from './api';
@@ -9,7 +9,8 @@ import { forgetTeacher } from './useTeacher';
 
 /**
  * 선생님 화면 '계정 관리' 탭. 선생님은 모든 계정을 구분(관리자·교사·학생·확인 필요)과 함께 읽기만 하고,
- * 관리자만 교사·관리자를 지정·해제한다(서버 set_teacher·set_admin이 다시 확인, 모든 변경은 권한 변경 기록에 남음).
+ * 관리자만 교사·관리자를 지정·해제한다(서버 set_teacher·set_admin·revoke_listed_email이 다시 확인, 모든 변경은 권한 변경 기록에 남음).
+ * 목록에만 있고 그 이메일로 로그인한 계정이 없는 항목은 '등록만 됨'으로 보이고, 관리자가 '목록에서 해제'로 지운다.
  * 학번은 이메일(학번 형식)에서 읽어 보여 줄 뿐 따로 저장하지 않는다.
  */
 const AUDIT_LIMIT = 20;
@@ -17,15 +18,18 @@ const dateText = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString
 const timeText = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-');
 
 const ACTION_LABEL: Record<RoleAction, string> = { grant_teacher: '교사로 지정', revoke_teacher: '교사 해제', grant_admin: '관리자로 지정', revoke_admin: '관리자 해제' };
+/** 화면의 동작: 계정 권한 4가지 + 등록만 된 이메일을 목록에서 지우기 */
+type UiAction = RoleAction | 'revoke_listed';
+const UI_LABEL: Record<UiAction, string> = { ...ACTION_LABEL, revoke_listed: '목록에서 해제' };
 
 interface Pending {
-  action: RoleAction;
+  action: UiAction;
   account: Account;
 }
 
 /** 확인 창에 보여 줄 효과(무엇이 바뀌는지) */
 function effectText(p: Pending, me: string | null): string {
-  const self = p.account.id === me;
+  const self = !!p.account.userId && p.account.userId === me;
   switch (p.action) {
     case 'grant_teacher':
       return '이 계정은 선생님 화면(모든 학생의 학습 기록·실시간 학습 위치·계정 목록)을 볼 수 있게 돼요.';
@@ -35,6 +39,8 @@ function effectText(p: Pending, me: string | null): string {
       return '이 계정은 다른 계정을 교사·관리자로 지정하거나 해제할 수 있게 돼요.';
     case 'revoke_admin':
       return `교사 권한은 그대로 남고, 권한을 바꾸는 버튼만 사라져요.${self ? ' 내 계정이에요.' : ''}`;
+    case 'revoke_listed':
+      return '이 이메일을 교사·관리자 목록에서 지워요. 나중에 이 이메일로 로그인해도 선생님 화면을 볼 수 없어요.';
   }
 }
 
@@ -101,10 +107,14 @@ export function AccountsPanel({ api }: { api: AccountsApi }) {
 
   const run = async (p: Pending) => {
     const on = p.action.startsWith('grant');
-    const changed = p.action.endsWith('teacher') ? await api.setTeacher(p.account.id, on) : await api.setAdmin(p.account.id, on);
+    let changed: boolean;
+    if (p.action === 'revoke_listed') changed = await api.revokeListed(p.account.email);
+    else if (!p.account.userId) throw new Error('계정이 없는 항목이에요.');
+    else changed = p.action.endsWith('teacher') ? await api.setTeacher(p.account.userId, on) : await api.setAdmin(p.account.userId, on);
     setPending(null);
-    setToast(changed ? `${p.account.name} 계정: ${ACTION_LABEL[p.action]}했어요.` : `${p.account.name} 계정은 이미 그 상태예요(바뀐 것 없음).`);
-    if (changed && p.action === 'revoke_teacher' && p.account.id === me) {
+    const who = p.action === 'revoke_listed' ? p.account.email : `${p.account.name} 계정`;
+    setToast(changed ? `${who}: ${UI_LABEL[p.action]}했어요.` : `${who}은(는) 이미 그 상태예요(바뀐 것 없음).`);
+    if (changed && p.action === 'revoke_teacher' && p.account.userId === me) {
       // 내 교사 권한을 해제함 → 이 화면의 자료를 더 읽지 않는다
       if (me) forgetTeacher(me);
       setLostAccess(true);
@@ -174,8 +184,9 @@ export function AccountsPanel({ api }: { api: AccountsApi }) {
                   <Cell label="구분">
                     <span className={`acc-kind kind-${a.kind}`}>{KIND_LABEL[a.kind]}</span>
                     {a.reason && <span className="acc-reason small">{REASON_LABEL[a.reason]}</span>}
+                    {a.listedAs && a.kind !== 'admin' && a.kind !== 'teacher' && <span className="acc-reason small">{LISTED_LABEL[a.listedAs]}</span>}
                   </Cell>
-                  <th scope="row" data-label="이름"><div className="acc-v">{a.name}{a.id === me ? ' (나)' : ''}</div></th>
+                  <th scope="row" data-label="이름"><div className="acc-v">{a.kind === 'listed' ? <span className="muted">(계정 없음)</span> : a.name}{a.userId && a.userId === me ? ' (나)' : ''}</div></th>
                   <Cell label="이메일" className="acc-email">{a.email || '-'}</Cell>
                   <Cell label="학번">
                     {a.sid ? <><span className="acc-sid">{a.sid.year} · {a.sid.no}</span>{parsedText(a.sid) && <span className="acc-sid-p small muted">{parsedText(a.sid)}</span>}</> : '-'}
@@ -199,14 +210,15 @@ export function AccountsPanel({ api }: { api: AccountsApi }) {
             {audit.map((r, i) => (
               <li key={`${r.at}-${i}`}>
                 <span className="small muted">{timeText(r.at)}</span>{' '}
-                <b>{r.actor ? r.actor_name || r.actor_email || '관리자' : '처음 적용(자동)'}</b> → {r.target_name || r.target_email || '-'}
+                <b>{r.actor ? r.actor_name || r.actor_email || '관리자' : '자동'}</b> → {r.target_name || r.target_email || '-'}
                 {r.target_email && r.target_name && r.target_name !== r.target_email && <span className="small muted"> ({r.target_email})</span>}
                 : <span className={`acc-act act-${r.action}`}>{ACTION_LABEL[r.action] ?? r.action}</span>
+                {r.note && <span className="small muted"> · {r.note}</span>}
               </li>
             ))}
           </ol>
         )}
-        <p className="small muted" style={{ margin: '0.4rem 0 0' }}>최근 {AUDIT_LIMIT}건까지 보여요. 처음 적용(자동)은 서버 설정 때 이미 등록된 선생님을 관리자로 옮긴 기록이에요.</p>
+        <p className="small muted" style={{ margin: '0.4rem 0 0' }}>최근 {AUDIT_LIMIT}건까지 보여요. '자동'은 서버 설정(migration)이 한 일이에요: 처음 적용 때 등록된 선생님을 관리자로 복사, 목록에 잘못 들어간 학생 계정 지우기.</p>
       </section>
       {pending && <ConfirmDialog p={pending} me={me} onCancel={() => setPending(null)} onConfirm={run} />}
       <Toast text={toast} />
@@ -229,21 +241,22 @@ function Toast({ text }: { text: string | null }) {
 
 /** 한 계정의 권한 버튼(관리자만). 학생 계정(학번 형식)에는 버튼이 없다 */
 function RowActions({ a, me, adminCount, onPick }: { a: Account; me: string | null; adminCount: number; onPick: (p: Pending) => void }) {
+  const btn = (action: UiAction, extra: { disabled?: boolean; title?: string } = {}) => (
+    <button key={action} className={`btn btn-small${action.startsWith('revoke') ? ' acc-revoke' : ''}`} disabled={extra.disabled} title={extra.title}
+      onClick={() => onPick({ action, account: a })} aria-label={`${a.kind === 'listed' ? a.email : a.name} ${UI_LABEL[action]}`}>
+      {UI_LABEL[action]}
+    </button>
+  );
+  if (a.kind === 'listed') return <div className="acc-btns">{btn('revoke_listed')}</div>;
   if (a.sid) return <span className="small muted" title="학생 계정(학번 형식)은 교사·관리자로 지정할 수 없어요">학생 계정 · 지정 불가</span>;
   const lastAdmin = a.kind === 'admin' && adminCount <= 1;
   const lastTitle = '마지막 관리자는 해제할 수 없어요. 다른 관리자를 먼저 지정해 주세요.';
-  const btn = (action: RoleAction, extra: { disabled?: boolean; title?: string } = {}) => (
-    <button key={action} className={`btn btn-small${action.startsWith('revoke') ? ' acc-revoke' : ''}`} disabled={extra.disabled} title={extra.title}
-      onClick={() => onPick({ action, account: a })} aria-label={`${a.name} ${ACTION_LABEL[action]}`}>
-      {ACTION_LABEL[action]}
-    </button>
-  );
   if (a.kind === 'admin') {
     return (
       <div className="acc-btns">
         {btn('revoke_admin', { disabled: lastAdmin, title: lastAdmin ? lastTitle : undefined })}
         {btn('revoke_teacher', { disabled: lastAdmin, title: lastAdmin ? lastTitle : undefined })}
-        {lastAdmin && <span className="small muted">마지막 관리자{a.id === me ? '(나)' : ''}</span>}
+        {lastAdmin && <span className="small muted">마지막 관리자{a.userId === me ? '(나)' : ''}</span>}
       </div>
     );
   }
@@ -252,6 +265,8 @@ function RowActions({ a, me, adminCount, onPick }: { a: Account; me: string | nu
   return (
     <div className="acc-btns">
       {btn('grant_teacher', { disabled: !!block, title: block ?? undefined })}
+      {/* 목록에 이메일이 있지만 교사 조건(인증·Google)을 못 채운 계정: 그 계정에 묶인 이메일을 목록에서 지운다 */}
+      {a.listedAs && btn('revoke_teacher')}
       {block && <span className="small muted">{block}</span>}
     </div>
   );
@@ -303,7 +318,7 @@ function ConfirmDialog({ p, me, onCancel, onConfirm }: { p: Pending; me: string 
     try {
       await onConfirm(p);
     } catch (e) {
-      setErr(rpcErrorText(p.action.endsWith('teacher') ? 'set_teacher' : 'set_admin', e));
+      setErr(rpcErrorText(p.action === 'revoke_listed' ? 'revoke_listed_email' : p.action.endsWith('teacher') ? 'set_teacher' : 'set_admin', e));
       setBusy(false);
       busyRef.current = false;
     }
@@ -312,20 +327,20 @@ function ConfirmDialog({ p, me, onCancel, onConfirm }: { p: Pending; me: string 
   return (
     <div className="monitor-modal-back acc-modal-back" onClick={(e) => e.target === e.currentTarget && !busy && onCancel()}>
       <div ref={box} className="monitor-modal acc-modal" role="dialog" aria-modal="true" aria-labelledby="acc-dlg-title" aria-describedby="acc-dlg-desc" onKeyDown={trap}>
-        <h2 id="acc-dlg-title">{ACTION_LABEL[p.action]}</h2>
+        <h2 id="acc-dlg-title">{UI_LABEL[p.action]}</h2>
         <div id="acc-dlg-desc" className="stack" style={{ gap: '0.4rem' }}>
           <p style={{ margin: 0 }}>
-            <b>{p.account.name}</b>{p.account.id === me ? ' (나)' : ''}<br />
+            <b>{p.account.kind === 'listed' ? '등록만 된 이메일(로그인한 계정 없음)' : p.account.name}</b>{p.account.userId && p.account.userId === me ? ' (나)' : ''}<br />
             <span className="small acc-email">{p.account.email}</span>
           </p>
-          <p style={{ margin: 0 }}>{ACTION_LABEL[p.action]}할까요? {effectText(p, me)}</p>
+          <p style={{ margin: 0 }}>{UI_LABEL[p.action]}할까요? {effectText(p, me)}</p>
           <p className="small muted" style={{ margin: 0 }}>바꾼 내용은 권한 변경 기록에 남아요.</p>
         </div>
         {err && <p className="notice notice-bad small" role="alert" style={{ margin: '0.6rem 0 0' }}>{err}</p>}
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: '0.9rem' }}>
           <button ref={cancel} className="btn" onClick={onCancel} disabled={busy}>취소</button>
           <button className={`btn btn-primary${revoke ? ' acc-danger' : ''}`} onClick={() => void go()} disabled={busy}>
-            {busy ? '바꾸는 중…' : ACTION_LABEL[p.action]}
+            {busy ? '바꾸는 중…' : UI_LABEL[p.action]}
           </button>
         </div>
       </div>

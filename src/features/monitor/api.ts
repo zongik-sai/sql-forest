@@ -49,8 +49,12 @@ export const MIGRATION_OF: Record<string, string> = {
   account_list: '20261029000000_roles.sql',
   set_teacher: '20261029000000_roles.sql',
   set_admin: '20261029000000_roles.sql',
+  revoke_listed_email: '20261029000000_roles.sql',
   role_audit_list: '20261029000000_roles.sql',
 };
+
+/** 관리자만 부를 수 있는 권한 변경 RPC */
+const ROLE_CHANGE_FNS = ['set_teacher', 'set_admin', 'revoke_listed_email'];
 
 /** 선생님에게 보여 줄 오류 문구(migration 미적용은 분명하게) */
 export function rpcErrorText(fn: string, e: unknown): string {
@@ -61,7 +65,7 @@ export function rpcErrorText(fn: string, e: unknown): string {
   if (x?.code === '22023' && /알 수 없는 과목/.test(x.message ?? '')) {
     return '서버의 과목 목록에 아직 이 과목이 없어요. 관리자가 최신 supabase/migrations/20261026000000_courses.sql을 다시 실행해야 해요.';
   }
-  if (x?.code === '42501') return fn === 'set_teacher' || fn === 'set_admin' ? '관리자 계정만 권한을 바꿀 수 있어요.' : '선생님 계정만 볼 수 있어요.';
+  if (x?.code === '42501') return ROLE_CHANGE_FNS.includes(fn) ? '관리자 계정만 권한을 바꿀 수 있어요.' : '선생님 계정만 볼 수 있어요.';
   if (x?.code === '23505') return '다른 요청이 동시에 처리되고 있어요. 잠시 뒤 다시 시도해 주세요.';
   return x?.message || String(e);
 }
@@ -108,6 +112,8 @@ export interface RoleAuditRow {
   target_email: string | null;
   target_name: string | null;
   action: RoleAction;
+  /** 자동 처리·이메일로 해제 등 까닭(없으면 null) */
+  note?: string | null;
 }
 
 /** 계정 목록(선생님 읽기)·교사/관리자 지정·해제(관리자). 권한은 서버가 다시 확인한다 */
@@ -117,6 +123,8 @@ export interface AccountsApi {
   /** 바뀌었으면 true, 이미 그 상태면 false */
   setTeacher(userId: string, on: boolean): Promise<boolean>;
   setAdmin(userId: string, on: boolean): Promise<boolean>;
+  /** 로그인한 계정이 없는 목록 이메일을 교사·관리자 목록에서 지운다 */
+  revokeListed(email: string): Promise<boolean>;
   audit(limit: number): Promise<RoleAuditRow[]>;
 }
 
@@ -132,6 +140,7 @@ export function supabaseAccountsApi(sb: SupabaseClient): AccountsApi {
     list: async () => (await call<AccountRow[] | null>('account_list')) ?? [],
     setTeacher: async (userId, on) => (await call<boolean>('set_teacher', { p_user: userId, p_on: on })) === true,
     setAdmin: async (userId, on) => (await call<boolean>('set_admin', { p_user: userId, p_on: on })) === true,
+    revokeListed: async (email) => (await call<boolean>('revoke_listed_email', { p_email: email })) === true,
     audit: async (limit) => (await call<RoleAuditRow[] | null>('role_audit_list', { p_limit: limit })) ?? [],
   };
 }

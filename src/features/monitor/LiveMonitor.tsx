@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import { onBeforeSignOut } from '../auth/signOutHooks';
 import { rpcErrorText, type MonitorApi } from './api';
 import { agoText, CHIP_LABEL, CHIP_ORDER, SUBJECT_LIST, sortLive, subjectName, toLiveStudents, type LiveChip, type LiveRow, type LiveSort, type LiveStudent } from './liveState';
+import { OnlyStudentsToggle, useOnlyStudents } from './OnlyStudents';
 import { ViewerSession, type ViewerState } from './rtc';
 
 /**
@@ -21,8 +22,6 @@ export function LiveMonitor({ api }: { api: MonitorApi }) {
   const [minutes, setMinutes] = useState(10);
   const [subject, setSubject] = useState('all');
   const [sort, setSort] = useState<LiveSort>('status');
-  // 학생 계정만(기본 켬): 선생님 테스트 계정 등이 섞이지 않게
-  const [onlyStu, setOnlyStu] = useState(true);
   const [viewer, setViewer] = useState<{ session: ViewerSession; name: string; n: number } | null>(null);
   const viewerRef = useRef<ViewerSession | null>(null);
   const seq = useRef(0);
@@ -86,7 +85,11 @@ export function LiveMonitor({ api }: { api: MonitorApi }) {
   }, []);
 
   const students = useMemo(() => toLiveStudents(rows ?? [], now), [rows, now]);
-  const hidden = onlyStu ? students.filter((s) => !s.sid).length : 0;
+  // 학생 계정만(지금 자료에 학생 계정 형식이 있으면 켬): 선생님 테스트 계정 등이 섞이지 않게
+  const hasStu = students.some((s) => s.sid);
+  const [onlyStu, setOnlyStu] = useOnlyStudents(hasStu);
+  const inSubject = (s: LiveStudent) => subject === 'all' || s.state.subject === subject;
+  const hidden = onlyStu ? students.filter((s) => !s.sid && inSubject(s)).length : 0;
   const shown = useMemo(
     () => sortLive(students.filter((s) => (!onlyStu || s.sid) && (subject === 'all' || s.state.subject === subject)), sort),
     [students, subject, sort, onlyStu],
@@ -137,9 +140,8 @@ export function LiveMonitor({ api }: { api: MonitorApi }) {
             <option value={60}>최근 1시간</option>
           </select>
         </label>
-        <label className="small t-only"><input type="checkbox" checked={onlyStu} onChange={(e) => setOnlyStu(e.target.checked)} /> 학생 계정만</label>
-        {hidden > 0 && <span className="small muted">학생 계정이 아닌 {hidden}명 숨김</span>}
       </div>
+      {rows && <OnlyStudentsToggle on={onlyStu} set={setOnlyStu} hidden={hidden} none={students.length > 0 && !hasStu} scope="목록·상태별 수" />}
       {err && <p className="notice notice-warn" role="alert">불러오지 못했어요: {err}</p>}
       {!rows && !err ? <p role="status">불러오는 중…</p> : rows && (
         <>

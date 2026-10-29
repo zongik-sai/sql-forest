@@ -616,6 +616,7 @@ table.data.acc-table { font-family: var(--font); }
 table.data.acc-table td, table.data.acc-table tbody th { vertical-align: top; white-space: normal; }
 table.data.acc-table th[scope='row'] { background: transparent; font-weight: 700; }
 table.data.acc-table .acc-date, table.data.acc-table .acc-email { white-space: nowrap; }
+table.data.acc-table th[scope='row'] { white-space: nowrap; }
 .acc-table tr[data-kind='unknown'] td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
 .acc-email { font-family: var(--mono); font-size: 0.84rem; }
 .acc-sid { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -625,8 +626,8 @@ table.data.acc-table .acc-date, table.data.acc-table .acc-email { white-space: n
 .acc-kind.kind-teacher { color: var(--moss-strong); border-color: var(--moss); background: var(--moss-soft); }
 .acc-kind.kind-student { color: var(--ink-soft); border-color: var(--line); background: var(--surface-2); }
 .acc-kind.kind-unknown { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
-.acc-reason { display: block; color: var(--warn); margin-top: 0.15rem; min-width: 9.5rem; max-width: 12rem; line-height: 1.35; }
-.acc-btns { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; min-width: 11rem; max-width: 16rem; }
+.acc-reason { display: block; color: var(--warn); margin-top: 0.15rem; min-width: 8.5rem; max-width: 10.5rem; line-height: 1.35; }
+.acc-btns { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; min-width: 10rem; max-width: 12.5rem; }
 .acc-btns .btn { white-space: nowrap; }
 .acc-btns .small { flex-basis: 100%; line-height: 1.35; }
 .acc-revoke { color: var(--bad); }
@@ -659,3 +660,11 @@ table.data.acc-table .acc-date, table.data.acc-table .acc-email { white-space: n
   .acc-btns { min-width: 0; max-width: none; }
   .acc-toasts { left: 1rem; right: 1rem; max-width: none; }
 }
+/* 등록만 됨(로그인한 계정 없는 목록 이메일)·학생 계정 형식이 없을 때 안내 */
+.acc-kind.kind-listed { color: var(--warn); border-color: var(--warn); border-style: dashed; background: transparent; }
+.acc-table tr[data-kind='listed'] td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+@media (max-width: 640px) {
+  .acc-table tr[data-kind='listed'] { border-left: 4px dashed var(--warn); }
+  .acc-table tr[data-kind='listed'] td:first-child { box-shadow: none; }
+}
+.t-only-none { flex-basis: 100%; margin: 0; }

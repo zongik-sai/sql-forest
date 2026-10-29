@@ -4,6 +4,7 @@ import { PLANT_STAGES } from '../../../components/Plant';
 import { compareStudentNo, onlyStudents, parsedText, studentId, studentNoText, type StudentId } from '../../auth/accountKind';
 import { supabase } from '../../auth/supabase';
 import { rpcErrorText } from '../../monitor/api';
+import { OnlyStudentsToggle, useOnlyStudents } from '../../monitor/OnlyStudents';
 import { useCourse, type CourseConfig } from '../course';
 import { LOCK_LIMIT, MOCK_LABEL, type MockKind } from '../model';
 import {
@@ -78,18 +79,6 @@ export function Drawer({ title, sub, onClose, children }: { title: string; sub?:
   );
 }
 
-/** '학생 계정만'(기본 켬): 학번 형식이 아닌 계정(선생님 테스트 계정 등)을 반 통계·표·CSV에서 뺀다 */
-function OnlyStudentsToggle({ on, set, hidden }: { on: boolean; set: (v: boolean) => void; hidden: number }) {
-  return (
-    <div className="row t-only-row">
-      <label className="small t-only"><input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} /> 학생 계정만</label>
-      <span className="small muted">
-        {on ? (hidden > 0 ? `학생 계정(학번 형식)이 아닌 ${hidden}명은 통계·표·CSV에서 뺐어요.` : '통계·표·CSV에 학생 계정(학번 형식)만 넣어요.') : '모든 계정(선생님 테스트 계정 포함)을 넣었어요.'}
-      </span>
-    </div>
-  );
-}
-
 /** 표의 학번 칸: 학번 5자리, 아래 작게 연도·학년 반 번호 */
 function SidCell({ sid }: { sid: StudentId | null }) {
   if (!sid) return <td className="muted">-</td>;
@@ -110,12 +99,14 @@ export function CourseClass({ course }: { course: CourseConfig }) {
   const fn = course.remote.kind === 'cg' ? 'cg_class_overview' : 'course_class_overview';
   const args = course.remote.kind === 'cg' ? undefined : { p_course: course.remote.course };
   const { rows, err, reload } = useRpc<CgClassRow>(fn, args);
-  const [only, setOnly] = useState(true);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<{ k: SortKey; desc: boolean }>({ k: 'sid', desc: false });
   const [open, setOpen] = useState<string | null>(null);
   const [allQ, setAllQ] = useState(false);
   const all = useMemo(() => (rows ? toStudents(rows, course) : []), [rows, course]);
+  // 학생 계정만(학생 계정 형식이 하나도 없으면 처음에는 끔 + 안내)
+  const hasStu = all.some((s) => s.sid);
+  const [only, setOnly] = useOnlyStudents(hasStu);
   // 반 통계(요약·통과율·많이 틀린 문항)·표·CSV 모두 이 목록을 따른다
   const students = useMemo(() => onlyStudents(all, only), [all, only]);
   const hidden = all.length - students.length;
@@ -151,7 +142,7 @@ export function CourseClass({ course }: { course: CourseConfig }) {
   const sel = open ? all.find((s) => s.id === open) : undefined;
   return (
     <div className="stack">
-      <OnlyStudentsToggle on={only} set={setOnly} hidden={hidden} />
+      <OnlyStudentsToggle on={only} set={setOnly} hidden={hidden} none={all.length > 0 && !hasStu} scope="통계·표·CSV" />
       <div className="kpis">
         <div className="kpi"><b>{sum.n}</b><span>학생</span></div>
         <div className="kpi"><b>{sum.active7}</b><span>최근 7일 학습</span></div>
@@ -318,11 +309,12 @@ const dbLevel = (xp: number) => Math.min(99, Math.floor(xp / 100));
 type DbSort = 'sid' | 'recent' | 'name' | 'xp';
 export function DbClass() {
   const { rows, err, reload } = useRpc<DbRow>('db_class_overview');
-  const [only, setOnly] = useState(true);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<DbSort>('sid');
   const [open, setOpen] = useState<string | null>(null);
   const all = useMemo(() => (rows ?? []).map((r) => ({ ...r, sid: studentId(r.email) })), [rows]);
+  const hasStu = all.some((r) => r.sid);
+  const [only, setOnly] = useOnlyStudents(hasStu);
   // 요약·평균·분포·표·CSV 모두 이 목록을 따른다
   const base = useMemo(() => (only ? all.filter((r) => r.sid) : all), [all, only]);
   const hidden = all.length - base.length;
@@ -353,7 +345,7 @@ export function DbClass() {
   const sel = open ? all.find((r) => r.user_id === open) : undefined;
   return (
     <div className="stack">
-      <OnlyStudentsToggle on={only} set={setOnly} hidden={hidden} />
+      <OnlyStudentsToggle on={only} set={setOnly} hidden={hidden} none={all.length > 0 && !hasStu} scope="통계·표·CSV" />
       <div className="kpis">
         <div className="kpi"><b>{n}</b><span>학생</span></div>
         <div className="kpi"><b>{base.filter((r) => r.last_activity && Date.parse(r.last_activity) >= week).length}</b><span>최근 7일 학습</span></div>
