@@ -34,13 +34,15 @@ export interface McqResult {
   orders: Record<string, number[]>;
 }
 
-export function McqRunner<T extends McqItem>({ items, storageKey, onAnswer, onFinish, finishLabel = '결과 보기' }: {
+export function McqRunner<T extends McqItem>({ items, storageKey, onAnswer, onFinish, finishLabel = '결과 보기', hideScore = false }: {
   items: T[];
   /** 진행 상태 저장 키(같은 문항 세트일 때만 이어 풀기) */
   storageKey: string;
   onAnswer: (q: T, correct: boolean) => void;
   onFinish: (r: McqResult) => void;
   finishLabel?: string;
+  /** 풀이 중 '맞힘 n' 숨기기(실력점검: 학생에게는 최고점·누적 점수만) */
+  hideScore?: boolean;
 }) {
   const ids = useMemo(() => items.map((q) => q.id), [items]);
   const [run, setRun] = useState<RunState>(() => {
@@ -83,7 +85,7 @@ export function McqRunner<T extends McqItem>({ items, storageKey, onAnswer, onFi
   return (
     <div className="stack">
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <span className="small muted">{run.idx + 1} / {items.length}문항 · 맞힘 {score}</span>
+        <span className="small muted">{run.idx + 1} / {items.length}문항{hideScore ? '' : ` · 맞힘 ${score}`}</span>
         <div className="cg-progress" aria-hidden="true"><span style={{ width: `${(Object.keys(run.answers).length / items.length) * 100}%` }} /></div>
       </div>
       <div className="panel stack">
@@ -129,10 +131,10 @@ export function McqRunner<T extends McqItem>({ items, storageKey, onAnswer, onFi
 }
 
 /** 풀이 후 틀린 문항 복습 카드 */
-export function ReviewCard({ q, n, picked, order, unansweredNote = true }: { q: McqItem; n?: number; picked: number | undefined; order?: number[]; unansweredNote?: boolean }) {
+export function ReviewCard({ q, n, picked, order, unansweredNote = true, open }: { q: McqItem; n?: number; picked: number | undefined; order?: number[]; unansweredNote?: boolean; open?: boolean }) {
   const ord = order ?? q.options.map((_, i) => i);
   return (
-    <details className="panel cg-review">
+    <details className="panel cg-review" open={open}>
       <summary>{n !== undefined ? `${n}. ` : ''}{q.question}</summary>
       {q.code && <CodeBlock code={q.code} label="문제 코드" />}
       <ol className="cg-opts" style={{ listStyle: 'none', paddingLeft: 0 }}>

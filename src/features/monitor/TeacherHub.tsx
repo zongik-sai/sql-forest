@@ -26,12 +26,15 @@ export async function loadCourse(id: string): Promise<CourseConfig> {
 }
 
 const TABS = [{ id: 'live', name: '실시간 모니터링' }, ...SUBJECT_LIST.map((s) => ({ id: s.id as string, name: s.name })), { id: 'accounts', name: '계정 관리' }];
+const LEGACY_TABS: Record<string, string> = { bin: 'basic', ip: 'basic' };
 
 export function TeacherHub() {
   const auth = useAuth();
   const teacher = useIsTeacher();
   const [params, setParams] = useSearchParams();
-  const raw = params.get('s');
+  // 예전 보충 학습 탭 주소(?s=bin·ip)는 기초 다듬기 탭으로(2026-11-09 합침)
+  const asked = params.get('s');
+  const raw = asked && Object.hasOwn(LEGACY_TABS, asked) ? LEGACY_TABS[asked] : asked;
   const tab = TABS.some((t) => t.id === raw) ? raw! : 'live';
   const api = useMemo(() => {
     const sb = supabase();

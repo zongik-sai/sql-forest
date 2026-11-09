@@ -5,38 +5,50 @@ import { useAuth } from '../../auth/AuthContext';
 import { unitHasContent, useCourse, type CourseId } from '../course';
 import { NEW_COURSES } from '../courses/defs';
 import { activeWrongIds, bestRegularMock, isPassed, nextPlantGoal, passedCount, plantStage, plantThresholds, unitLevel } from '../model';
+import { selfCheckLine } from '../selfCheck';
 import { useCg } from '../store';
 import { CG_LEVELS, CG_LEVEL_NAME } from '../types';
 
 const stageRule = (total: number, mockNeed: number) => ['시작', ...plantThresholds(total).map((n) => `${n}단계`), `꽃 + 모의 ${mockNeed}점`];
 
-/** 보충 학습 과목(2진법 이해·IP 이해) */
-const SUPPLEMENTS = NEW_COURSES.filter((c) => c.group === 'supplement');
-/** 기초(2진법·IP 주소)가 필요한 과목: 과목 홈에 보충 학습 안내를 작게 둔다 */
-const NEEDS_SUPPLEMENT: readonly CourseId[] = ['net', 'cg'];
-/** 네트워크 3단원(IP 주소와 서브네팅): 보충 학습을 마치고 이어 갈 곳 */
-const NET_IP_UNIT = '/network/unit/U3';
+/** 기초 다듬기(진법·오류 정정·IP·서브네팅): 네트워크·컴퓨터 일반 홈에 작은 안내, 기초 다듬기 홈에서 다시 이어 갈 곳 */
+const BASICS = NEW_COURSES.find((c) => c.group === 'foundation');
+/**
+ * 기초 다듬기 안내를 둘 과목과, 그 과목 단원 바로 앞에 익히면 좋은 기초 다듬기 단원.
+ * 네트워크 2단원(데이터 통신: 오류 검출·정정) ← 4단원 패리티·해밍 코드, 3단원(IP 주소와 서브네팅) ← 9단원 서브네팅 계산
+ */
+const BRIDGES: Partial<Record<CourseId, { before: string; unit: string; label: string }[]>> = {
+  cg: [],
+  net: [
+    { before: '2단원(오류 제어) 전에', unit: 'U4', label: '패리티·해밍 코드' },
+    { before: '3단원(IP·서브네팅) 전에', unit: 'U9', label: '서브네팅 계산' },
+  ],
+};
+/** 기초 다듬기를 마치고 이어 갈 네트워크 단원 */
+const NEXT_AFTER_BASICS = [
+  { to: '/network/unit/U2', label: '네트워크 2단원(오류 제어)' },
+  { to: '/network/unit/U3', label: '3단원(IP·서브네팅)' },
+];
 
-/** 기초가 어려운 학생에게 보충 학습 과목 안내(네트워크·컴퓨터 일반 홈) */
-function SupplementBridge() {
-  if (!SUPPLEMENTS.length) return null;
+/** 네트워크·컴퓨터 일반 홈: 기초 다듬기 안내 */
+function BasicsBridge({ id }: { id: CourseId }) {
+  const links = BRIDGES[id];
+  if (!BASICS || !links) return null;
   return (
     <p className="small cg-bridge" style={{ margin: 0 }}>
-      기초가 어렵다면:{' '}
-      {SUPPLEMENTS.map((c, i) => (
-        <span key={c.id}>{i > 0 && ' · '}<Link to={c.path}>{c.name}</Link></span>
-      ))}{' '}
-      <span className="muted">(보충 학습)</span>
+      <Link to={BASICS.path}>{BASICS.name}</Link>: 진법·오류 정정(패리티·해밍 코드·CRC)·IP·서브네팅을 짧게 먼저 익혀요.
+      {links.map((l) => (
+        <span key={l.unit}> · {l.before} <Link to={`${BASICS.path}/unit/${l.unit}`}>{l.label}</Link></span>
+      ))}
     </p>
   );
 }
 
-/** 보충 학습 과목 홈: 다 익힌 뒤 이어 갈 곳 */
-function SupplementNext({ id }: { id: CourseId }) {
-  const ip = NEW_COURSES.find((c) => c.id === 'ip');
+/** 기초 다듬기 홈: 다 익힌 뒤 이어 갈 곳 */
+function BasicsNext() {
   return (
     <p className="small muted cg-bridge-back" style={{ margin: 0 }}>
-      다 익혔다면 {id === 'bin' && ip && <><Link to={ip.path}>{ip.name}</Link>나 </>}<Link to={NET_IP_UNIT}>네트워크 3단원</Link>으로
+      다 익혔다면 {NEXT_AFTER_BASICS.map((n, i) => <span key={n.to}>{i > 0 && '·'}<Link to={n.to}>{n.label}</Link></span>)}으로
     </p>
   );
 }
@@ -91,7 +103,7 @@ export function CgHome() {
       <section aria-labelledby="units-h" className="stack">
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h2 id="units-h" style={{ margin: 0 }}>단원</h2>
-          <span className="small muted">단원마다 이론·개념 맞추기 → 전체 끼워맞추기 → 기초 → 요약 → 실력점검</span>
+          <span className="small muted">단원마다 이론·개념 맞추기 → 전체 끼워맞추기 → 기초 → 요약 → {course.selfCheck ? `${course.selfCheck.size}문항 실력점검` : '실력점검'}</span>
         </div>
         <div className="cg-units">
           {course.units.map((u, i) => {
@@ -108,13 +120,16 @@ export function CgHome() {
                   <b>{u.title}</b>
                   <span className="cg-steps" aria-label={`레벨 ${lv}/5`}>
                     {CG_LEVELS.map((l) => (
-                      <span key={l} className={isPassed(s, u.id, l) ? 'on' : ''} title={`${l}단계 ${CG_LEVEL_NAME[l]}${isPassed(s, u.id, l) ? ' 통과' : ''}`} />
+                      <span key={l} className={isPassed(s, u.id, l) ? 'on' : ''} title={`${l}단계 ${CG_LEVEL_NAME[l]}${isPassed(s, u.id, l) ? (course.selfCheck && l === 5 ? ' 마침' : ' 통과') : ''}`} />
                     ))}
                   </span>
                   <span className="small muted">
-                    {unitHasContent(u) ? <>레벨 {lv}/5{nextLv ? ` · 다음: ${CG_LEVEL_NAME[nextLv]}` : ' · 모두 통과'}</> : '내용 준비 중'}
+                    {unitHasContent(u) ? <>레벨 {lv}/5{nextLv ? ` · 다음: ${CG_LEVEL_NAME[nextLv]}` : course.selfCheck ? ' · 모두 마침' : ' · 모두 통과'}</> : '내용 준비 중'}
                     {course.id !== 'cg' && areas.length > 0 && ` · ${areas.join(', ')}`}
                   </span>
+                  {course.selfCheck && unitHasContent(u) && (
+                    <span className={`small cg-selfcheck${s.checks?.[u.id] ? '' : ' none'}`}>{selfCheckLine(s.checks?.[u.id], course.selfCheck.size)}</span>
+                  )}
                 </span>
               </Link>
             );
@@ -122,8 +137,8 @@ export function CgHome() {
         </div>
       </section>
 
-      {NEEDS_SUPPLEMENT.includes(course.id) && <SupplementBridge />}
-      {SUPPLEMENTS.some((c) => c.id === course.id) && <SupplementNext id={course.id} />}
+      <BasicsBridge id={course.id} />
+      {BASICS?.id === course.id && <BasicsNext />}
 
       <section className="row">
         <Link className="btn btn-primary" to={`${base}/mock`}>모의고사 보기</Link>

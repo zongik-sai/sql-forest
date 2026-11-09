@@ -13,8 +13,11 @@ describe('학습 위치: 경로 → 과목·단원·단계 이름', () => {
   it('단원 × 5단계 과목', () => {
     expect(deriveLocation('/computer/unit/U3/3')).toEqual({ subject: 'cg', unit: 'U3', step: '3', label: '3단원 · 3단계 기초 객관식', activity: true });
     expect(deriveLocation('/network/unit/U1')).toMatchObject({ subject: 'net', unit: 'U1', step: null, label: '1단원 · 단원 보기' });
-    expect(deriveLocation('/binary/unit/U2/5')).toMatchObject({ subject: 'bin', label: '2단원 · 5단계 실력점검' });
-    expect(deriveLocation('/ip/mock/set1')).toMatchObject({ subject: 'ip', step: 'mock:set1', label: '모의고사 1회', activity: true });
+    // 기초 다듬기 5단계는 10문항 실력점검(자기 점검)
+    expect(deriveLocation('/basics/unit/U2/5')).toMatchObject({ subject: 'basic', label: '2단원 · 실력점검' });
+    expect(deriveLocation('/basics/mock/set1')).toMatchObject({ subject: 'basic', step: 'mock:set1', label: '모의고사 1회', activity: true });
+    // 예전 보충 학습 주소는 과목이 아님(앱이 기초 다듬기로 바로 보낸다)
+    expect(deriveLocation('/binary/unit/U2/5')).toMatchObject({ subject: null });
     expect(deriveLocation('/data/mock')).toMatchObject({ subject: 'data', label: '모의고사 목록', activity: false });
     expect(deriveLocation('/programming/wrong')).toMatchObject({ subject: 'prog', label: '오답노트' });
     expect(deriveLocation('/programming')).toMatchObject({ subject: 'prog', label: '단원 목록' });
@@ -34,9 +37,9 @@ describe('학습 위치: 경로 → 과목·단원·단계 이름', () => {
     expect(cleanPath('/a b<>"c')).toBe('/abc');
     expect(cleanPath('/'.repeat(300)).length).toBe(200);
   });
-  it('과목 목록: 데이터베이스·컴퓨터 일반 + defs.ts의 모든 과목(보충 학습 포함)', () => {
-    expect(SUBJECT_LIST.map((s) => s.id)).toEqual(['db', 'cg', 'net', 'prog', 'data', 'bin', 'ip']);
-    expect(SUBJECT_LIST.map((s) => s.name)).toEqual(['데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data', '2진법 이해', 'IP 이해']);
+  it('과목 목록: 데이터베이스·컴퓨터 일반 + defs.ts의 모든 과목(기초 다듬기 포함)', () => {
+    expect(SUBJECT_LIST.map((s) => s.id)).toEqual(['db', 'cg', 'net', 'prog', 'data', 'basic']);
+    expect(SUBJECT_LIST.map((s) => s.name)).toEqual(['데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data', '기초 다듬기']);
   });
 });
 

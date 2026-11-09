@@ -3,7 +3,7 @@ import { PGlite, type Transaction } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * 새 과목(네트워크·프로그래밍·Data, 보충 학습 2진법 이해·IP 이해) 기록(course_progress)·선생님 과목별 반 현황 RPC를 실제 Postgres 엔진(PGlite)에서 검사한다.
+ * 새 과목(네트워크·프로그래밍·Data·기초 다듬기, 예전 보충 학습 2진법 이해·IP 이해) 기록(course_progress)·선생님 과목별 반 현황 RPC를 실제 Postgres 엔진(PGlite)에서 검사한다.
  * Supabase 방식(authenticated 역할 + JWT sub)을 흉내 내며, 실제 Supabase 프로젝트 검증은 별도.
  */
 const S1 = '11111111-1111-1111-1111-111111111111';
@@ -76,7 +76,15 @@ describe('course_progress: 본인 기록만, 과목마다 한 행', () => {
     await expect(as(S1, (tx) => tx.query(`insert into public.course_progress(user_id, course, state) values ($1, 'math', '{}')`, [S1]))).rejects.toThrow(/check constraint/);
     await expect(as(S1, (tx) => tx.query(`insert into public.course_progress(user_id, course, state) values ($1, 'cg', '{}')`, [S1]))).rejects.toThrow(/check constraint/);
   });
-  it('보충 학습 과목(bin·ip)도 과목마다 따로 저장', async () => {
+  it('기초 다듬기(basic)도 과목마다 따로 저장(실력점검 기록 포함 JSON 그대로)', async () => {
+    const st = { v: 1, units: { U1: { lv5: { passedAt: '2026-11-09T00:00:00.000Z' } } }, checks: { U1: { best: 8, sum: 15, n: 2, hist: [{ at: '2026-11-09T00:00:00.000Z', score: 7 }, { at: '2026-11-09T00:05:00.000Z', score: 8 }] } }, importedLegacy: true };
+    expect(await save(S2, 'basic', st, 0)).toEqual({ status: 'ok', revision: 1 });
+    expect(await save(S2, 'basic', { ...st, upd: 'x' }, 1)).toEqual({ status: 'ok', revision: 2 });
+    expect(await save(S2, 'basic', st, 1)).toMatchObject({ status: 'conflict', revision: 2, state: { checks: { U1: { best: 8, n: 2 } } } });
+    await expect(save(S2, 'BASIC', st, 0)).rejects.toThrow(/알 수 없는 과목/);
+    await expect(save(S2, 'basics', st, 0)).rejects.toThrow(/알 수 없는 과목/);
+  });
+  it('예전 보충 학습 과목(bin·ip)도 예전 행 그대로 저장·읽기(기초 다듬기가 처음 한 번 읽어 옮김)', async () => {
     expect(await save(S2, 'bin', { v: 1, units: { U1: {} } }, 0)).toEqual({ status: 'ok', revision: 1 });
     expect(await save(S2, 'bin', { v: 1, units: { U1: {}, U3: {} } }, 1)).toEqual({ status: 'ok', revision: 2 });
     expect(await save(S2, 'ip', { v: 1, units: { U2: {} } }, 0)).toEqual({ status: 'ok', revision: 1 });
@@ -134,17 +142,29 @@ describe('선생님 과목별 반 학습 현황(읽기 전용)', () => {
     expect(byId[S2]).toMatchObject({ name: '나래', email: 's2@school.example', state: { v: 1, units: { U5: {} } } });
     expect((await overview(T, 'prog')).map((r) => r.user_id)).toEqual([S1]);
     expect((await overview(T, 'data')).map((r) => r.user_id)).toEqual([S1]);
-    // 보충 학습 과목
+    // 예전 보충 학습 과목(행은 그대로 남음)
     const bin = await overview(T, 'bin');
     expect(bin.map((r) => [r.user_id, r.name, r.state])).toEqual([[S2, '나래', { v: 1, units: { U1: {}, U3: {} } }]]);
     expect((await overview(T, 'ip')).map((r) => r.user_id)).toEqual([S2]);
+    // 기초 다듬기: 선생님은 실력점검 회차 기록까지 그대로 받는다
+    const basic = await overview(T, 'basic');
+    expect(basic.map((r) => r.user_id)).toEqual([S2]);
+    expect(basic[0].state).toMatchObject({ checks: { U1: { best: 8, sum: 15, n: 2 } }, upd: 'x' });
   });
   it('모르는 과목은 거부', async () => {
     await expect(overview(T, 'cg')).rejects.toThrow(/알 수 없는 과목/);
     await expect(overview(T, 'xx')).rejects.toThrow(/알 수 없는 과목/);
     await expect(overview(T, null as unknown as string)).rejects.toThrow(/알 수 없는 과목/);
   });
-  it('예전 판(과목 3개 제약)으로 만든 표에 다시 적용해도 bin·ip가 열린다', async () => {
+  it('학생은 자기 예전 행(bin·ip)을 기초 다듬기 옮기기용으로 읽을 수 있다(본인 행만, RLS)', async () => {
+    await save(S1, 'bin', { v: 1, units: { U2: {} } }, 0);
+    const mine = await as(S1, (tx) => tx.query<{ user_id: string; course: string }>(`select user_id, course from public.course_progress where course in ('bin', 'ip') order by course`));
+    expect(mine.rows).toEqual([{ user_id: S1, course: 'bin' }]);
+    const theirs = await as(S2, (tx) => tx.query<{ user_id: string; course: string }>(`select user_id, course from public.course_progress where course in ('bin', 'ip') order by course`));
+    expect(theirs.rows).toEqual([{ user_id: S2, course: 'bin' }, { user_id: S2, course: 'ip' }]);
+    await as(S1, (tx) => tx.query(`delete from public.course_progress where course = 'bin'`));
+  });
+  it('예전 판(과목 3개 제약)으로 만든 표에 다시 적용해도 bin·ip·basic이 열린다', async () => {
     const old = new PGlite();
     await old.exec(readFileSync('tests/db/supabase-shim.sql', 'utf8'));
     for (const f of ['20261001000000_sql_forest_v2.sql', '20261007000000_computer_general.sql', '20261015000000_unit_reset.sql', '20261016000000_unit_reset_stages.sql']) {
@@ -156,7 +176,16 @@ describe('선생님 과목별 반 학습 현황(읽기 전용)', () => {
     await old.exec(readFileSync('supabase/migrations/20261026000000_courses.sql', 'utf8'));
     const cons = await old.query<{ def: string }>(`select pg_get_constraintdef(oid) as def from pg_constraint where conrelid = 'public.course_progress'::regclass and contype = 'c' and conname like '%course%'`);
     expect(cons.rows).toHaveLength(1);
-    expect(cons.rows[0].def).toMatch(/'bin'.*'ip'/);
+    expect(cons.rows[0].def).toMatch(/'bin'.*'ip'.*'basic'/);
+    // 운영에는 bin·ip까지 있는 판이 이미 적용돼 있다: 그 판에 다시 적용해도(여러 번) basic 저장이 된다
+    await old.exec(readFileSync('supabase/migrations/20261026000000_courses.sql', 'utf8'));
+    await old.query(`insert into auth.users(id, email, email_confirmed_at) values ($1, 'x@school.example', now())`, [S1]);
+    const r = await old.transaction(async (tx) => {
+      await tx.exec('set local role authenticated');
+      await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [S1]);
+      return (await tx.query<{ r: Save }>(`select public.save_course_progress('basic', '{"v":1}'::jsonb, 0) as r`)).rows[0].r;
+    });
+    expect(r).toEqual({ status: 'ok', revision: 1 });
     await old.close();
   }, 60000);
   it('선생님도 학생 기록을 직접 수정·삭제할 수 없다(읽기만)', async () => {

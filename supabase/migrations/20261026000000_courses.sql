@@ -1,6 +1,9 @@
 -- =====================================================================
--- 새 과목(네트워크·프로그래밍·Data, 보충 학습 2진법 이해·IP 이해) 학습 기록 + 선생님 반 학습 현황(2026-10-26)
--- 과목 ID: net·prog·data(8단원), bin·ip(보충 학습 3단원). 컴퓨터 일반(cg)은 cg_progress를 그대로 쓴다.
+-- 새 과목(네트워크·프로그래밍·Data·기초 다듬기) 학습 기록 + 선생님 반 학습 현황(2026-10-26, 2026-11-09 기초 다듬기 추가)
+-- 과목 ID: net·prog·data, basic(기초 다듬기 10단원, 2026-11-09). 컴퓨터 일반(cg)은 cg_progress를 그대로 쓴다.
+-- bin·ip(예전 보충 학습 2진법 이해·IP 이해, 3단원)는 기초 다듬기로 합쳤다. 예전 행은 그대로 두고(앱이 처음 한 번 읽어
+-- 기초 다듬기로 옮긴다) 목록에서도 빼지 않는다(예전 행 저장·읽기가 계속 되게).
+-- 이미 운영에 적용된 파일이다: 과목이 늘면 이 파일을 SQL Editor에서 다시 실행한다(제약은 지우고 다시 만들고, 함수는 create or replace).
 -- 모두 컴퓨터 일반과 같은 구조(단원 × 5단계 · 모의고사 · 오답노트)이고 기록 형식(JSON 문서)도 같다.
 -- 적용: 20261007000000_computer_general.sql 다음에 SQL Editor에서 실행(여러 번 실행해도 안전)
 -- 원칙(컴퓨터 일반 cg_progress와 같음)
@@ -28,7 +31,7 @@ create table if not exists public.course_progress (
 -- 과목 목록: 이 파일을 다시 실행하면(과목이 늘어난 판) 기존 표의 제약도 새 목록으로 바뀐다
 alter table public.course_progress drop constraint if exists course_progress_course_check;
 alter table public.course_progress add constraint course_progress_course_check
-  check (course in ('net', 'prog', 'data', 'bin', 'ip'));
+  check (course in ('net', 'prog', 'data', 'bin', 'ip', 'basic'));
 
 create or replace function private.course_bump_revision() returns trigger
 language plpgsql set search_path = '' as $$
@@ -76,7 +79,7 @@ create or replace function public.save_course_progress(p_course text, p_state js
 returns jsonb language plpgsql security invoker set search_path = '' as $$
 declare v_uid uuid := private.require_uid(); r public.course_progress%rowtype;
 begin
-  if p_course is null or p_course not in ('net', 'prog', 'data', 'bin', 'ip') then
+  if p_course is null or p_course not in ('net', 'prog', 'data', 'bin', 'ip', 'basic') then
     raise exception '알 수 없는 과목입니다' using errcode = '22023';
   end if;
   select * into r from public.course_progress where user_id = v_uid and course = p_course for update;
@@ -108,7 +111,7 @@ begin
   if not private.is_teacher() then
     raise exception '선생님 계정만 볼 수 있어요' using errcode = '42501';
   end if;
-  if p_course is null or p_course not in ('net', 'prog', 'data', 'bin', 'ip') then
+  if p_course is null or p_course not in ('net', 'prog', 'data', 'bin', 'ip', 'basic') then
     raise exception '알 수 없는 과목입니다' using errcode = '22023';
   end if;
   return query

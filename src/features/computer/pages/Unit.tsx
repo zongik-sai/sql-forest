@@ -5,8 +5,9 @@ import { useAuth } from '../../auth/AuthContext';
 import { unitHasContent, useCourse } from '../course';
 import { CodeBlock, McqRunner, ReviewCard, type McqResult } from '../McqRunner';
 import { CardMatch } from '../../../components/CardMatch';
-import { shuffle } from '../mock';
-import { cardsDone, isOpen, isPassed, markCard, markDone, noteAnswer, passNeed, recordScore, unitLevel } from '../model';
+import { drawSelfCheck, shuffle } from '../mock';
+import { cardsDone, isOpen, isPassed, markCard, markDone, noteAnswer, passNeed, recordScore, recordSelfCheck, unitLevel } from '../model';
+import { resumableIds, selfCheckLine } from '../selfCheck';
 import { useCg } from '../store';
 import { BLANK_RE, CG_LEVELS, CG_LEVEL_NAME, type CgCard, type CgLevel, type CgMcq, type CgUnit, type CgUnitId } from '../types';
 
@@ -49,6 +50,12 @@ function LevelStatus({ unitId, lv }: { unitId: CgUnitId; lv: CgLevel }) {
   const { state } = useCg();
   const course = useCourse();
   const rec = state.units[unitId]?.[`lv${lv}`];
+  // 실력점검(자기 점검): 최고점·누적만(통과·마지막 점수 없음)
+  if (lv === 5 && course.selfCheck) {
+    const c = state.checks?.[unitId];
+    if (c) return <span className="badge badge-exec">최고 {c.best}/{course.selfCheck.size} · 누적 {c.sum}점</span>;
+    return isOpen(state, unitId, lv) ? <span className="badge badge-dialect">열림</span> : <span className="badge badge-plain">잠김</span>;
+  }
   if (rec?.passedAt) return <span className="badge badge-exec">통과{rec.best !== undefined ? ` ${rec.best}/${rec.total}` : ''}</span>;
   if (!isOpen(state, unitId, lv)) return <span className="badge badge-plain">잠김</span>;
   if (lv === 1) {
@@ -60,11 +67,15 @@ function LevelStatus({ unitId, lv }: { unitId: CgUnitId; lv: CgLevel }) {
   return <span className="badge badge-dialect">열림</span>;
 }
 
-const levelDetail = (u: CgUnit, lv: CgLevel) =>
+/** 실력점검(자기 점검) 한 번에 푸는 문항 수: 정한 수(10)와 단원 실력점검 문항 수 중 작은 쪽 */
+const selfCheckCount = (u: CgUnit, size: number) => Math.min(size, u.check.length);
+
+const levelDetail = (u: CgUnit, lv: CgLevel, selfCheck?: { size: number }) =>
   lv === 1 ? `카드 ${u.cards.length}장 · 한 장씩 읽고 개념 맞추기` :
   lv === 2 ? `단원 전체 빈칸 ${u.blanks.length}개 · ${passNeed(2, u.blanks.length)}개 이상` :
   lv === 3 ? `${u.basic.length}문항 · ${passNeed(3, u.basic.length)}개 이상` :
   lv === 4 ? '핵심 정리 · 비교표 · 자주 틀리는 포인트' :
+  selfCheck ? `${selfCheckCount(u, selfCheck.size)}문항 · 풀 때마다 새로 뽑아요 · 점수가 누적돼요` :
   `${u.check.length}문항 · ${passNeed(5, u.check.length)}개 이상`;
 
 /** 다른 에이전트가 아직 쓰는 중인 빈 단원·단계 */
@@ -87,13 +98,14 @@ export function UnitPage() {
       {u.intro && <p style={{ margin: 0 }}>{u.intro}</p>}
       {!unitHasContent(u) && <NotReady what="이 단원" />}
       <p className="muted" style={{ margin: 0 }}>레벨 {lv}/5 · 앞 단계를 통과하면 다음 단계가 열려요.</p>
+      {course.selfCheck && <p className={`cg-selfcheck${state.checks?.[u.id] ? '' : ' none'}`} style={{ margin: 0 }}>{selfCheckLine(state.checks?.[u.id], course.selfCheck.size)}</p>}
       <ol className="cg-levels">
         {CG_LEVELS.map((l) => (
           <li key={l} className="panel">
             <span className="cg-lv-num">{l}</span>
             <span className="stack" style={{ gap: '0.15rem' }}>
               <b>{CG_LEVEL_NAME[l]}</b>
-              <span className="small muted">{levelDetail(u, l)}</span>
+              <span className="small muted">{levelDetail(u, l, course.selfCheck)}</span>
             </span>
             <LevelStatus unitId={u.id} lv={l} />
             <Link className={`btn btn-small ${isOpen(state, u.id, l) && !isPassed(state, u.id, l) ? 'btn-primary' : ''}`} to={`${base}/unit/${u.id}/${l}`}>
@@ -134,9 +146,9 @@ export function LevelPage() {
             <Link className="btn btn-primary" to={`${base}/unit/${u.id}/${lv - 1}`}>앞 단계로</Link>
             <button className="btn" onClick={() => setForced(`${u.id}/${lv}`)}>그래도 풀어보기</button>
           </div>
-          <p className="small muted" style={{ margin: 0 }}>미리 풀어서 기준을 넘으면 이 단계도 통과로 기록돼요.</p>
+          <p className="small muted" style={{ margin: 0 }}>{lv === 5 && course.selfCheck ? '미리 풀어도 점수가 누적되고 이 단계를 마친 것으로 기록돼요.' : '미리 풀어서 기준을 넘으면 이 단계도 통과로 기록돼요.'}</p>
         </div>
-      ) : lv === 1 ? <Theory u={u} /> : lv === 2 ? <Blanks u={u} /> : lv === 4 ? <Summary u={u} /> : <Quiz u={u} lv={lv} />}
+      ) : lv === 1 ? <Theory u={u} /> : lv === 2 ? <Blanks u={u} /> : lv === 4 ? <Summary u={u} /> : lv === 5 && course.selfCheck ? <SelfCheck u={u} size={course.selfCheck.size} /> : <Quiz u={u} lv={lv} />}
     </div>
   );
 }
@@ -376,6 +388,7 @@ function BlankFill({ u }: { u: CgUnit }) {
 
 function Summary({ u }: { u: CgUnit }) {
   const cg = useCg();
+  const sc = useCourse().selfCheck;
   const done = isPassed(cg.state, u.id, 4);
   if (!u.summary.keys.length && !u.summary.tables.length && !u.summary.traps.length) return <NotReady what="이 단계" />;
   return (
@@ -395,7 +408,7 @@ function Summary({ u }: { u: CgUnit }) {
         <><p className="notice notice-good" style={{ margin: 0 }}>요약을 확인했어요.</p><NextStep u={u} lv={4} /></>
       ) : (
         <div className="panel row" style={{ justifyContent: 'space-between' }}>
-          <span>요약을 확인했으면 실력점검에 도전하세요(통과 {passNeed(5, u.check.length)}/{u.check.length}).</span>
+          <span>{sc ? `요약을 확인했으면 ${selfCheckCount(u, sc.size)}문항 실력점검으로 스스로 확인해 보세요.` : `요약을 확인했으면 실력점검에 도전하세요(통과 ${passNeed(5, u.check.length)}/${u.check.length}).`}</span>
           <button className="btn btn-primary" onClick={() => cg.commit((s) => markDone(s, u.id, 4))}>요약 확인 완료</button>
         </div>
       )}
@@ -457,6 +470,96 @@ function QuizRun({ u, lv }: { u: CgUnit; lv: 3 | 5 }) {
         onFinish={(r) => {
           if (full) cg.commit((s) => recordScore(s, u.id, lv, r.score, r.total).state);
           setResult({ ...r, full });
+          window.scrollTo(0, 0);
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * 실력점검(자기 점검, selfCheck 과목의 5단계: 기초 다듬기). 볼 때마다 단원 실력점검 문항 중 size개(10)를 새로 뽑아
+ * 한 문제씩 풀고 바로 채점한다(보기 순서도 섞음, 시간 제한 없음). 뽑은 문항·답은 이 기기 초안(`<과목>:run:<단원>:check`)에 남아
+ * 새로고침해도 같은 회차를 이어 푼다(5번 잠김 단원 초기화 때 함께 지움). 다 풀고 마치면 한 회차로 기록한다.
+ * 결과 화면: 이번에 쌓인 점수·누적 합계·최고점과 문항 다시 보기만(통과·불합격·마지막 점수·평균·회차 목록 없음, 선생님 요청).
+ */
+function SelfCheck({ u, size }: { u: CgUnit; size: number }) {
+  if (!u.check.length) return <NotReady what="이 단계" />;
+  return <SelfCheckRun u={u} size={size} />;
+}
+
+interface SelfCheckDone { r: McqResult; gained: number; first: boolean; newBest: boolean }
+
+function SelfCheckRun({ u, size }: { u: CgUnit; size: number }) {
+  const cg = useCg();
+  const prefix = useLearnerPrefix();
+  const course = useCourse();
+  const key = `${prefix}${course.storage}:run:${u.id}:check`;
+  const count = selfCheckCount(u, size);
+  const [items, setItems] = useState<CgMcq[]>(() => {
+    // 풀던 회차가 있으면 그 문항 그대로(이어 풀기), 없으면 새로 뽑기
+    const ids = resumableIds(readJson<unknown>(key, null), u.check.map((q) => q.id), count);
+    return ids ? ids.map((id) => u.check.find((q) => q.id === id)!) : drawSelfCheck(u.check, count);
+  });
+  const [round, setRound] = useState(0);
+  const [done, setDone] = useState<SelfCheckDone | null>(null);
+  const rec = cg.state.checks?.[u.id];
+  const again = () => {
+    setItems(drawSelfCheck(u.check, count));
+    setDone(null);
+    setRound((r) => r + 1);
+    window.scrollTo(0, 0);
+  };
+  if (done) {
+    const wrong = new Set(items.filter((q) => done.r.answers[q.id] !== q.answer).map((q) => q.id));
+    return (
+      <div className="stack cg-sc-result">
+        <section className="stack" data-testid="selfcheck-result" aria-live="polite" aria-labelledby="sc-done-h">
+          <h2 id="sc-done-h" style={{ margin: 0 }}>실력점검을 마쳤어요</h2>
+          <div className="kpis">
+            <div className="kpi"><b className="cg-sc-gain">누적 점수 +{done.gained}점</b><span>이번 점검으로 쌓인 점수</span></div>
+            <div className="kpi"><b>{rec?.sum ?? done.gained}점</b><span>누적 합계 점수</span></div>
+            <div className="kpi"><b>{rec?.best ?? done.gained}/{size}</b><span>최고점</span></div>
+          </div>
+          <p style={{ margin: 0 }}>
+            {done.newBest ? '최고점을 새로 세웠어요! ' : done.first ? '첫 실력점검을 마쳤어요. ' : ''}
+            또 풀면 누적 점수가 계속 쌓여요. 다시 점검할 때마다 문제를 새로 뽑아요.
+          </p>
+          <div className="row">
+            <button className="btn btn-primary" onClick={again}>새 문제로 다시 점검하기</button>
+            <Link className="btn btn-quiet" to={`${course.basePath}/wrong`}>오답노트</Link>
+          </div>
+          <NextStep u={u} lv={5} />
+        </section>
+        <section className="stack" aria-labelledby="sc-review-h">
+          <h2 id="sc-review-h" style={{ margin: 0, fontSize: '1.1rem' }}>문항 다시 보기</h2>
+          <p className="small muted" style={{ margin: 0 }}>정답과 해설을 확인해 보세요. 다시 볼 문항은 펼쳐 두었고 오답노트에도 모였어요.</p>
+          {items.map((q, i) => <ReviewCard key={q.id} q={q} n={i + 1} picked={done.r.answers[q.id]} order={done.r.orders[q.id]} open={wrong.has(q.id)} />)}
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="stack">
+      <p className="muted" style={{ margin: 0 }}>
+        실력점검 문항 {u.check.length}개 중 {count}문항을 새로 뽑았어요. 한 문제씩 풀고 바로 정답과 해설을 확인해요(시간 제한 없음).
+        다 풀면 맞힌 만큼 누적 점수가 쌓이고, 틀린 문항은 오답노트에 모여요.
+      </p>
+      <McqRunner
+        key={round}
+        items={items}
+        storageKey={key}
+        hideScore
+        finishLabel="점검 마치고 결과 보기"
+        onAnswer={(q, correct) => cg.commit((s) => noteAnswer(s, q.id, correct))}
+        onFinish={(r) => {
+          let out: Omit<SelfCheckDone, 'r'> = { gained: r.score, first: false, newBest: false };
+          cg.commit((s) => {
+            const x = recordSelfCheck(s, u.id, r.score, size);
+            out = { gained: x.gained, first: x.first, newBest: x.newBest };
+            return x.state;
+          });
+          setDone({ r, ...out });
           window.scrollTo(0, 0);
         }}
       />

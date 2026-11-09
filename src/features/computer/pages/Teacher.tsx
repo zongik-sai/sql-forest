@@ -8,7 +8,7 @@ import { OnlyStudentsToggle, useOnlyStudents } from '../../monitor/OnlyStudents'
 import { useCourse, type CourseConfig } from '../course';
 import { LOCK_LIMIT, MOCK_LABEL, type MockKind } from '../model';
 import {
-  classSummary, CSV_SID_HEADER, csvSid, downloadText, lastActivity, questionStats, studentDetail, toCsv, toStudents, unitClassStats, type CgClassRow, type CgStudent,
+  classSummary, CSV_SID_HEADER, csvSid, downloadText, lastActivity, questionStats, selfCheckClassStats, studentDetail, toCsv, toStudents, unitClassStats, type CgClassRow, type CgStudent,
 } from '../teacher';
 import { CG_LEVEL_NAME, type CgLevel } from '../types';
 
@@ -88,7 +88,7 @@ function SidCell({ sid }: { sid: StudentId | null }) {
 
 const hiddenNote = (hidden: number) => (hidden > 0 ? ` 학생 계정(학번 형식)이 아닌 ${hidden}명은 숨겼어요('학생 계정만'을 끄면 보여요).` : '');
 
-type SortKey = 'name' | 'sid' | 'passed' | 'mockBest' | 'wrong' | 'lastAt' | 'locks';
+type SortKey = 'name' | 'sid' | 'passed' | 'mockBest' | 'wrong' | 'lastAt' | 'locks' | 'checkSum';
 const lockSum = (s: CgStudent) => Object.values(s.state.locks).reduce((a, l) => a + (l?.length ?? 0), 0);
 const resetSum = (s: CgStudent) => Object.values(s.state.resets).reduce((a, r) => a + (r?.n ?? 0), 0);
 
@@ -112,6 +112,9 @@ export function CourseClass({ course }: { course: CourseConfig }) {
   const hidden = all.length - students.length;
   const sum = useMemo(() => classSummary(students, Date.now(), course), [students, course]);
   const ustats = useMemo(() => unitClassStats(students, course), [students, course]);
+  // 실력점검(자기 점검, 기초 다듬기): 선생님은 회차·마지막 점수까지 모두 본다(학생 화면에는 최고점·누적만)
+  const sc = course.selfCheck;
+  const scStats = useMemo(() => selfCheckClassStats(students, course), [students, course]);
   const qstats = useMemo(() => questionStats(students), [students]);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -134,9 +137,14 @@ export function CourseClass({ course }: { course: CourseConfig }) {
       <button className="btn-quiet thsort" onClick={() => setSort((s) => ({ k, desc: s.k === k ? !s.desc : k !== 'name' && k !== 'sid' }))}>{label}{sort.k === k ? (sort.desc ? ' ▼' : ' ▲') : ''}</button>
     </th>
   );
+  const scHead = sc ? units.flatMap((u) => [`${u} 실력점검 최고(/${sc.size})`, `${u} 실력점검 누적`, `${u} 실력점검 횟수`]) : [];
+  const scCells = (s: CgStudent) => (sc ? units.flatMap((u) => {
+    const c = s.state.checks?.[u];
+    return [c?.best ?? '', c?.sum ?? '', c?.n ?? 0];
+  }) : []);
   const csv = () => downloadText(`${course.name.replace(/\s/g, '')}_반현황_${today()}.csv`, toCsv(
-    ['이름', '이메일', ...CSV_SID_HEADER, '식물', `통과(/${total})`, ...units.map((u) => `${u} 레벨`), '모의 최고', '모의 응시', '오답', '잠김(지금)', '단원 초기화', '최근 활동'],
-    list.map((s) => [s.name, s.email, ...csvSid(s.sid), PLANT_STAGES[s.plant], s.passed, ...units.map((u) => s.levels[u]), s.mockBest, s.state.mock.length, s.wrong, lockSum(s), resetSum(s), fmt(s.lastAt)]),
+    ['이름', '이메일', ...CSV_SID_HEADER, '식물', `통과(/${total})`, ...units.map((u) => `${u} 레벨`), ...scHead, '모의 최고', '모의 응시', '오답', '잠김(지금)', '단원 초기화', '최근 활동'],
+    list.map((s) => [s.name, s.email, ...csvSid(s.sid), PLANT_STAGES[s.plant], s.passed, ...units.map((u) => s.levels[u]), ...scCells(s), s.mockBest, s.state.mock.length, s.wrong, lockSum(s), resetSum(s), fmt(s.lastAt)]),
   ));
   const shownQ = allQ ? qstats.slice(0, 30) : qstats.slice(0, 8);
   const sel = open ? all.find((s) => s.id === open) : undefined;
@@ -148,6 +156,7 @@ export function CourseClass({ course }: { course: CourseConfig }) {
         <div className="kpi"><b>{sum.active7}</b><span>최근 7일 학습</span></div>
         <div className="kpi"><b>{sum.avgPassed.toFixed(1)}</b><span>평균 통과 단계(/{total})</span></div>
         <div className="kpi"><b>{sum.mockPassed}</b><span>모의고사 {course.pass.mock.need}/{course.pass.mock.total} 이상 경험</span></div>
+        {sc && <div className="kpi"><b>{scStats.reduce((a, x) => a + x.attempts, 0)}</b><span>실력점검 응시(모든 단원 합계)</span></div>}
         <div className="kpi"><b className="kpi-small">{fmt(lastActivity(students))}</b><span>마지막 활동</span></div>
       </div>
       {sum.n === 0 ? <p className="notice">아직 이 과목을 공부한(로그인해 저장한) 학생이 없어요.{hiddenNote(hidden)}</p> : (
@@ -169,8 +178,29 @@ export function CourseClass({ course }: { course: CourseConfig }) {
                 </tbody>
               </table>
             </div>
-            <p className="small muted" style={{ margin: '0.5rem 0 0' }}>통과율 = 그 단계를 통과한 학생 비율. 잠김은 마지막 초기화 이후 합계, 초기화는 5번 잠겨 단원 기록이 지워진 학생 수예요.</p>
+            <p className="small muted" style={{ margin: '0.5rem 0 0' }}>통과율 = 그 단계를 통과한 학생 비율{sc ? `(5단계 실력점검은 한 번 이상 푼 학생 비율)` : ''}. 잠김은 마지막 초기화 이후 합계, 초기화는 5번 잠겨 단원 기록이 지워진 학생 수예요.</p>
           </div>
+          {sc && (
+            <div className="panel t-wide">
+              <h2>실력점검({sc.size}문항)</h2>
+              <div className="table-wrap">
+                <table className="data t-sc-table">
+                  <thead><tr><th scope="col">단원</th><th scope="col">푼 학생</th><th scope="col">평균 최고점</th><th scope="col">응시 합계</th></tr></thead>
+                  <tbody>
+                    {scStats.map((x) => (
+                      <tr key={x.unitId}>
+                        <th scope="row" title={course.unitById(x.unitId)?.title}>{x.unitId.replace('U', '')}. {course.unitById(x.unitId)?.title}</th>
+                        <td className="num">{x.students}명</td>
+                        <td className="num">{x.students ? `${x.avgBest.toFixed(1)}/${sc.size}` : '-'}</td>
+                        <td className="num">{x.attempts}회</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="small muted" style={{ margin: '0.5rem 0 0' }}>학생 화면에는 단원별 최고점과 누적 합계 점수만 보여요. 회차별 점수는 학생 이름을 누르면 볼 수 있어요.</p>
+            </div>
+          )}
           <div className="panel t-wide">
             <h2>많이 틀린 문항</h2>
             {shownQ.length === 0 ? <p className="muted">없어요.</p> : (
@@ -202,7 +232,7 @@ export function CourseClass({ course }: { course: CourseConfig }) {
           <thead><tr>
             {th('name', '이름')}{th('sid', '학번')}<th scope="col">식물</th>{th('passed', '통과')}
             {units.map((u) => <th scope="col" key={u}>{u}</th>)}
-            {th('mockBest', '모의 최고')}{th('wrong', '오답')}{th('locks', '잠김')}{th('lastAt', '최근 활동')}
+            {sc && th('checkSum', '실력점검 누적')}{th('mockBest', '모의 최고')}{th('wrong', '오답')}{th('locks', '잠김')}{th('lastAt', '최근 활동')}
           </tr></thead>
           <tbody>
             {list.map((s) => (
@@ -215,6 +245,7 @@ export function CourseClass({ course }: { course: CourseConfig }) {
                 <td>{PLANT_STAGES[s.plant]}</td>
                 <td>{s.passed}/{total}</td>
                 {units.map((u) => <td key={u} className={`lv lv${s.levels[u]}`}>{s.levels[u]}</td>)}
+                {sc && <td>{s.checkN ? `${s.checkSum}점 · ${s.checkN}회` : '-'}</td>}
                 <td>{s.mockBest || '-'}</td>
                 <td>{s.wrong}</td>
                 <td>{lockSum(s)}{resetSum(s) ? ` · 초기화 ${resetSum(s)}` : ''}</td>
@@ -224,7 +255,7 @@ export function CourseClass({ course }: { course: CourseConfig }) {
           </tbody>
         </table>
       </div>
-      <p className="small muted">이름을 누르면 단원 × 단계 기록·잠김·모의고사·오답노트를 자세히 볼 수 있어요.</p>
+      <p className="small muted">이름을 누르면 단원 × 단계 기록·잠김·{sc ? '실력점검 회차별 점수·' : ''}모의고사·오답노트를 자세히 볼 수 있어요.</p>
       {sel && <CourseStudentDrawer course={course} s={sel} onClose={() => setOpen(null)} />}
     </div>
   );
@@ -262,8 +293,43 @@ function CourseStudentDrawer({ course, s, onClose }: { course: CourseConfig; s: 
             </tbody>
           </table>
         </div>
-        <p className="small muted" style={{ margin: '0.4rem 0 0' }}>✓ 통과 · … 시도했지만 아직 통과 전 · 숫자는 최고 점수/문항 수. 단계별 시도 횟수는 저장하지 않아요.</p>
+        <p className="small muted" style={{ margin: '0.4rem 0 0' }}>✓ 통과{course.selfCheck ? '(5단계 실력점검은 한 번 이상 풂)' : ''} · … 시도했지만 아직 통과 전 · 숫자는 최고 점수/문항 수. 단계별 시도 횟수는 저장하지 않아요.</p>
       </section>
+      {course.selfCheck && (
+        <section>
+          <h3>실력점검({course.selfCheck.size}문항)</h3>
+          <div className="table-wrap">
+            <table className="data t-sc-detail">
+              <thead><tr><th scope="col">단원</th><th scope="col">최고</th><th scope="col">누적</th><th scope="col">횟수</th><th scope="col">마지막</th></tr></thead>
+              <tbody>
+                {d.checks.map((c) => (
+                  <tr key={c.unitId}>
+                    <th scope="row" title={course.unitById(c.unitId)?.title}>{c.unitId}</th>
+                    <td className="num">{c.n ? `${c.best}/${course.selfCheck!.size}` : '-'}</td>
+                    <td className="num">{c.n ? `${c.sum}점` : '-'}</td>
+                    <td className="num">{c.n}회</td>
+                    <td className="num" title={c.lastAt ? fmt(c.lastAt) : undefined}>{c.last !== null ? `${c.last}/${course.selfCheck!.size}` : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <h4 style={{ margin: '0.75rem 0 0.25rem' }}>회차별 기록 ({d.checkHist.length}회)</h4>
+          {d.checkHist.length === 0 ? <p className="muted small">아직 푼 기록이 없어요.</p> : (
+            <div className="table-wrap">
+              <table className="data t-sc-hist">
+                <thead><tr><th scope="col">날짜</th><th scope="col">단원</th><th scope="col">점수</th></tr></thead>
+                <tbody>
+                  {d.checkHist.map((h) => (
+                    <tr key={`${h.unitId}-${h.at}`}><td>{fmt(h.at)}</td><td>{h.unitId}</td><td className="num">{h.score}/{course.selfCheck!.size}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="small muted" style={{ margin: '0.4rem 0 0' }}>학생 화면에는 최고점과 누적 합계만 보여요. 회차 기록은 단원마다 최근 50회까지 남아요(횟수·누적은 그 전 회차도 포함).</p>
+        </section>
+      )}
       <section>
         <h3>모의고사 ({d.mocks.length}회)</h3>
         {d.mocks.length === 0 ? <p className="muted small">아직 응시 기록이 없어요.</p> : (

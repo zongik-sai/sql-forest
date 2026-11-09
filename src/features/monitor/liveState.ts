@@ -1,5 +1,5 @@
 import { compareStudentNo, studentId, type StudentId } from '../auth/accountKind';
-import { NEW_COURSES } from '../computer/courses/defs';
+import { NEW_COURSES, selfCheckOf } from '../computer/courses/defs';
 import type { CourseId } from '../computer/course';
 import { MOCK_LABEL } from '../computer/model';
 import { CG_LEVEL_NAME, type CgLevel } from '../computer/types';
@@ -58,6 +58,8 @@ export interface LiveLocation {
 }
 
 const COURSE_PATHS: { id: CourseId; path: string }[] = [{ id: 'cg', path: '/computer' }, ...NEW_COURSES.map((c) => ({ id: c.id, path: c.path }))];
+/** 5단계가 실력점검(자기 점검)인 과목(기초 다듬기): 위치 이름을 'N단원 · 실력점검 문항 k/10'으로 */
+const SELF_CHECK_SUBJECTS = new Set<SubjectKey>(NEW_COURSES.filter((c) => selfCheckOf(c)).map((c) => c.id));
 const DB_PAGES: Record<string, [string, boolean]> = {
   '/db': ['시작 화면', false], '/garden': ['나의 정원', false], '/pre': ['사전 진단', true], '/review': ['오답 복습', false],
   '/report': ['보고서', false], '/practice': ['자유 실습장', false], '/final': ['최종 진단', true],
@@ -80,6 +82,7 @@ export function deriveLocation(rawPath: string): LiveLocation {
       const n = /^U(\d{1,2})$/.exec(unit)?.[1];
       const head = n ? `${Number(n)}단원` : unit;
       const lv = Number(rest[2]);
+      if (rest[2] && lv === 5 && SELF_CHECK_SUBJECTS.has(course.id)) return { subject: course.id, unit, step: '5', label: `${head} · 실력점검`, activity: true };
       if (rest[2] && lv >= 1 && lv <= 5) return { subject: course.id, unit, step: String(lv), label: `${head} · ${lv}단계 ${CG_LEVEL_NAME[lv as CgLevel]}`, activity: true };
       return { subject: course.id, unit, step: null, label: `${head} · 단원 보기`, activity: true };
     }
@@ -142,14 +145,16 @@ export function deriveFocus(i: FocusInput): LiveFocus {
 
 export function buildLiveState(i: { path: string; detail: string | null; fs: boolean; sharing: boolean; dev: string } & Omit<FocusInput, 'activity'>): LiveState {
   const loc = deriveLocation(i.path);
+  // 실력점검(자기 점검) 중: 'N단원 · 실력점검 문항 k/10' 한 줄로(문항 위치를 이름에 붙이고 detail은 비움)
+  const inSelfCheck = loc.step === '5' && !!loc.subject && SELF_CHECK_SUBJECTS.has(loc.subject) && !!i.detail && /^문항 \d{1,3}\/\d{1,3}$/.test(i.detail);
   return {
     v: 1,
     subject: loc.subject,
     path: cleanPath(i.path),
     unit: loc.unit,
     step: loc.step,
-    label: loc.label.slice(0, 120),
-    detail: i.detail ? i.detail.slice(0, 80) : null,
+    label: (inSelfCheck ? `${loc.label} ${i.detail}` : loc.label).slice(0, 120),
+    detail: inSelfCheck ? null : i.detail ? i.detail.slice(0, 80) : null,
     focus: deriveFocus({ ...i, activity: loc.activity }),
     fs: i.fs,
     locks: i.session?.strict ? Math.max(0, Math.min(99, i.session.strict.locks)) : null,
