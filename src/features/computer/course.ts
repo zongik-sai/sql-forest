@@ -1,10 +1,10 @@
 import { createContext, createElement, useContext, type ReactNode } from 'react';
 import type { CoursePass, CourseShape } from './model';
-import type { CourseSize, NewCourseId } from './courses/defs';
+import type { CourseSize, LegacySource, NewCourseId } from './courses/defs';
 import { CG_PASS, type CgMcq, type CgUnit, type CgUnitId } from './types';
 
 /**
- * 단원 × 5단계 과목 정의(컴퓨터 일반·네트워크·프로그래밍·Data가 같은 학습 구조를 쓴다).
+ * 단원 × 5단계 과목 정의(컴퓨터 일반·네트워크·프로그래밍·Data·기초 다듬기가 같은 학습 구조를 쓴다).
  * 화면·저장소·모의고사·선생님 현황은 모두 지금 과목(useCourse)을 따른다.
  */
 export type CourseId = 'cg' | NewCourseId;
@@ -38,8 +38,10 @@ export interface CourseConfig extends CourseShape {
   remote: CourseRemote;
   /** 고정 모의고사 시드 앞부분: `${mockSeed}-mock-set1-v1` */
   mockSeed: string;
-  /** 과목 크기: full(컴퓨터 일반과 같은 분량) · short(보충 학습 3단원) */
+  /** 과목 크기: full(컴퓨터 일반과 같은 분량) · foundation(기초 다듬기: 짧은 단원 + 10문항 실력점검) */
   size: CourseSize;
+  /** 처음 열 때 한 번 옮겨 올 예전 과목 기록(기초 다듬기: 2진법 이해·IP 이해). selfCheck(5단계 자기 점검)는 CourseShape에 있다 */
+  legacy?: LegacySource[];
   /**
    * 통과 기준. 모의고사 문항 수·합격 기준·시간은 화면·식물(열매)·기록이 모두 이 값을 따른다.
    * 단계(끼워맞추기·기초·실력점검)는 실제 문항 수로 passNeed가 같은 비율로 계산한다(여기 값은 과목 기본 문항 수 기준 안내용).
@@ -62,6 +64,9 @@ export interface CourseInput {
   size?: CourseSize;
   /** 기본: 컴퓨터 일반 기준(CG_PASS) */
   pass?: CoursePass;
+  /** 5단계를 size문항 실력점검(자기 점검)으로(기본: 없음 — 예전처럼 통과 기준) */
+  selfCheck?: { size: number };
+  legacy?: LegacySource[];
 }
 
 /** 단원 목록에서 과목 정의를 만든다(ID 찾기 표는 Map이라 'constructor' 같은 키는 undefined) */
@@ -76,6 +81,7 @@ export function makeCourse(c: CourseInput): CourseConfig {
     unitById: (id) => unitMap.get(id), mcqById: (id) => mcqMap.get(id),
     areas: c.areas, areaLabel: (id) => labels.get(id) ?? id,
     storage: c.storage ?? c.id, remote: c.remote, mockSeed: c.mockSeed ?? c.id, size: c.size ?? 'full', pass: c.pass ?? CG_PASS,
+    ...(c.selfCheck ? { selfCheck: { ...c.selfCheck } } : {}), ...(c.legacy?.length ? { legacy: c.legacy } : {}),
   };
 }
 

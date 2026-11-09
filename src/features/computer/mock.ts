@@ -67,11 +67,23 @@ export interface MockOptions {
   total?: number;
   /** 단원별 몫을 뽑고 남는 자리를 채울 문항(기본 check: 컴퓨터 일반과 같음) */
   fill?: 'check' | 'basic';
+  /** 단원마다 뽑을 실력점검·기초 문항 수(기본 MOCK_PER_UNIT 4 + 2). 기초 다듬기(10단원 · 30문항)는 2 + 1 */
+  perUnit?: { check: number; basic: number };
 }
 
 /** 화면과 같은 방법으로 과목의 모의고사 옵션을 만든다(시드·영역 순서·문항 수·채우기) */
 export function mockOptionsOf(c: Pick<CourseConfig, 'mockSeed' | 'areas' | 'pass' | 'size'>): MockOptions {
-  return { seedPrefix: c.mockSeed, areas: c.areas.map((a) => a.id), total: c.pass.mock.total, fill: c.size === 'short' ? 'basic' : 'check' };
+  return {
+    seedPrefix: c.mockSeed, areas: c.areas.map((a) => a.id), total: c.pass.mock.total, fill: c.size === 'short' ? 'basic' : 'check',
+    // 기초 다듬기: 10단원 × (실력점검 2 + 기초 1) = 30문항으로 단원마다 고르게(4 + 2씩 뽑아 자르면 단원별 문항 수가 들쭉날쭉)
+    ...(c.size === 'foundation' ? { perUnit: FOUNDATION_PER_UNIT } : {}),
+  };
+}
+export const FOUNDATION_PER_UNIT = { check: 2, basic: 1 } as const;
+
+/** 실력점검(자기 점검) 한 번에 풀 문항: 단원 실력점검 문항 중 size개를 새로 뽑는다(순서도 섞음) */
+export function drawSelfCheck<T>(items: T[], size: number, rnd: () => number = Math.random): T[] {
+  return shuffle(items, rnd).slice(0, Math.max(0, size));
 }
 
 export const FIXED_SETS = ['set1', 'set2', 'set3'] as const;
@@ -97,12 +109,13 @@ export function buildMock(units: CgUnit[], kind: MockKind, opts: MockOptions = {
     const items = orderByArea(shuffle((opts.wrongIds ?? []).map((id) => byId.get(id)).filter((q): q is CgMcq => !!q), rnd).slice(0, total), areas);
     return { items, orders: items.map((q) => optionOrder(q.options.length, rnd)) };
   }
-  if (kind === 'random') return pick(units, seededRandom(opts.seed ?? `${Date.now()}-${Math.random()}`), new Set(), areas, total, fill);
+  const per = opts.perUnit ?? MOCK_PER_UNIT;
+  if (kind === 'random') return pick(units, seededRandom(opts.seed ?? `${Date.now()}-${Math.random()}`), new Set(), areas, total, fill, per);
   // 고정 회차: 1회부터 차례로 뽑으며 앞 회차 문항을 제외한다
   const used = new Set<string>();
   let paper: MockPaper = { items: [], orders: [] };
   for (const k of FIXED_SETS) {
-    paper = pick(units, seededRandom(mockSeedOf(opts.seedPrefix ?? 'cg', k)), used, areas, total, fill);
+    paper = pick(units, seededRandom(mockSeedOf(opts.seedPrefix ?? 'cg', k)), used, areas, total, fill, per);
     for (const q of paper.items) used.add(q.id);
     if (k === kind) break;
   }
@@ -118,7 +131,7 @@ export function fixedSetCount(units: CgUnit[], opts: MockOptions = {}): number {
   const used = new Set<string>();
   let n = 0;
   for (const k of FIXED_SETS) {
-    const p = pick(units, seededRandom(mockSeedOf(opts.seedPrefix ?? 'cg', k)), used, opts.areas ?? CG_AREAS, total, opts.fill ?? 'check');
+    const p = pick(units, seededRandom(mockSeedOf(opts.seedPrefix ?? 'cg', k)), used, opts.areas ?? CG_AREAS, total, opts.fill ?? 'check', opts.perUnit ?? MOCK_PER_UNIT);
     if (!p.items.length || p.items.some((q) => used.has(q.id))) break;
     for (const q of p.items) used.add(q.id);
     n++;
@@ -126,14 +139,14 @@ export function fixedSetCount(units: CgUnit[], opts: MockOptions = {}): number {
   return Math.max(1, n);
 }
 
-function pick(units: CgUnit[], rnd: () => number, exclude: Set<string>, areas: readonly string[], total: number, fill: 'check' | 'basic'): MockPaper {
+function pick(units: CgUnit[], rnd: () => number, exclude: Set<string>, areas: readonly string[], total: number, fill: 'check' | 'basic', per: { check: number; basic: number }): MockPaper {
   const take = (qs: CgMcq[], n: number) => {
     const fresh = shuffle(qs.filter((q) => !exclude.has(q.id)), rnd);
     const reuse = shuffle(qs.filter((q) => exclude.has(q.id)), rnd);
     return [...fresh, ...reuse].slice(0, n);
   };
   const picked: CgMcq[] = [];
-  for (const u of units) picked.push(...take(u.check, MOCK_PER_UNIT.check), ...take(u.basic, MOCK_PER_UNIT.basic));
+  for (const u of units) picked.push(...take(u.check, per.check), ...take(u.basic, per.basic));
   const usedNow = new Set(picked.map((q) => q.id));
   const extraPool = units.flatMap((u) => (fill === 'basic' ? u.basic : u.check)).filter((q) => !usedNow.has(q.id));
   picked.push(...take(extraPool, Math.max(0, total - picked.length)));
