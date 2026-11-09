@@ -71,7 +71,10 @@ export interface MockOptions {
   perUnit?: { check: number; basic: number };
 }
 
-/** 화면과 같은 방법으로 과목의 모의고사 옵션을 만든다(시드·영역 순서·문항 수·채우기) */
+/** 기초 다듬기(10단원 · 30문항): 단원마다 실력점검 2 + 기초 1 */
+export const FOUNDATION_PER_UNIT = { check: 2, basic: 1 } as const;
+
+/** 화면과 같은 방법으로 과목의 모의고사 옵션을 만든다(시드·영역 순서·문항 수·채우기·단원별 몫) */
 export function mockOptionsOf(c: Pick<CourseConfig, 'mockSeed' | 'areas' | 'pass' | 'size'>): MockOptions {
   return {
     seedPrefix: c.mockSeed, areas: c.areas.map((a) => a.id), total: c.pass.mock.total, fill: c.size === 'short' ? 'basic' : 'check',
@@ -79,7 +82,6 @@ export function mockOptionsOf(c: Pick<CourseConfig, 'mockSeed' | 'areas' | 'pass
     ...(c.size === 'foundation' ? { perUnit: FOUNDATION_PER_UNIT } : {}),
   };
 }
-export const FOUNDATION_PER_UNIT = { check: 2, basic: 1 } as const;
 
 /** 실력점검(자기 점검) 한 번에 풀 문항: 단원 실력점검 문항 중 size개를 새로 뽑는다(순서도 섞음) */
 export function drawSelfCheck<T>(items: T[], size: number, rnd: () => number = Math.random): T[] {
