@@ -3,10 +3,11 @@
  * 내용은 courses/<과목>/U1~U<n>.json(원본 형식은 컴퓨터 일반 pc_bank.json 단원과 같고,
  * 이론 카드에 개념 맞추기 match·선택 code, 문항에 선택 code가 더 있다).
  */
-export type NewCourseId = 'net' | 'prog' | 'data' | 'bin' | 'ip' | 'basic';
+export type NewCourseId = 'net' | 'prog' | 'data' | 'basic';
 
 /**
- * 단원 크기. full: 컴퓨터 일반과 같은 분량, short: 보충 학습용 짧은 단원(2026-10-26 선생님 요청: 'IP 이해'·'2진법 이해').
+ * 단원 크기. full: 컴퓨터 일반과 같은 분량, foundation: 기초 다듬기(짧은 단원 + 10문항 실력점검),
+ * short: 예전 보충 학습(2진법 이해·IP 이해, 2026-11-09 기초 다듬기로 합침 — 지금 쓰는 과목은 없음).
  * 문항 수가 다르면 통과 기준은 같은 비율로 계산한다.
  */
 export type CourseSize = 'full' | 'short' | 'foundation';
@@ -22,6 +23,21 @@ export const MOCK_SIZE: Record<CourseSize, { total: number; need: number; minute
   short: { total: 20, need: 12, minutes: 20 },
   foundation: { total: 30, need: 18, minutes: 30 },
 };
+
+/**
+ * 5단계를 '실력점검(자기 점검)'으로 푸는 과목 크기(2026-11-09 선생님 요청: 기초 다듬기).
+ * 볼 때마다 실력점검 문항 중 size개를 새로 뽑아 풀고, 학생에게는 최고점·누적 합계 점수만 보인다(통과·불합격 없음).
+ * 첫 제출로 5단계를 마친 것으로 센다. 다른 크기(full·short)는 예전 그대로(기준 이상이면 통과).
+ */
+export const SELF_CHECK: Partial<Record<CourseSize, { size: number }>> = { foundation: { size: 10 } };
+export const selfCheckOf = (d: { size?: CourseSize }) => SELF_CHECK[d.size ?? 'full'];
+
+/**
+ * 예전 과목 기록을 한 번만 옮겨 오는 규칙(기초 다듬기: 2진법 이해 'bin' 1~3단원 → 1~3단원, IP 이해 'ip' 1~3단원 → 6·8·10단원).
+ * course는 예전 과목 ID(이 기기 저장 키 `${학습자}${course}:state`, 서버 course_progress.course), units는 예전 단원 → 새 단원.
+ * 옮긴 단원의 문항·카드 ID 번호(t·f·b·a)와 내용은 그대로다.
+ */
+export interface LegacySource { course: string; units: Record<string, `U${number}`> }
 
 export interface CourseUnitPlan {
   num: number;
@@ -44,8 +60,10 @@ export interface NewCourseDef {
   units: CourseUnitPlan[];
   /** 기본 full */
   size?: CourseSize;
-  /** 첫 화면 묶음: main(정규 과목) · supplement(보충 학습) · foundation(기초 다듬기: 정규 과목과 같은 큰 카드로 맨 아래). 기본 main */
-  group?: 'main' | 'supplement' | 'foundation';
+  /** 첫 화면 묶음: main(정규 과목) · foundation(기초 다듬기: 정규 과목과 같은 큰 카드로 맨 아래). 기본 main */
+  group?: 'main' | 'foundation';
+  /** 처음 열 때 한 번 옮겨 올 예전 과목 기록 */
+  legacy?: LegacySource[];
 }
 
 export const NEW_COURSES: NewCourseDef[] = [
@@ -110,29 +128,11 @@ export const NEW_COURSES: NewCourseDef[] = [
     ],
   },
   {
-    id: 'bin', name: '2진법 이해', path: '/binary', size: 'short', group: 'supplement',
-    basis: '보충 학습: 컴퓨터 일반(자료 표현)·네트워크(IP 주소와 서브네팅)를 공부하기 전에 필요한 2진법 기초',
-    summary: '0과 1로 수를 나타내는 법, 2진·10진·16진 바꾸기, 비트·바이트와 AND·OR 연산을 3단원으로 짧게 익혀요.',
-    areas: [{ id: 'NUM', label: '진법과 자리값' }, { id: 'CONV', label: '진법 변환' }, { id: 'BIT', label: '비트와 2진 연산' }],
-    units: [
-      { num: 1, title: '수와 자리값: 10진법과 2진법', areas: ['NUM'], scope: '진법이란(몇 개의 숫자로 수를 나타내는지), 10진법의 자리값(1·10·100), 2진법의 자리값(1·2·4·8·16·32·64·128), 컴퓨터가 0과 1을 쓰는 이유(전기 신호 켜짐·꺼짐), 2진수를 10진수로 바꾸기(1인 자리의 자리값 더하기), 2의 거듭제곱 표(2^0~2^8), 짝수·홀수와 맨 끝 비트' },
-      { num: 2, title: '진법 변환: 10진·2진·16진', areas: ['CONV'], scope: '10진수를 2진수로(2로 나눈 나머지를 거꾸로 읽기, 큰 자리값부터 빼기 두 방법), 8비트로 맞추기(앞에 0 채우기), 16진법(0~9·A~F)과 쓰임(색상 코드·MAC 주소), 2진↔16진(4비트씩 묶기), 8진(3비트씩) 간단히, 표기법(0b·0x·(1010)₂), 자주 쓰는 값(255=11111111=FF, 128=10000000)' },
-      { num: 3, title: '비트·바이트와 2진 연산', areas: ['BIT'], scope: '비트와 바이트(8비트), n비트로 나타낼 수 있는 경우의 수 2^n과 최댓값 2^n−1, 저장 용량 단위(B·KB·MB·GB, 1024배), 2진 덧셈(올림), 비트 연산 AND·OR·NOT(자리별로 계산, AND는 둘 다 1일 때만 1), AND로 필요한 부분만 남기기(마스크 개념 — IP 서브넷으로 이어짐), 왼쪽 이동은 ×2(간단히)' },
-    ],
-  },
-  {
-    id: 'ip', name: 'IP 이해', path: '/ip', size: 'short', group: 'supplement',
-    basis: '보충 학습: 네트워크 3단원(IP 주소와 서브네팅) 앞에서 IP 주소의 뜻과 계산을 쉽게 익히는 기초',
-    summary: 'IP 주소가 무엇인지, 서브넷 마스크로 네트워크를 나누는 법, 내 컴퓨터의 IP 설정을 확인하는 법을 3단원으로 짧게 익혀요.',
-    areas: [{ id: 'ADDR', label: 'IP 주소 구조' }, { id: 'MASK', label: '서브넷 마스크' }, { id: 'CONF', label: 'IP 설정과 확인' }],
-    units: [
-      { num: 1, title: 'IP 주소란?', areas: ['ADDR'], scope: '주소가 필요한 이유(집 주소·우편 비유), IPv4는 32비트를 8비트씩 4칸(옥텟)으로 나눠 점으로 구분한 10진 표기, 한 칸이 0~255인 이유(8비트), IP 주소를 2진수로·2진수를 IP로 바꾸기, 올바른 IP와 잘못된 IP 고르기, 네트워크 부분과 호스트 부분(아파트 동·호수 비유), IP 주소와 MAC 주소의 차이(바뀌는 주소·고정된 장치 번호) 기초' },
-      { num: 2, title: '서브넷 마스크와 네트워크 주소', areas: ['MASK'], scope: '서브넷 마스크의 뜻(1인 비트는 네트워크, 0인 비트는 호스트), 255.255.255.0 = /24, CIDR 표기(/8·/16·/24, /25·/26 간단히), IP AND 마스크 = 네트워크 주소, 브로드캐스트 주소(호스트 부분이 모두 1), 쓸 수 있는 호스트 수 2^n−2(네트워크·브로드캐스트 주소 제외), 두 IP가 같은 네트워크인지 판정' },
-      { num: 3, title: 'IP 설정과 확인', areas: ['CONF'], scope: '공인 IP와 사설 IP(10.x·172.16~31.x·192.168.x), 공유기와 NAT 한 줄 설명, 기본 게이트웨이(다른 네트워크로 나가는 문), DNS 서버(이름→IP), DHCP 자동 할당과 고정(수동) IP, ipconfig 결과 읽기(IPv4 주소·서브넷 마스크·기본 게이트웨이), ping으로 연결 확인, 특수 주소(127.0.0.1 루프백, 169.254.x.x 자동 할당 주소, 0.0.0.0), IPv6 맛보기(128비트·16진수·:: 줄임)' },
-    ],
-  },
-  {
     id: 'basic', name: '기초 다듬기', path: '/basics', size: 'foundation', group: 'foundation',
+    legacy: [
+      { course: 'bin', units: { U1: 'U1', U2: 'U2', U3: 'U3' } },
+      { course: 'ip', units: { U1: 'U6', U2: 'U8', U3: 'U10' } },
+    ],
     basis: '기초 다듬기(2026-11-09 선생님 요청): 컴퓨터 일반(자료 표현)·네트워크(데이터 통신의 오류 제어, IP 주소와 서브네팅)를 공부하기 전에 필요한 진법·오류 정정·IP 기초. 진법 변환 → 진법 응용(오류 정정: 패리티 → 해밍 코드 → CRC) → IP → IP 클래스 → 서브네팅 순서',
     summary: '진법 변환부터 패리티·해밍 코드·CRC로 오류를 찾는 법, IP 주소와 클래스, 서브네팅까지 10단원으로 짧게 다듬어요. 단원마다 10문항 실력점검으로 스스로 확인해요.',
     areas: [

@@ -46,9 +46,23 @@ export interface WrongEntry {
   clearedAt?: string;
 }
 
+/** 실력점검(자기 점검) 한 번: 제출 시각과 맞힌 수 */
+export interface SelfCheckAttempt { at: string; score: number }
+
+/**
+ * 단원 실력점검 기록(기초 다듬기처럼 과목에 selfCheck가 있을 때만). 학생 화면에는 최고점·누적 합계만 보인다.
+ * best: 최고 점수, sum: 누적 합계 점수, n: 제출 횟수, hist: 회차별 기록(최근 SELF_CHECK_KEEP개, 시각순 — 선생님 화면용)
+ */
+export interface SelfCheckRecord { best: number; sum: number; n: number; hist: SelfCheckAttempt[] }
+
 export interface CgState {
   v: 1;
   units: Partial<Record<CgUnitId, UnitRecord>>;
+  /** 단원 실력점검 기록(selfCheck 과목만, 비어 있으면 필드 없음 — 다른 과목 기록 JSON은 예전 그대로) */
+  checks?: Partial<Record<CgUnitId, SelfCheckRecord>>;
+  /** 예전 과목 기록을 옮겨 왔는지(한 번만, 기초 다듬기: 2진법 이해·IP 이해)와 처음 옮긴 시각 */
+  importedLegacy?: true;
+  importedLegacyAt?: string;
   mock: MockRecord[];
   wrong: Record<string, WrongEntry>;
   /** 개념 맞추기를 마친 이론 카드(카드 ID → 처음 마친 시각) */
@@ -83,7 +97,16 @@ export interface CourseShape {
   unitIds: readonly CgUnitId[];
   totalSteps: number;
   pass?: CoursePass;
+  /** 5단계가 size문항 실력점검(자기 점검)인 과목(기초 다듬기). 없으면 예전처럼 통과 기준이 있는 실력점검 */
+  selfCheck?: { size: number };
 }
+
+/** 실력점검 회차 기록은 단원마다 최근 이만큼만 둔다(횟수·합계는 따로 셈) */
+export const SELF_CHECK_KEEP = 50;
+/** 저장된 시각 형식(toISOString) */
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+export const isIsoTime = (x: unknown): x is string => typeof x === 'string' && ISO_RE.test(x) && Number.isFinite(Date.parse(x));
+const isCount = (x: unknown): x is number => typeof x === 'number' && Number.isInteger(x) && x >= 0;
 
 /** 과목의 모의고사 크기(생략하면 컴퓨터 일반 50문항·30문항 합격·50분) */
 export const mockSizeOf = (shape?: CourseShape): MockSize => shape?.pass?.mock ?? CG_PASS.mock;
@@ -148,7 +171,78 @@ export function normalizeCgState(raw: unknown, shape: CourseShape = CG_SHAPE): C
     }
   }
   if (typeof r.upd === 'string') s.upd = r.upd;
+  // 실력점검 기록은 selfCheck 과목만(다른 과목은 버림: 예전 그대로)
+  if (shape.selfCheck && r.checks && typeof r.checks === 'object') {
+    const checks: NonNullable<CgState['checks']> = {};
+    for (const u of shape.unitIds) {
+      if (!Object.hasOwn(r.checks, u)) continue;
+      const c = normalizeCheck((r.checks as Record<string, unknown>)[u], shape.selfCheck.size);
+      if (c) checks[u] = c;
+    }
+    if (Object.keys(checks).length) s.checks = checks;
+  }
+  if (r.importedLegacy === true) {
+    s.importedLegacy = true;
+    if (isIsoTime(r.importedLegacyAt)) s.importedLegacyAt = r.importedLegacyAt;
+  }
   return s;
+}
+
+const MAX_ATTEMPTS = 100_000;
+const byTime = (a: SelfCheckAttempt, b: SelfCheckAttempt) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+
+/** 회차 기록 정리: 같은 시각은 하나(점수가 큰 쪽), 시각순, 최근 SELF_CHECK_KEEP개 */
+function tidyHist(list: SelfCheckAttempt[]): SelfCheckAttempt[] {
+  const byAt = new Map<string, number>();
+  for (const h of list) byAt.set(h.at, Math.max(byAt.get(h.at) ?? -1, h.score));
+  return [...byAt.entries()].map(([at, score]) => ({ at, score })).sort(byTime).slice(-SELF_CHECK_KEEP);
+}
+const histSum = (h: SelfCheckAttempt[]) => h.reduce((a, x) => a + x.score, 0);
+
+/**
+ * 실력점검 기록 하나 읽기: 점수는 0~size 정수, 시각은 ISO 형식만. 서로 맞지 않는 값은 '줄지 않는 쪽'으로 맞춘다
+ * (횟수 ≥ 회차 기록 수, 합계 ≥ 회차 점수 합·최고점, 최고점 ≥ 회차 최고, 합계 ≤ 횟수 × size). 한 번도 안 풀었으면 없음.
+ */
+function normalizeCheck(x: unknown, size: number): SelfCheckRecord | null {
+  if (!x || typeof x !== 'object') return null;
+  const o = x as Record<string, unknown>;
+  const raw: SelfCheckAttempt[] = [];
+  if (Array.isArray(o.hist)) for (const h of o.hist) {
+    if (!h || typeof h !== 'object') continue;
+    const { at, score } = h as { at?: unknown; score?: unknown };
+    if (isIsoTime(at) && isCount(score) && score <= size) raw.push({ at, score });
+  }
+  const hist = tidyHist(raw);
+  const n = Math.min(MAX_ATTEMPTS, Math.max(isCount(o.n) ? o.n : 0, hist.length));
+  if (n === 0) return null;
+  const best = Math.max(isCount(o.best) && o.best <= size ? o.best : 0, ...hist.map((h) => h.score));
+  const sum = Math.min(n * size, Math.max(isCount(o.sum) ? o.sum : 0, histSum(hist), best));
+  return { best, sum, n, hist };
+}
+
+/**
+ * 두 기기의 실력점검 기록 병합: 최고점은 큰 쪽, 회차 기록은 시각으로 합집합(같은 시각은 하나), 횟수·합계는 큰 쪽(합친 회차 기록보다 작지 않게).
+ * 한계: 두 기기에서 서로 모르게(병합 전에) 푼 회차는 회차 기록에는 모두 남지만, 회차 기록이 SELF_CHECK_KEEP개를 넘은 뒤에는
+ * 횟수·합계가 실제보다 적게 셀 수 있다. 그래도 어느 쪽 값보다 줄어들지는 않는다.
+ */
+export function mergeSelfCheck(a: SelfCheckRecord | undefined, b: SelfCheckRecord | undefined): SelfCheckRecord | undefined {
+  if (!a || !b) return a ?? b;
+  const hist = tidyHist([...a.hist, ...b.hist]);
+  return { best: Math.max(a.best, b.best), sum: Math.max(a.sum, b.sum, histSum(hist)), n: Math.max(a.n, b.n, hist.length), hist };
+}
+
+/** 실력점검 기록을 넣는다(비었으면 필드를 없앤다: 다른 과목·빈 기록 JSON은 예전 그대로) */
+function withChecks(s: CgState, checks: NonNullable<CgState['checks']>): CgState {
+  const out = { ...s };
+  if (Object.keys(checks).length) out.checks = checks;
+  else delete out.checks;
+  return out;
+}
+function withoutCheck(s: CgState, u: CgUnitId): CgState {
+  if (!s.checks || !Object.hasOwn(s.checks, u)) return s;
+  const checks = { ...s.checks };
+  delete checks[u];
+  return withChecks(s, checks);
 }
 
 /**
