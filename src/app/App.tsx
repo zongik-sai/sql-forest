@@ -17,14 +17,15 @@ import { LAST_SUBJECT_KEY, SubjectHome, subjectOfPath } from './SubjectHome';
 import { writeRaw } from '../lib/storage';
 import { LiveReporter } from '../features/monitor/LiveReporter';
 import { LiveIndicator, TeacherLink } from '../features/monitor/LiveIndicator';
+import { legacyCoursePath } from './legacyPaths';
 // 컴퓨터 일반은 문제은행이 커서 들어갈 때만 내려받는다
 const ComputerRoutes = lazy(() => import('../features/computer/ComputerApp'));
 // 같은 단원 × 5단계 엔진을 쓰는 과목들: 과목마다 자기 단원 8개만 담긴 chunk
 const NetworkRoutes = lazy(() => import('../features/computer/courses/net'));
 const ProgrammingRoutes = lazy(() => import('../features/computer/courses/prog'));
 const DataRoutes = lazy(() => import('../features/computer/courses/data'));
-const BinaryRoutes = lazy(() => import('../features/computer/courses/bin'));
-const IpRoutes = lazy(() => import('../features/computer/courses/ip'));
+// 기초 다듬기(예전 보충 학습 2진법 이해·IP 이해를 합친 10단원)
+const BasicsRoutes = lazy(() => import('../features/computer/courses/basic'));
 const loadingCourse = <div className="page" role="status">불러오는 중…</div>;
 // 선생님 화면(실시간 모니터링·과목별 반 현황): 선생님만 쓰므로 들어갈 때만 내려받는다
 const TeacherHub = lazy(() => import('../features/monitor/TeacherHub'));
@@ -278,6 +279,12 @@ function PlaygroundRoute() {
   return <Playground />;
 }
 
+/** 예전 보충 학습 주소(/binary·/ip …)는 기초 다듬기의 같은 자리로 */
+function LegacyCourseRedirect() {
+  const loc = useLocation();
+  return <Navigate to={legacyCoursePath(loc.pathname) ?? '/basics'} replace />;
+}
+
 /** 기본은 HashRouter(GitHub Pages). 비공개 미리보기처럼 주소 hash를 쓸 수 없는 곳은 VITE_ROUTER=memory */
 const Router = import.meta.env.VITE_ROUTER === 'memory' ? MemoryRouter : HashRouter;
 
@@ -318,9 +325,10 @@ export function App() {
         <Route path="/programming/*" element={<Suspense fallback={loadingCourse}><ProgrammingRoutes /></Suspense>} />
         {/* 'Data' 과목(/data). 데이터베이스 과목 경로(/db·/garden·/learn …)와 겹치지 않는다 */}
         <Route path="/data/*" element={<Suspense fallback={loadingCourse}><DataRoutes /></Suspense>} />
-        {/* 보충 학습(짧은 3단원 과목) */}
-        <Route path="/binary/*" element={<Suspense fallback={loadingCourse}><BinaryRoutes /></Suspense>} />
-        <Route path="/ip/*" element={<Suspense fallback={loadingCourse}><IpRoutes /></Suspense>} />
+        <Route path="/basics/*" element={<Suspense fallback={loadingCourse}><BasicsRoutes /></Suspense>} />
+        {/* 예전 보충 학습 주소 → 기초 다듬기 */}
+        <Route path="/binary/*" element={<LegacyCourseRedirect />} />
+        <Route path="/ip/*" element={<LegacyCourseRedirect />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
