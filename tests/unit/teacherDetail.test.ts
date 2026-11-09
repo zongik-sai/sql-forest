@@ -25,8 +25,8 @@ function sample(): CgState[] {
 describe('선생님 화면: 더 자세히', () => {
   const [a, b] = sample();
   const students = toStudents([
-    { user_id: '1', name: '가온', email: 'a@x.kr', state: a, updated_at: '2026-10-26T01:00:00Z' },
-    { user_id: '2', name: '나래', email: 'b@x.kr', state: b, updated_at: '2026-10-26T02:00:00Z' },
+    { user_id: '1', name: '가온', email: 'a@x.example', state: a, updated_at: '2026-10-26T01:00:00Z' },
+    { user_id: '2', name: '나래', email: 'b@x.example', state: b, updated_at: '2026-10-26T02:00:00Z' },
   ], CG_COURSE);
 
   it('단원별 단계 통과율·평균 레벨·잠김·초기화', () => {

@@ -102,7 +102,7 @@ describe('실력점검 기록 읽기(검사)', () => {
     expect(s.checks!.U1).toEqual({ best: 7, sum: 20, n: 3, hist: [{ at: T(1), score: 5 }, { at: T(3), score: 7 }] });
     expect(s.checks!.U2).toEqual({ best: 4, sum: 4, n: 1, hist: [{ at: T(1), score: 4 }] });
     expect(s.checks!.U3).toBeUndefined();
-    expect(s.checks!.U4).toEqual({ best: 3, sum: 20, n: 2, hist: [] });
+    expect(s.checks!.U4).toEqual({ best: 10, sum: 20, n: 2, hist: [] }); // 최고점 ≥ 평균(20 ÷ 2)으로 올려 맞춤
     expect(s.checks!.U5).toEqual({ best: 8, sum: 8, n: 1, hist: [{ at: T(1), score: 8 }] });
     expect(Object.keys(s.checks!)).toEqual(['U1', 'U2', 'U4', 'U5']);
     expect(normalizeCgState({ checks: 'x' }, BASIC).checks).toBeUndefined();
@@ -353,9 +353,9 @@ describe('선생님 화면: 기초 다듬기 실력점검(선생님은 모두 �
   a = recordSelfCheck(a, 'U2', 7, 10, T(3)).state;
   const b = recordSelfCheck(emptyCgState(), 'U1', 8, 10, T(2)).state;
   const students = toStudents([
-    { user_id: '1', name: '가온', email: 'a@x.kr', state: a, updated_at: T(9) },
-    { user_id: '2', name: '나래', email: 'b@x.kr', state: b, updated_at: T(2) },
-    { user_id: '3', name: '다온', email: 'c@x.kr', state: emptyCgState(), updated_at: T(1) },
+    { user_id: '1', name: '가온', email: 'a@x.example', state: a, updated_at: T(9) },
+    { user_id: '2', name: '나래', email: 'b@x.example', state: b, updated_at: T(2) },
+    { user_id: '3', name: '다온', email: 'c@x.example', state: emptyCgState(), updated_at: T(1) },
   ], BASIC);
   it('학생별 누적·응시 합계', () => {
     expect(students.map((s) => [s.checkSum, s.checkN])).toEqual([[26, 4], [8, 1], [0, 0]]);

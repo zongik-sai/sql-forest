@@ -149,7 +149,37 @@ language sql stable security definer set search_path = '' as $$
   );
 $$;
 
--- 선생님 = 교사 목록의 이메일 + 이메일 인증 + 같은 이메일의 Google 로그인 + 학번 형식 아님(저장된 이메일·소문자·목록 이메일 모두)
+-- 한 계정에 묶인 모든 이메일(소문자): 계정 이메일 + 그 계정의 Google 로그인 이메일들
+create or replace function private.user_emails(p_uid uuid) returns text[]
+language sql stable security definer set search_path = '' as $$
+  select coalesce(array_agg(distinct x.e) filter (where x.e is not null and x.e <> ''), '{}')
+  from (
+    select lower(u.email) as e from auth.users u where u.id = p_uid
+    union all select lower(btrim(u.email)) from auth.users u where u.id = p_uid
+    union all select lower(i.identity_data ->> 'email') from auth.identities i where i.user_id = p_uid and i.provider = 'google'
+    union all select lower(btrim(i.identity_data ->> 'email')) from auth.identities i where i.user_id = p_uid and i.provider = 'google'
+  ) x;
+$$;
+
+-- 그 계정에 묶인 이메일 중 학번 형식이 있는지: 계정 이메일(저장값 그대로) + 모든 로그인 정보(공급자 무관)의 이메일 + user_emails.
+-- 계정 이메일을 개인 주소로 바꿔도 학교 Google 로그인이 묶여 있으면 학생으로 본다(교사·관리자 지정·판정에서 제외)
+create or replace function private.uid_student_id(p_uid uuid) returns text
+language sql stable security definer set search_path = '' as $$
+  select coalesce(
+    (select private.student_id(u.email) from auth.users u where u.id = p_uid),
+    (select min(private.student_id(i.identity_data ->> 'email')) from auth.identities i where i.user_id = p_uid),
+    (select min(private.student_id(e)) from unnest(private.user_emails(p_uid)) as x(e)));
+$$;
+
+create or replace function private.uid_is_student(p_uid uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select private.uid_student_id(p_uid) is not null
+    or exists (select 1 from auth.users u where u.id = p_uid and private.is_student_email(u.email))
+    or exists (select 1 from auth.identities i where i.user_id = p_uid and private.is_student_email(i.identity_data ->> 'email'))
+    or exists (select 1 from unnest(private.user_emails(p_uid)) as x(e) where private.is_student_email(x.e));
+$$;
+
+-- 선생님 = 교사 목록의 이메일 + 이메일 인증 + 같은 이메일의 Google 로그인 + 학번 형식 아님(저장된 이메일·소문자·목록 이메일·그 계정에 묶인 모든 이메일)
 create or replace function private.is_teacher_uid(p_uid uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (
@@ -158,6 +188,7 @@ language sql stable security definer set search_path = '' as $$
     join auth.identities i on i.user_id = u.id and i.provider = 'google' and lower(i.identity_data ->> 'email') = t.email
     where u.id = p_uid and u.email_confirmed_at is not null
       and not private.is_student_email(u.email) and not private.is_student_email(t.email)
+      and not private.uid_is_student(u.id)
   );
 $$;
 
@@ -181,17 +212,6 @@ language sql stable security definer set search_path = '' as $$
   select private.is_admin_uid(auth.uid());
 $$;
 
--- 한 계정에 묶인 모든 이메일(소문자): 계정 이메일 + 그 계정의 Google 로그인 이메일들
-create or replace function private.user_emails(p_uid uuid) returns text[]
-language sql stable security definer set search_path = '' as $$
-  select coalesce(array_agg(distinct x.e) filter (where x.e is not null and x.e <> ''), '{}')
-  from (
-    select lower(u.email) as e from auth.users u where u.id = p_uid
-    union all select lower(btrim(u.email)) from auth.users u where u.id = p_uid
-    union all select lower(i.identity_data ->> 'email') from auth.identities i where i.user_id = p_uid and i.provider = 'google'
-    union all select lower(btrim(i.identity_data ->> 'email')) from auth.identities i where i.user_id = p_uid and i.provider = 'google'
-  ) x;
-$$;
 
 -- 이 이메일들을 빼고 남는 실제 관리자(권한이 살아 있는 계정)의 이메일 수
 drop function if exists private.admins_left(text);
@@ -259,7 +279,7 @@ begin
   return query
     with base as (
       select u.id, u.email::text as em, (u.email_confirmed_at is not null) as verified,
-             u.created_at as c_at, u.last_sign_in_at as l_at, private.student_id(u.email) as sid,
+             u.created_at as c_at, u.last_sign_in_at as l_at, private.uid_student_id(u.id) as sid,
              private.has_google(u.id, u.email) as g, private.is_teacher_uid(u.id) as t,
              private.user_emails(u.id) as ems
       from auth.users u
@@ -319,7 +339,7 @@ begin
     if v_email is null or v_email !~ '^[^@ \t\r\n]+@[^@ \t\r\n]+$' then
       raise exception '이메일이 없는 계정은 교사로 지정할 수 없어요' using errcode = '22023';
     end if;
-    if private.is_student_email(v_raw) then
+    if private.is_student_email(v_raw) or private.uid_is_student(p_user) then
       raise exception '학생 계정(학번 형식)은 교사로 지정할 수 없어요' using errcode = '22023';
     end if;
     if not v_verified then
@@ -374,7 +394,7 @@ begin
   select lower(u.email) into v_actor from auth.users u where u.id = v_uid;
 
   if p_on then
-    if private.is_student_email(v_raw) then
+    if private.is_student_email(v_raw) or private.uid_is_student(p_user) then
       raise exception '학생 계정(학번 형식)은 관리자로 지정할 수 없어요' using errcode = '22023';
     end if;
     if not private.is_teacher_uid(p_user) then
@@ -470,5 +490,5 @@ grant execute on function public.am_i_admin(), public.account_list(), public.set
   public.set_admin(uuid, boolean), public.revoke_listed_email(text), public.role_audit_list(integer) to authenticated;
 revoke all on function private.student_id(text), private.is_student_email(text), private.has_google(uuid, text),
   private.is_teacher_uid(uuid), private.is_teacher(), private.is_admin_uid(uuid), private.is_admin(),
-  private.user_emails(uuid), private.admins_left(text[])
+  private.user_emails(uuid), private.uid_student_id(uuid), private.uid_is_student(uuid), private.admins_left(text[])
   from public, anon, authenticated;

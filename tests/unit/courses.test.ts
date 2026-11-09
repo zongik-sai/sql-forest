@@ -210,8 +210,8 @@ describe('선생님 반 현황(과목 단원 기준)', () => {
     const a = addMock(passSteps(emptyCgState(), 15), mock('random', 33, 'm'));
     const b = noteAnswer(passSteps(emptyCgState(), 3), 'U2-a1', false, T(1));
     const students = toStudents([
-      { user_id: '1', name: '가온', email: 'a@x.kr', state: a, updated_at: '2026-10-26T00:00:00Z' },
-      { user_id: '2', name: null, email: 'nare@x.kr', state: { ...b, units: { ...b.units, U7: { lv1: { passedAt: T(1) } } } }, updated_at: '2026-10-01T00:00:00Z' },
+      { user_id: '1', name: '가온', email: 'a@x.example', state: a, updated_at: '2026-10-26T00:00:00Z' },
+      { user_id: '2', name: null, email: 'nare@x.example', state: { ...b, units: { ...b.units, U7: { lv1: { passedAt: T(1) } } } }, updated_at: '2026-10-01T00:00:00Z' },
     ], COURSE);
     expect(students.map((s) => [s.name, s.passed, s.plant, s.mockPassed, s.wrong])).toEqual([['가온', 15, 6, true, 0], ['nare', 3, 2, false, 1]]);
     expect(Object.keys(students[0].levels)).toEqual(['U1', 'U2', 'U3']);

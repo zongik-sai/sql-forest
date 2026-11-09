@@ -24,6 +24,7 @@ const FAKEADMIN = 'a0000000-0000-4000-8000-00000000000b'; // 관리자 이메일
 const PWADMIN = 'a0000000-0000-4000-8000-00000000000c'; // 관리자 이메일 + 인증됐지만 Google 아님
 const NOBODY = 'a0000000-0000-4000-8000-0000000000ff';
 const GID = 'a0000000-0000-4000-8000-00000000000d'; // 계정 이메일과 Google 로그인 이메일이 다른 계정(예전 선생님 이메일)
+const MOVED = 'a0000000-0000-4000-8000-00000000000f'; // 학생이 계정 이메일을 개인 주소로 바꾸고 개인 Google을 연결한 계정(학교 Google 로그인은 그대로 묶여 있음)
 const KELVIN = 'a0000000-0000-4000-8000-00000000000e'; // 도메인의 k가 켈빈 기호: 저장값은 학번 형식이 아니지만 lower()하면 학번 형식
 
 const MIGRATIONS = ['20261001000000_sql_forest_v2.sql', '20261007000000_computer_general.sql', '20261015000000_unit_reset.sql',
@@ -322,6 +323,22 @@ describe('관리자: 교사·관리자 지정과 해제', () => {
   it('migration이 이미 지운 학번 형식 교사 행은 다시 해제할 것이 없다', async () => {
     expect(await setTeacher(ADMIN, SFLAG, false)).toBe(false);
     expect((await lists()).teachers).not.toContain('sai_209699999@seoulai.sen.hs.kr');
+  });
+  it('계정 이메일을 개인 주소로 바꿔도 학번 형식 로그인 이메일이 묶여 있으면 학생: 지정 거부, 선생님·관리자가 될 수 없고 목록에 학번이 보인다', async () => {
+    await addUser(db, MOVED, 'moved.personal@example.org', { name: '바꾼학생', google: 'sai_209610150@seoulai.sen.hs.kr' });
+    await db.query(`insert into auth.identities(user_id, provider, identity_data) values ($1, 'google', '{"email":"moved.personal@example.org"}'::jsonb)`, [MOVED]);
+    await expect(setTeacher(ADMIN, MOVED, true)).rejects.toThrow(/학생 계정\(학번 형식\)은 교사로/);
+    await expect(setAdmin(ADMIN, MOVED, true)).rejects.toThrow(/학생 계정\(학번 형식\)은 관리자로/);
+    const row = (await accounts(ADMIN)).find((r) => r.user_id === MOVED);
+    expect(row).toMatchObject({ kind: 'student', student_year: 2096, student_no: '10150' });
+    // SQL Editor로 개인 주소를 교사·관리자 목록에 직접 넣어도(표 제약은 개인 주소라 통과) 권한이 생기지 않는다
+    await db.exec(`insert into private.teachers(email) values ('moved.personal@example.org'); insert into private.admins(email) values ('moved.personal@example.org')`);
+    expect(await amTeacher(MOVED)).toBe(false);
+    expect(await amAdmin(MOVED)).toBe(false);
+    await expect(setTeacher(MOVED, OUTSIDE, true)).rejects.toThrow(/관리자만/);
+    await db.exec(`delete from private.teachers where email = 'moved.personal@example.org'; delete from private.admins where email = 'moved.personal@example.org'`);
+    await db.query('delete from auth.identities where user_id = $1', [MOVED]);
+    await db.query('delete from auth.users where id = $1', [MOVED]);
   });
   it('lower()하면 학번 형식이 되는 이메일(켈빈 기호 k)도 학생 계정으로 보고 거부한다', async () => {
     await addUser(db, KELVIN, 'sai_209610199@seoulai.sen.hs.\u212Ar', { name: '흉내' });

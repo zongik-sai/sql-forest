@@ -111,7 +111,7 @@ export function toCsv(header: string[], rows: (string | number)[][]): string {
     const t = String(v);
     // 수식 주입 방지: = + - @ 탭 CR로 시작하면 앞에 작은따옴표
     const safe = /^[=+\-@\t\r]/.test(t) ? `'${t}` : t;
-    return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+    return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
   return '﻿' + [header, ...rows].map((r) => r.map(esc).join(',')).join('\r\n');
 }

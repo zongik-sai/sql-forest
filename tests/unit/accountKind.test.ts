@@ -20,7 +20,7 @@ describe('학번 형식 판정(공통 시험 자료)', () => {
   });
   it('시험 자료에 요구된 경계가 모두 들어 있다', () => {
     const emails = fixture.vectors.map((v) => v.email ?? '');
-    for (const needle of ['sai_209610101@example.com', '.kr.evil.com', '@xseoulai', '_20961010@', '_2096101011@', 'sai12209610101@', 'sai1209610101@',
+    for (const needle of ['sai_209610101@example.com', '.kr.evil.example', '@xseoulai', '_20961010@', '_2096101011@', 'sai12209610101@', 'sai1209610101@',
       'sai1209610101_209610102@', '_209610101_209610102@', '_199910101@', 'SAI_', '  sai_']) {
       expect(emails.some((e) => e.includes(needle)), needle).toBe(true);
     }
@@ -66,7 +66,7 @@ describe('계정 구분(서버 account_list와 같은 규칙)', () => {
     expect(unknownReason({ email: 'sai_209610101@seoulai.sen.hs.kr', google: false, emailVerified: true })).toBe('not_google');
     expect(unknownReason({ email: 'Example.Teacher@SeoulAI.sen.hs.kr', google: true, emailVerified: true })).toBe('school_no_pattern');
     expect(unknownReason({ email: 'someone@example.com', google: true, emailVerified: true })).toBe('outside');
-    expect(unknownReason({ email: 'x@seoulai.sen.hs.kr.evil.com', google: true, emailVerified: true })).toBe('outside');
+    expect(unknownReason({ email: 'x@seoulai.sen.hs.kr.evil.example', google: true, emailVerified: true })).toBe('outside');
   });
 });
 

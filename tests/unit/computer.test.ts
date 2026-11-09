@@ -237,9 +237,9 @@ describe('선생님 반 학습 현황 집계', () => {
     b = noteAnswer(noteAnswer(b, 'U1-b1', false, T(1)), 'U2-a3', false, T(2));
     const c = noteAnswer(emptyCgState(), 'U1-b1', false, T(3));
     const students = toStudents([
-      { user_id: '1', name: '가온', email: 'a@x.kr', state: a, updated_at: '2026-10-07T00:00:00Z' },
-      { user_id: '2', name: null, email: 'nare@x.kr', state: b, updated_at: '2026-10-05T00:00:00Z' },
-      { user_id: '3', name: '다온', email: 'c@x.kr', state: c, updated_at: '2026-09-01T00:00:00Z' },
+      { user_id: '1', name: '가온', email: 'a@x.example', state: a, updated_at: '2026-10-07T00:00:00Z' },
+      { user_id: '2', name: null, email: 'nare@x.example', state: b, updated_at: '2026-10-05T00:00:00Z' },
+      { user_id: '3', name: '다온', email: 'c@x.example', state: c, updated_at: '2026-09-01T00:00:00Z' },
     ]);
     expect(students.map((s) => [s.name, s.passed, s.plant, s.mockPassed, s.wrong])).toEqual([
       ['가온', 40, 6, true, 0], ['nare', 6, 1, false, 2], ['다온', 0, 0, false, 1],

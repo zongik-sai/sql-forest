@@ -201,7 +201,7 @@ const histSum = (h: SelfCheckAttempt[]) => h.reduce((a, x) => a + x.score, 0);
 
 /**
  * 실력점검 기록 하나 읽기: 점수는 0~size 정수, 시각은 ISO 형식만. 서로 맞지 않는 값은 '줄지 않는 쪽'으로 맞춘다
- * (횟수 ≥ 회차 기록 수, 합계 ≥ 회차 점수 합·최고점, 최고점 ≥ 회차 최고, 합계 ≤ 횟수 × size). 한 번도 안 풀었으면 없음.
+ * (횟수 ≥ 회차 기록 수, 합계 ≥ 회차 점수 합·최고점, 최고점 ≥ 회차 최고·평균, 합계 ≤ 횟수 × size). 한 번도 안 풀었으면 없음.
  */
 function normalizeCheck(x: unknown, size: number): SelfCheckRecord | null {
   if (!x || typeof x !== 'object') return null;
@@ -217,7 +217,8 @@ function normalizeCheck(x: unknown, size: number): SelfCheckRecord | null {
   if (n === 0) return null;
   const best = Math.max(isCount(o.best) && o.best <= size ? o.best : 0, ...hist.map((h) => h.score));
   const sum = Math.min(n * size, Math.max(isCount(o.sum) ? o.sum : 0, histSum(hist), best));
-  return { best, sum, n, hist };
+  // 최고점은 평균보다 작을 수 없다(망가진 값만 해당): 줄이지 않고 최고점을 올려 맞춘다
+  return { best: Math.max(best, Math.ceil(sum / n)), sum, n, hist };
 }
 
 /**

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { learnerPrefix, readJson, removeRaw, removeWithPrefix, UNSYNCED_SUFFIX, writeJson, writeRaw } from '../../lib/storage';
+import { learnerPrefix, readJson, readRaw, removeRaw, removeWithPrefix, UNSYNCED_SUFFIX, writeJson, writeRaw } from '../../lib/storage';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../auth/supabase';
 import { useCourse, type CourseConfig } from './course';
@@ -65,14 +65,18 @@ export async function loadRemote(sb: SupabaseClient, course: CourseConfig) {
   return { data: data as { state: unknown; revision: number } | null, error };
 }
 
+/** 다시 시도해도 결과가 같은 오류(표 없음 42P01·PGRST205, 권한 없음 42501) */
+const LEGACY_PERMANENT_ERRORS = new Set(['42P01', 'PGRST205', '42501']);
+
 /**
- * 예전 과목 기록 읽기(서버의 본인 행만: RLS). 서버가 답했으면(행 없음·표 없음 등 오류 코드가 있는 답 포함) complete,
- * 연결이 안 됐으면 complete=false(다음에 다시 시도).
+ * 예전 과목 기록 읽기(서버의 본인 행만: RLS). 서버가 답했거나 다시 해도 같은 오류(표 없음·권한 없음)면 complete,
+ * 연결 실패·일시 오류(시간 초과, 토큰 만료, 서버 혼잡 등)면 complete=false(다음에 다시 시도).
  */
 export async function loadLegacyRemote(sb: SupabaseClient, courses: string[]): Promise<{ rows: Record<string, unknown>; complete: boolean }> {
   try {
     const { data, error } = await sb.from('course_progress').select('course, state, revision').in('course', courses);
-    if (error) return { rows: {}, complete: !!error.code };
+    // 표가 없음·권한 없음처럼 다시 해도 같은 답만 '끝남'으로 본다. 시간 초과·토큰 만료·서버 혼잡 같은 일시 오류는 다음에 다시 시도
+    if (error) return { rows: {}, complete: LEGACY_PERMANENT_ERRORS.has(error.code ?? '') };
     const rows: Record<string, unknown> = {};
     for (const r of (data ?? []) as { course: string; state: unknown }[]) if (courses.includes(r.course)) rows[r.course] = r.state;
     return { rows, complete: true };
@@ -340,7 +344,19 @@ export function CgProvider({ children }: { children: ReactNode }) {
   /** 예전 과목 기록 옮기기(한 번): 이 기기 사본 + (로그인이면) 서버의 본인 예전 행 */
   const runLegacy = useCallback(async (sb: SupabaseClient | null, alive: () => boolean) => {
     const c = courseRef.current;
-    if (!c.legacy?.length || stateRef.current.importedLegacy || legacyBusy.current) return;
+    if (!c.legacy?.length || legacyBusy.current) return;
+    if (stateRef.current.importedLegacy) {
+      // 다른 기기에서 이미 옮겼어도, 이 기기에 서버에 못 올린 예전 과목 사본이 남아 있으면 그 사본만 합치고 표시를 지운다
+      const pre = learnerPrefix(learnerKey);
+      const pending = c.legacy.filter((src) => readRaw(`${pre}${src.course}${UNSYNCED_SUFFIX}`) !== null);
+      if (!pending.length) return;
+      const { importedLegacy, importedLegacyAt, ...rest } = stateRef.current;
+      const inputs = pending.map((src) => ({ src, versions: [readJson<unknown>(stateKeyOf(learnerKey, src.course), null)].filter((v) => v !== null) }));
+      const r = importLegacy(rest, inputs, c, new Date().toISOString(), false);
+      for (const src of pending) removeRaw(`${pre}${src.course}${UNSYNCED_SUFFIX}`);
+      if (r.imported) commit(() => ({ ...r.state, importedLegacy, importedLegacyAt }));
+      return;
+    }
     legacyBusy.current = true;
     try {
       const remote = sb ? await loadLegacyRemote(sb, c.legacy.map((l) => l.course)) : { rows: {} as Record<string, unknown>, complete: true };
@@ -350,6 +366,9 @@ export function CgProvider({ children }: { children: ReactNode }) {
         versions: [readJson<unknown>(stateKeyOf(learnerKey, src.course), null), remote.rows[src.course]].filter((v) => v !== null && v !== undefined),
       }));
       const r = importLegacy(stateRef.current, inputs, c, new Date().toISOString(), remote.complete);
+      // 예전 과목의 '서버 저장 안 됨' 표시: 그 기기 사본은 이제 이 과목 기록(자기 표시·서버 저장으로 보호됨)에 들어 있으므로 지운다.
+      // 그대로 두면 예전 과목 화면이 없어 영영 지워지지 않고 로그아웃 경고만 남는다(예전 기록 자체는 지우지 않음)
+      for (const src of c.legacy) removeRaw(`${learnerPrefix(learnerKey)}${src.course}${UNSYNCED_SUFFIX}`);
       if (r.state === stateRef.current) return;
       if (r.imported) {
         commit(() => r.state);
