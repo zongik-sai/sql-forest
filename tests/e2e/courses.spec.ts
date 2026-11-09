@@ -11,7 +11,7 @@ import { buildMock } from '../../src/features/computer/mock';
  */
 interface RawCard { id: string; title: string; code?: string; match?: { pairs: { term: string; desc: string }[]; distractor: string } }
 const rawUnit = (c: NewCourseId, n: number) => JSON.parse(readFileSync(`src/features/computer/courses/${c}/U${n}.json`, 'utf8')) as { title: string; theory: RawCard[] };
-/** 정규 과목(네트워크·프로그래밍 8단원, Data 11단원). 보충 학습(2진법 이해·IP 이해, 3단원)은 supplement.spec.ts */
+/** 정규 과목(네트워크·프로그래밍 8단원, Data 11단원). 기초 다듬기(10단원, 10문항 실력점검)는 basics.spec.ts */
 const MAIN_COURSES = NEW_COURSES.filter((c) => (c.group ?? 'main') === 'main');
 const loadCourse = (c: NewCourseId) => buildNewCourse(c, NEW_COURSES.find((d) => d.id === c)!.units.map((u) => JSON.parse(readFileSync(`src/features/computer/courses/${c}/U${u.num}.json`, 'utf8'))));
 
@@ -31,12 +31,12 @@ async function startUnit(page: Page) {
 }
 const overflowX = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-test('첫 화면: 과목 5개(과목 이름만, 자격증 이름 없음), 새 과목으로 들어가고 최근 공부 표시', async ({ page }) => {
+test('첫 화면: 과목 6개(과목 이름만, 자격증 이름 없음, 기초 다듬기는 맨 아래), 새 과목으로 들어가고 최근 공부 표시', async ({ page }) => {
   await fresh(page);
   await expect(page.getByRole('heading', { name: '무엇을 공부할까요?' })).toBeVisible();
-  await expect(page.locator('.subject-card')).toHaveCount(5);
+  await expect(page.locator('.subject-card')).toHaveCount(6);
   const names = await page.locator('.subject-card h2').allInnerTexts();
-  expect(names).toEqual(['데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data']);
+  expect(names).toEqual(['데이터베이스', '컴퓨터 일반', '네트워크', '프로그래밍', 'Data', '기초 다듬기']);
   const main = await page.locator('main').innerText();
   expect(main).not.toMatch(/SQLD|PC정비사|정보처리기사|네트워크관리사|정보기기운용|COS ?Pro|YBM/);
   for (const c of MAIN_COURSES) await expect(page.locator('.subject-card', { hasText: c.name }).first()).toContainText(`${c.units.length}단원 × 5단계`);
