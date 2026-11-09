@@ -4,6 +4,7 @@ import { learnerPrefix, readJson, removeRaw, removeWithPrefix, UNSYNCED_SUFFIX, 
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../auth/supabase';
 import { useCourse, type CourseConfig } from './course';
+import { importLegacy } from './legacy';
 import { hasProgress, mergeCgStates, normalizeCgState, plantStage, type CgState } from './model';
 
 /**
@@ -13,6 +14,9 @@ import { hasProgress, mergeCgStates, normalizeCgState, plantStage, type CgState 
  * - 로그인 없이 둘러보기: 이 기기에만 저장(guest). 로그인하면 "내 계정으로 가져오기" 안내(과목별).
  * - 로그아웃하면 AuthContext가 이 사용자의 기기 사본(학습자 키로 시작하는 모든 키)을 지운다.
  * 이 기기 저장 키: `${learnerPrefix}${course.storage}:state`·`:rev`(컴퓨터 일반 'cg:', 네트워크 'net:' …)
+ * - 예전 과목 기록 옮기기(course.legacy, 기초 다듬기): 기록에 importedLegacy 표시가 없으면 한 번, 이 기기의 예전 과목 사본
+ *   (`${learnerPrefix}bin:state`·`ip:state`)과 로그인 사용자는 서버의 본인 예전 행(course_progress의 bin·ip, RLS)을 읽어 합친다(legacy.ts).
+ *   예전 기록은 지우거나 바꾸지 않는다.
  */
 export type CgSaveStatus = 'local' | 'saving' | 'saved' | 'offline' | 'error';
 
@@ -32,6 +36,9 @@ interface CgCtx {
   clearGrew: () => void;
   /** 저장 대기 중인 기록을 지금 서버로 보낸다. 모두 저장됐으면 true(로그아웃 전에 호출) */
   flush: () => Promise<boolean>;
+  /** 예전 과목 기록을 방금 옮겨 왔으면 그 과목들(안내 표시 후 지움) */
+  legacyNotice: string[] | null;
+  clearLegacyNotice: () => void;
 }
 
 const Ctx = createContext<CgCtx | null>(null);
@@ -56,6 +63,22 @@ export async function loadRemote(sb: SupabaseClient, course: CourseConfig) {
     : sb.from('course_progress').select('state, revision').eq('course', r.course).maybeSingle();
   const { data, error } = await q;
   return { data: data as { state: unknown; revision: number } | null, error };
+}
+
+/**
+ * 예전 과목 기록 읽기(서버의 본인 행만: RLS). 서버가 답했으면(행 없음·표 없음 등 오류 코드가 있는 답 포함) complete,
+ * 연결이 안 됐으면 complete=false(다음에 다시 시도).
+ */
+export async function loadLegacyRemote(sb: SupabaseClient, courses: string[]): Promise<{ rows: Record<string, unknown>; complete: boolean }> {
+  try {
+    const { data, error } = await sb.from('course_progress').select('course, state, revision').in('course', courses);
+    if (error) return { rows: {}, complete: !!error.code };
+    const rows: Record<string, unknown> = {};
+    for (const r of (data ?? []) as { course: string; state: unknown }[]) if (courses.includes(r.course)) rows[r.course] = r.state;
+    return { rows, complete: true };
+  } catch {
+    return { rows: {}, complete: false };
+  }
 }
 
 /** 서버 저장(revision compare-and-set) */
@@ -89,6 +112,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
   const [isTeacher, setIsTeacher] = useState(false);
   const [guestToImport, setGuestToImport] = useState<CgState | null>(null);
   const [grewTo, setGrewTo] = useState<number | null>(null);
+  const [legacyNotice, setLegacyNotice] = useState<string[] | null>(null);
   const stateRef = useRef(state);
   const revRef = useRef<number>(readJson<number>(revKey, 0));
   const dirtyRef = useRef(false);
@@ -97,6 +121,8 @@ export function CgProvider({ children }: { children: ReactNode }) {
   const readyRef = useRef(mode !== 'user');
   const retryRef = useRef<{ t: ReturnType<typeof setTimeout> | null; n: number }>({ t: null, n: 0 });
   const unmountedRef = useRef(false);
+  // 예전 과목 기록 옮기기(아래에서 정의): 불러오기 effect가 부른다
+  const legacyRef = useRef<(sb: SupabaseClient | null, alive: () => boolean) => Promise<void>>(async () => {});
 
   // 사용자 전환 시 다시 읽기
   useEffect(() => {
@@ -111,7 +137,11 @@ export function CgProvider({ children }: { children: ReactNode }) {
     if (mode === 'user') {
       const g = norm(readJson(stateKeyOf(GUEST_KEY, seg), null));
       setGuestToImport(hasProgress(g, courseRef.current) ? g : null);
-    } else setGuestToImport(null);
+    } else {
+      setGuestToImport(null);
+      // 로그인 없이·데모: 이 기기의 예전 과목 기록만 읽어 옮긴다(로그인 사용자는 서버 기록을 읽은 뒤)
+      void legacyRef.current(null, () => true);
+    }
   }, [stateKey, revKey, mode, seg, norm]);
 
   const writeLocal = useCallback((s: CgState) => writeJson(stateKey, s), [stateKey]);
@@ -215,6 +245,8 @@ export function CgProvider({ children }: { children: ReactNode }) {
         }
         else setSaveStatus('saved');
       } else setSaveStatus('saved');
+      // 서버 기록(다른 기기에서 이미 옮겼는지)을 안 뒤에 예전 과목 기록 옮기기
+      await legacyRef.current(sb, () => alive);
     })().catch(() => {
       if (!alive) return;
       setSaveStatus('error');
@@ -297,10 +329,46 @@ export function CgProvider({ children }: { children: ReactNode }) {
     }
   }, [mode, schedule, writeLocal, unsyncedKey]);
 
-  // 로그인 없이 남긴 이 과목 기록(guest 키 `${seg}:` 아래 전부: 기록·풀던 초안·모의고사)만 가져오고 지운다
+  /** 화면에는 바로 보이고 이 기기에만 저장(서버 저장은 다음 기록 때 함께): 옮길 예전 기록이 없을 때의 '옮김' 표시 */
+  const setQuiet = useCallback((next: CgState) => {
+    stateRef.current = next;
+    setState(next);
+    writeLocal(next);
+  }, [writeLocal]);
+
+  const legacyBusy = useRef(false);
+  /** 예전 과목 기록 옮기기(한 번): 이 기기 사본 + (로그인이면) 서버의 본인 예전 행 */
+  const runLegacy = useCallback(async (sb: SupabaseClient | null, alive: () => boolean) => {
+    const c = courseRef.current;
+    if (!c.legacy?.length || stateRef.current.importedLegacy || legacyBusy.current) return;
+    legacyBusy.current = true;
+    try {
+      const remote = sb ? await loadLegacyRemote(sb, c.legacy.map((l) => l.course)) : { rows: {} as Record<string, unknown>, complete: true };
+      if (!alive() || stateRef.current.importedLegacy) return;
+      const inputs = c.legacy.map((src) => ({
+        src,
+        versions: [readJson<unknown>(stateKeyOf(learnerKey, src.course), null), remote.rows[src.course]].filter((v) => v !== null && v !== undefined),
+      }));
+      const r = importLegacy(stateRef.current, inputs, c, new Date().toISOString(), remote.complete);
+      if (r.state === stateRef.current) return;
+      if (r.imported) {
+        commit(() => r.state);
+        setLegacyNotice(inputs.filter((x) => x.versions.length).map((x) => x.src.course));
+      } else setQuiet(r.state);
+    } finally {
+      legacyBusy.current = false;
+    }
+  }, [learnerKey, commit, setQuiet]);
+  legacyRef.current = runLegacy;
+
+  // 로그인 없이 남긴 이 과목 기록(guest 키 `${seg}:` 아래 전부: 기록·풀던 초안·모의고사)만 가져오고 지운다.
+  // 로그인 없이 옮긴 예전 과목 표시는 가져오지 않는다(이 계정의 예전 기록 옮기기를 막지 않게)
   const importGuest = useCallback(() => {
     if (!guestToImport) return;
-    commit((s) => merge(s, guestToImport));
+    const g: CgState = { ...guestToImport };
+    delete g.importedLegacy;
+    delete g.importedLegacyAt;
+    commit((s) => merge(s, g));
     removeWithPrefix(`${learnerPrefix(GUEST_KEY)}${seg}:`);
     setGuestToImport(null);
   }, [guestToImport, commit, merge, seg]);
@@ -312,8 +380,8 @@ export function CgProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<CgCtx>(() => ({
     state, commit, mode, saveStatus, loading, isTeacher, guestToImport, importGuest, discardGuest,
-    grewTo, clearGrew: () => setGrewTo(null), flush,
-  }), [state, commit, mode, saveStatus, loading, isTeacher, guestToImport, importGuest, discardGuest, grewTo, flush]);
+    grewTo, clearGrew: () => setGrewTo(null), flush, legacyNotice, clearLegacyNotice: () => setLegacyNotice(null),
+  }), [state, commit, mode, saveStatus, loading, isTeacher, guestToImport, importGuest, discardGuest, grewTo, flush, legacyNotice]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -100,6 +100,21 @@ function GuestImportBanner() {
   );
 }
 
+/** 예전 과목(2진법 이해·IP 이해) 기록을 방금 옮겨 왔을 때 한 번 */
+function LegacyNotice() {
+  const cg = useCg();
+  const course = useCourse();
+  if (!cg.legacyNotice?.length) return null;
+  const names = (course.legacy ?? []).filter((l) => cg.legacyNotice!.includes(l.course));
+  const where = names.map((l) => `${l.name} ${Object.keys(l.units).map((u) => u.slice(1)).join('·')}단원 → ${Object.values(l.units).map((u) => u.slice(1)).join('·')}단원`).join(', ');
+  return (
+    <div className="notice notice-good row" role="status" style={{ marginBottom: '1rem' }}>
+      <span>예전에 공부한 기록을 {course.name}로 옮겨 왔어요({where}). 예전 기록은 그대로 두었어요.</span>
+      <button className="btn btn-small btn-quiet" onClick={cg.clearLegacyNotice}>닫기</button>
+    </div>
+  );
+}
+
 function CourseLayout() {
   const cg = useCg();
   const course = useCourse();
@@ -110,6 +125,7 @@ function CourseLayout() {
       <main id="main" className="page">
         <InAppNotice />
         <GuestImportBanner />
+        <LegacyNotice />
         {cg.loading ? <p role="status">내 기록을 불러오는 중…</p> : ready ? <Outlet /> : (
           <div className="notice notice-warn">{course.name} 문제은행을 준비하고 있어요. 잠시 후 다시 들어와 주세요.</div>
         )}

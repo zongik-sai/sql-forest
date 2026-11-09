@@ -34,10 +34,10 @@ export const selfCheckOf = (d: { size?: CourseSize }) => SELF_CHECK[d.size ?? 'f
 
 /**
  * 예전 과목 기록을 한 번만 옮겨 오는 규칙(기초 다듬기: 2진법 이해 'bin' 1~3단원 → 1~3단원, IP 이해 'ip' 1~3단원 → 6·8·10단원).
- * course는 예전 과목 ID(이 기기 저장 키 `${학습자}${course}:state`, 서버 course_progress.course), units는 예전 단원 → 새 단원.
+ * course는 예전 과목 ID(이 기기 저장 키 `${학습자}${course}:state`, 서버 course_progress.course), name은 안내용 이름, units는 예전 단원 → 새 단원.
  * 옮긴 단원의 문항·카드 ID 번호(t·f·b·a)와 내용은 그대로다.
  */
-export interface LegacySource { course: string; units: Record<string, `U${number}`> }
+export interface LegacySource { course: string; name: string; units: Record<string, `U${number}`> }
 
 export interface CourseUnitPlan {
   num: number;
@@ -130,8 +130,8 @@ export const NEW_COURSES: NewCourseDef[] = [
   {
     id: 'basic', name: '기초 다듬기', path: '/basics', size: 'foundation', group: 'foundation',
     legacy: [
-      { course: 'bin', units: { U1: 'U1', U2: 'U2', U3: 'U3' } },
-      { course: 'ip', units: { U1: 'U6', U2: 'U8', U3: 'U10' } },
+      { course: 'bin', name: '2진법 이해', units: { U1: 'U1', U2: 'U2', U3: 'U3' } },
+      { course: 'ip', name: 'IP 이해', units: { U1: 'U6', U2: 'U8', U3: 'U10' } },
     ],
     basis: '기초 다듬기(2026-11-09 선생님 요청): 컴퓨터 일반(자료 표현)·네트워크(데이터 통신의 오류 제어, IP 주소와 서브네팅)를 공부하기 전에 필요한 진법·오류 정정·IP 기초. 진법 변환 → 진법 응용(오류 정정: 패리티 → 해밍 코드 → CRC) → IP → IP 클래스 → 서브네팅 순서',
     summary: '진법 변환부터 패리티·해밍 코드·CRC로 오류를 찾는 법, IP 주소와 클래스, 서브네팅까지 10단원으로 짧게 다듬어요. 단원마다 10문항 실력점검으로 스스로 확인해요.',
