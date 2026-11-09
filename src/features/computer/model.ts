@@ -327,7 +327,7 @@ export const lockCount = (s: CgState, u: CgUnitId) => s.locks[u]?.length ?? 0;
 
 const unitCardPrefix = (u: CgUnitId) => `${u}-t`;
 
-/** 단원의 진도·점수(단계 기록·카드)와 잠김 횟수를 지운다. 오답노트·모의고사·다른 단원은 그대로 */
+/** 단원의 진도·점수(단계 기록·카드·실력점검 기록)와 잠김 횟수를 지운다. 오답노트·모의고사·다른 단원은 그대로 */
 export function resetUnit(s: CgState, u: CgUnitId, now = new Date().toISOString()): CgState {
   const units = { ...s.units };
   delete units[u];
@@ -335,7 +335,7 @@ export function resetUnit(s: CgState, u: CgUnitId, now = new Date().toISOString(
   const locks = { ...s.locks };
   delete locks[u];
   const prev = s.resets[u];
-  return stamp({ ...s, units, cards, locks, resets: { ...s.resets, [u]: { at: after(now, prev?.at), n: (prev?.n ?? 0) + 1 } } }, now);
+  return stamp(withoutCheck({ ...s, units, cards, locks, resets: { ...s.resets, [u]: { at: after(now, prev?.at), n: (prev?.n ?? 0) + 1 } } }, u), now);
 }
 
 /** 잠김 1회 기록. 한도에 닿으면 그 단원을 초기화한다 */
@@ -355,7 +355,7 @@ function dropStaleUnits(x: CgState, latest: CgState['resets'], shape: CourseShap
       delete units[u];
       const locks = { ...out.locks };
       delete locks[u];
-      out = { ...out, units, locks, cards: Object.fromEntries(Object.entries(out.cards).filter(([k]) => !k.startsWith(unitCardPrefix(u)))) };
+      out = withoutCheck({ ...out, units, locks, cards: Object.fromEntries(Object.entries(out.cards).filter(([k]) => !k.startsWith(unitCardPrefix(u)))) }, u);
     }
   }
   return out;
@@ -397,6 +397,25 @@ export function recordScore(s: CgState, u: CgUnitId, lv: 2 | 3 | 5, score: numbe
   const rec = state.units[u]![`lv${lv}`]!;
   if (rec.passedAt === undefined) delete rec.passedAt;
   return { state, passed, firstPass };
+}
+
+/**
+ * 실력점검(자기 점검) 한 번 제출(selfCheck 과목의 5단계). 점수는 0~size로 맞추고, 최고점·누적 합계·횟수·회차 기록을 갱신한다.
+ * 통과 기준은 없다: 첫 제출로 5단계를 마친 것으로 기록한다(lv5.passedAt, 식물·통과 단계 수가 이 값을 쓴다).
+ */
+export function recordSelfCheck(s: CgState, u: CgUnitId, score: number, size: number, now = new Date().toISOString()): { state: CgState; record: SelfCheckRecord; gained: number; first: boolean; newBest: boolean } {
+  const sc = Math.max(0, Math.min(size, Math.round(Number.isFinite(score) ? score : 0)));
+  const prev = s.checks?.[u];
+  const at = after(now, prev?.hist.at(-1)?.at);
+  const record: SelfCheckRecord = {
+    best: Math.max(prev?.best ?? 0, sc),
+    sum: (prev?.sum ?? 0) + sc,
+    n: (prev?.n ?? 0) + 1,
+    hist: [...(prev?.hist ?? []), { at, score: sc }].slice(-SELF_CHECK_KEEP),
+  };
+  let state = stamp({ ...s, checks: { ...(s.checks ?? {}), [u]: record } }, now);
+  state = setLevel(state, u, 5, (r) => ({ passedAt: r.passedAt ?? at, lastAt: at }), now);
+  return { state, record, gained: sc, first: !prev, newBest: !!prev && sc > prev.best };
 }
 
 /** 문항 하나를 풀었을 때 오답노트 갱신: 틀리면 넣고, 오답노트에 있던 문항을 맞히면 뺀다 */
@@ -476,11 +495,22 @@ export function mergeCgStates(a0: CgState, b0: CgState, shape: CourseShape = CG_
   }
   const cards: CgState['cards'] = {};
   for (const k of new Set([...Object.keys(a.cards), ...Object.keys(b.cards)])) cards[k] = minIso(a.cards[k], b.cards[k])!;
-  return { v: 1, units, mock, wrong, cards, locks, resets, upd: maxIso(a.upd, b.upd) ?? '' };
+  const checks: NonNullable<CgState['checks']> = {};
+  for (const u of shape.unitIds) {
+    const c = mergeSelfCheck(a.checks?.[u], b.checks?.[u]);
+    if (c) checks[u] = c;
+  }
+  const out: CgState = withChecks({ v: 1, units, mock, wrong, cards, locks, resets, upd: maxIso(a.upd, b.upd) ?? '' }, checks);
+  if (a.importedLegacy || b.importedLegacy) {
+    out.importedLegacy = true;
+    const at = minIso(a.importedLegacyAt, b.importedLegacyAt);
+    if (at) out.importedLegacyAt = at;
+  }
+  return out;
 }
 
 /** 의미 있는 진행이 있는지(가져오기 안내용) */
-export const hasProgress = (s: CgState, shape: CourseShape = CG_SHAPE) => passedCount(s, shape) > 0 || s.mock.length > 0 || Object.keys(s.wrong).length > 0 || Object.keys(s.cards).length > 0 || Object.values(s.units).some((u) => u && Object.keys(u).length > 0);
+export const hasProgress = (s: CgState, shape: CourseShape = CG_SHAPE) => passedCount(s, shape) > 0 || s.mock.length > 0 || Object.keys(s.wrong).length > 0 || Object.keys(s.cards).length > 0 || Object.keys(s.checks ?? {}).length > 0 || Object.values(s.units).some((u) => u && Object.keys(u).length > 0);
 
 /** 모의고사 결과 집계 */
 export function scoreMock(
