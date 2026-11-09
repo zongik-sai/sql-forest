@@ -7,7 +7,7 @@ import { MOCK_SIZE, NEW_COURSES, UNIT_COUNTS } from '../../src/features/computer
 import { CG_COURSE } from '../../src/features/computer/content';
 import { buildMock, fixedSetCount, mockOptionsOf, mockSeedOf, orderByArea } from '../../src/features/computer/mock';
 import {
-  activeWrongIds, addLock, addMock, bestRegularMock, emptyCgState, hasProgress, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
+  activeWrongIds, addLock, addMock, emptyCgState, hasProgress, markCard, markDone, mergeCgStates, nextPlantGoal, normalizeCgState, noteAnswer,
   passedCount, passNeed, plantStage, plantThresholds, recordScore, resetUnit, TOTAL_STEPS, type CgState, type MockRecord,
 } from '../../src/features/computer/model';
 import { classSummary, toStudents } from '../../src/features/computer/teacher';

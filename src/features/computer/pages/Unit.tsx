@@ -527,9 +527,9 @@ function SelfCheckRun({ u, size }: { u: CgUnit; size: number }) {
           </p>
           <div className="row">
             <button className="btn btn-primary" onClick={again}>새 문제로 다시 점검하기</button>
+            <Link className="btn" to={course.basePath}>단원 목록으로</Link>
             <Link className="btn btn-quiet" to={`${course.basePath}/wrong`}>오답노트</Link>
           </div>
-          <NextStep u={u} lv={5} />
         </section>
         <section className="stack" aria-labelledby="sc-review-h">
           <h2 id="sc-review-h" style={{ margin: 0, fontSize: '1.1rem' }}>문항 다시 보기</h2>

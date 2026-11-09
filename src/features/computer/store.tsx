@@ -4,7 +4,7 @@ import { learnerPrefix, readJson, removeRaw, removeWithPrefix, UNSYNCED_SUFFIX, 
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../auth/supabase';
 import { useCourse, type CourseConfig } from './course';
-import { importLegacy } from './legacy';
+import { importLegacy, mapLegacyState } from './legacy';
 import { hasProgress, mergeCgStates, normalizeCgState, plantStage, type CgState } from './model';
 
 /**
@@ -353,7 +353,7 @@ export function CgProvider({ children }: { children: ReactNode }) {
       if (r.state === stateRef.current) return;
       if (r.imported) {
         commit(() => r.state);
-        setLegacyNotice(inputs.filter((x) => x.versions.length).map((x) => x.src.course));
+        setLegacyNotice(inputs.filter((x) => x.versions.length && hasProgress(mapLegacyState(x.versions, x.src, c), c)).map((x) => x.src.course));
       } else setQuiet(r.state);
     } finally {
       legacyBusy.current = false;
