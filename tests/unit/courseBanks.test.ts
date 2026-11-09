@@ -67,10 +67,11 @@ function checkMcq(q: RawQ, id: string, areas: string[], where: string, check: bo
 
 for (const c of NEW_COURSES) {
   const areas = c.areas.map((a) => a.id);
-  const short = c.size === 'short';
+  const short = c.size === 'short' || c.size === 'foundation';
   const COUNTS = UNIT_COUNTS[c.size ?? 'full'];
   // 정답 번호 분포: 문항 35개(full)는 번호마다 7~10개, 18개(short)는 3~6개
-  const spread = short ? [3, 6] : [7, 10];
+  // 22개(foundation: 기초 10 + 실력점검 12)는 4~7개
+  const spread = c.size === 'foundation' ? [4, 7] : short ? [3, 6] : [7, 10];
   const sum = short ? { keys: [4, 8], compare: [1, 2], traps: [3, 6] } : { keys: [6, 10], compare: [1, 3], traps: [4, 8] };
   for (const plan of c.units) {
     describe(`${c.id}-U${plan.num} ${plan.title}`, () => {
